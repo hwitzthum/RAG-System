@@ -1,13 +1,13 @@
 # RAG System
 
-Phase 1-10 repository scaffold for the production-ready multilingual RAG platform.
+Phase 1-12 repository scaffold for the production-ready multilingual RAG platform.
 
 ## Structure
 
 - `app/`: Next.js App Router UI and API routes
 - `components/`: reusable UI components
 - `lib/`: core configuration, auth/security, and shared contracts
-- `worker/`: Python ingestion worker scaffold
+- `worker/`: Python ingestion worker fallback runtime (deprecated for production)
 - `database/`: SQL migration docs and bootstrap notes
 - `supabase/`: Supabase CLI config and migration files
 - `evaluation/`: benchmark datasets and scripts (placeholder)
@@ -32,13 +32,30 @@ Health endpoint: `GET /api/health`
 ```bash
 npm run check
 npm run test:security
-npm run test:worker
 npm run infra:check-env:web
 npm run infra:check-env:staging
 npm run infra:preflight
+npm run infra:vercel:prepare-staging
+npm run infra:vercel:readiness
 npm run db:validate:migrations
 npm run eval:dataset:validate
 npm run eval:benchmark:dry
+npm run obs:validate
+npm run obs:ingestion:check:dry
+```
+
+After `vercel link`, sync and validate project IDs:
+
+```bash
+npm run infra:vercel:sync-ids
+npm run infra:vercel:readiness:postlink
+```
+
+Fallback worker validation (optional rollback path only):
+
+```bash
+npm run infra:check-env:worker
+npm run test:worker
 ```
 
 ## Upload API (Phase 5)
@@ -46,7 +63,9 @@ npm run eval:benchmark:dry
 - `POST /api/upload` (`admin`): stores PDF in Supabase Storage and enqueues ingestion job
 - `GET /api/upload/{documentId}` (`reader|admin`): returns document + latest ingestion job status
 
-## Worker Quick Start
+## Worker Fallback Quick Start (Optional)
+
+Use this only for rollback/fallback scenarios. Production ingestion is Vercel-first.
 
 ```bash
 cd worker
@@ -114,14 +133,27 @@ Phase 12 production hardening commands:
 
 ```bash
 npm run obs:validate
+npm run obs:ingestion:check
 npm run perf:load:dry
 npm run perf:resilience:dry
-npm run release:readiness
+npm run perf:soak:verify:dry
+npm run release:readiness:precutover
 ```
+
+`perf:soak:verify:dry` does not overwrite `evaluation/performance/staging-soak-latest.json`.
 
 Live hardening checks:
 
 ```bash
 npm run perf:load -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
 npm run perf:resilience -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
+npm run perf:soak:verify -- --window-hours 24 --min-completed-jobs 25 --min-ready-documents 25 --max-p95-completion-ms 900000 --max-dead-letter-growth 0 --max-duplicate-write-errors 0
+npm run release:readiness
+```
+
+One-command matrix runners:
+
+```bash
+npm run release:matrix:precutover
+npm run release:matrix:strict -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
 ```

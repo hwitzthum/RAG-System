@@ -1,6 +1,6 @@
 # OBSERVABILITY_RUNBOOK.md
 
-Version: 1.0  
+Version: 1.1  
 Date: 2026-03-06
 
 ## Purpose
@@ -25,6 +25,8 @@ Operational setup for Phase 12 observability dashboards and alerts.
 - retrieval quality (`Recall@5`, `nDCG@10`, citation accuracy)
 - hallucination rate
 - ingestion completed/failed/dead-letter counters
+- ingestion queue depth and stale-processing counters
+- ingestion cron run failure counter
 - provider error and timeout rates
 
 ## Alert Rules
@@ -38,14 +40,21 @@ Configured alert names:
 - `hallucination_rate_high`
 - `provider_error_rate_high`
 - `ingestion_dead_letter_detected`
+- `ingestion_queue_backlog_high`
+- `ingestion_processing_stale_detected`
+- `ingestion_cron_run_failures_detected`
 
 ## Validation Command
 
 ```bash
 npm run obs:validate
+npm run obs:ingestion:check:dry
+# live check (requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
+npm run obs:ingestion:check
 ```
 
-This checks that required dashboard metrics and alert rules are present in configuration files.
+`obs:validate` checks required dashboard metrics and alert rule names.  
+`obs:ingestion:check` emits `evaluation/performance/ingestion-health-latest.json` and fails if queue/backlog/cron-progress gates fail.
 
 ## Pre-Release Exit Criteria
 
@@ -58,4 +67,3 @@ This checks that required dashboard metrics and alert rules are present in confi
 
 - This runbook validates configuration completeness in-repo.
 - Cloud wiring (monitoring platform dashboards, webhook channels, pager integrations) must be completed in the target environment.
-

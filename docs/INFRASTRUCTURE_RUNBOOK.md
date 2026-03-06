@@ -1,16 +1,17 @@
 # INFRASTRUCTURE_RUNBOOK.md
 
-Version: 1.0  
+Version: 1.3  
 Date: 2026-03-06
 
 ## Purpose
 
-Operational runbook for Phase 2 infrastructure provisioning and validation.
+Operational runbook for Phase 2 provisioning and Phase 12.6 Vercel-first production runtime alignment.
 
 ## Provisioning Scope
 
 - Vercel project linkage for Next.js deployment
 - Supabase project linkage for DB/Auth/Storage
+- Vercel cron-driven ingestion runtime provisioning
 - Storage bucket provisioning (`documents`)
 - `pgvector` extension enablement
 - staging env validation
@@ -25,17 +26,34 @@ Operational runbook for Phase 2 infrastructure provisioning and validation.
 ## 1. Run Preflight
 
 ```bash
+npm run infra:vercel:prepare-staging
+npm run infra:vercel:readiness
 npm run infra:preflight
 ```
+
+`infra:vercel:prepare-staging` enforces `INGESTION_RUNTIME_MODE=vercel` and generates `CRON_SECRET` if missing/placeholder.
 
 ## 2. Link/Create Vercel Project
 
 ```bash
 vercel link
 vercel env pull .env.vercel
+npm run infra:vercel:sync-ids
+npm run infra:vercel:readiness:postlink
 ```
 
-Populate `.env.staging` with `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` after linking.
+Set ingestion runtime configuration for production path:
+
+- `INGESTION_RUNTIME_MODE=vercel`
+- `INGESTION_BATCH_SIZE=1`
+- `INGESTION_LOCK_TIMEOUT_SECONDS=900`
+- `CRON_SECRET=<long-random-secret>` (required)
+
+Worker fallback remains available for rollback only:
+
+- `INGESTION_RUNTIME_MODE=worker`
+- disable Vercel cron job for `/api/internal/ingestion/run`
+- operate `worker/` runtime externally
 
 ## 3. Link/Create Supabase Project
 
@@ -59,6 +77,11 @@ This applies migration:
 ```bash
 npm run infra:check-env:staging
 npm run infra:check-env:web
+```
+
+Optional fallback-only validation:
+
+```bash
 npm run infra:check-env:worker
 ```
 
@@ -68,6 +91,8 @@ npm run infra:check-env:worker
 - Supabase project linked and accessible
 - `pgvector` extension enabled in remote DB
 - `documents` storage bucket exists with correct policies
+- Vercel ingestion runtime env is set to `INGESTION_RUNTIME_MODE=vercel`
+- `CRON_SECRET` configured for protected cron execution
 - staging env file passes validation checks
 
 ## Notes

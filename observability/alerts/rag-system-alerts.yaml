@@ -43,3 +43,20 @@ rules:
     threshold: ingestion_jobs_dead_letter > 0 for 5m
     action: create_incident
 
+  - name: ingestion_queue_backlog_high
+    description: Ingestion queue backlog indicates processing lag.
+    severity: high
+    threshold: ingestion_jobs_queued > 25 for 15m
+    action: create_incident
+
+  - name: ingestion_processing_stale_detected
+    description: Ingestion processing jobs appear stale beyond lock timeout window.
+    severity: high
+    threshold: ingestion_jobs_processing_stale > 0 for 10m
+    action: create_incident
+
+  - name: ingestion_cron_run_failures_detected
+    description: Ingestion cron runner has recent failed invocations.
+    severity: critical
+    threshold: ingestion_cron_run_failures > 0 for 10m
+    action: page_oncall

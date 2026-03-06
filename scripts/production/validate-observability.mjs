@@ -18,6 +18,9 @@ const requiredDashboardMetrics = [
   "provider_error_rate",
   "provider_timeout_rate",
   "ingestion_jobs_dead_letter",
+  "ingestion_jobs_queued",
+  "ingestion_jobs_processing_stale",
+  "ingestion_cron_run_failures",
 ];
 
 const requiredAlertNames = [
@@ -28,6 +31,9 @@ const requiredAlertNames = [
   "hallucination_rate_high",
   "provider_error_rate_high",
   "ingestion_dead_letter_detected",
+  "ingestion_queue_backlog_high",
+  "ingestion_processing_stale_detected",
+  "ingestion_cron_run_failures_detected",
 ];
 
 function fail(message) {
@@ -65,4 +71,3 @@ if (missingAlertNames.length > 0) {
 console.log("Observability validation passed.");
 console.log(`Dashboard metrics checked: ${requiredDashboardMetrics.length}`);
 console.log(`Alert rules checked: ${requiredAlertNames.length}`);
-

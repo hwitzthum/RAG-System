@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-03-06T16:33:11.414Z",
+  "mode": "live",
+  "passed": false,
+  "thresholds": {
+    "windowHours": 24,
+    "minCompletedJobs": 25,
+    "minReadyDocuments": 25,
+    "lockTimeoutSeconds": 900,
+    "maxP95CompletionMs": 900000,
+    "maxDeadLetterGrowth": 0,
+    "maxDuplicateWriteErrors": 0
+  },
+  "observed": {
+    "completedJobsInWindow": 0,
+    "readyDocumentsInWindow": 0,
+    "stuckProcessingJobsBeyondLock": 0,
+    "deadLetterCurrentWindow": 0,
+    "deadLetterPreviousWindow": 0,
+    "deadLetterGrowth": 0,
+    "p95CompletionMs": null,
+    "duplicateWriteErrorCount": 0
+  },
+  "checks": [
+    {
+      "name": "completed_jobs_minimum_reached",
+      "passed": false,
+      "detail": "completed_jobs=0, min_required=25, window_hours=24"
+    },
+    {
+      "name": "ready_documents_minimum_reached",
+      "passed": false,
+      "detail": "ready_documents=0, min_required=25, window_hours=24"
+    },
+    {
+      "name": "no_stuck_processing_jobs_beyond_lock_timeout",
+      "passed": true,
+      "detail": "stuck_processing=0, lock_timeout_seconds=900"
+    },
+    {
+      "name": "dead_letter_growth_within_limit",
+      "passed": true,
+      "detail": "dead_letter_current=0, dead_letter_previous=0, growth=0, max_growth=0"
+    },
+    {
+      "name": "p95_completion_within_limit",
+      "passed": false,
+      "detail": "No completed jobs found in window; p95 completion cannot be evaluated."
+    },
+    {
+      "name": "duplicate_write_errors_within_limit",
+      "passed": true,
+      "detail": "duplicate_write_errors=0, max_allowed=0"
+    }
+  ]
+}

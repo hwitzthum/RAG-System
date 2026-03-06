@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-03-06T16:38:52.391Z",
+  "target": "postlink",
+  "passed": false,
+  "gates": {
+    "preSignupGate": false,
+    "postLinkGate": false
+  },
+  "checks": [
+    {
+      "name": "node_cli_available",
+      "passed": true,
+      "detail": "node --version available"
+    },
+    {
+      "name": "npm_cli_available",
+      "passed": true,
+      "detail": "npm --version available"
+    },
+    {
+      "name": "vercel_cli_available",
+      "passed": false,
+      "detail": "vercel --version available"
+    },
+    {
+      "name": "git_remote_configured",
+      "passed": true,
+      "detail": "origin"
+    },
+    {
+      "name": "staging_env_file_exists",
+      "passed": true,
+      "detail": "/Users/hwitzthum/rag-system/.env.staging"
+    },
+    {
+      "name": "staging_env_core_values_configured",
+      "passed": true,
+      "detail": "Core staging env keys are configured."
+    },
+    {
+      "name": "vercel_json_framework_nextjs",
+      "passed": true,
+      "detail": "/Users/hwitzthum/rag-system/vercel.json"
+    },
+    {
+      "name": "vercel_json_cron_configured",
+      "passed": true,
+      "detail": "/api/internal/ingestion/run cron configured"
+    },
+    {
+      "name": "vercel_project_linked",
+      "passed": false,
+      "detail": "/Users/hwitzthum/rag-system/.vercel/project.json"
+    },
+    {
+      "name": "vercel_project_ids_present",
+      "passed": false,
+      "detail": "orgId=missing, projectId=missing"
+    },
+    {
+      "name": "staging_env_vercel_ids_configured",
+      "passed": false,
+      "detail": "VERCEL_ORG_ID and VERCEL_PROJECT_ID are non-placeholder"
+    },
+    {
+      "name": "staging_env_ingestion_mode_vercel",
+      "passed": false,
+      "detail": "INGESTION_RUNTIME_MODE=worker"
+    },
+    {
+      "name": "staging_env_cron_secret_valid",
+      "passed": false,
+      "detail": "CRON_SECRET exists and length >=16"
+    }
+  ],
+  "nextSteps": [
+    "Install Vercel CLI: npm i -g vercel",
+    "After signup/login run: vercel login && vercel link",
+    "Set CRON_SECRET in .env.staging to a random 16+ character secret."
+  ]
+}

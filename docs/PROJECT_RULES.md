@@ -1,6 +1,6 @@
 # PROJECT_RULES.md
 
-Version: 3.0  
+Version: 3.1  
 Date: 2026-03-06
 
 ## Purpose
@@ -20,7 +20,8 @@ If documents conflict, follow this precedence order.
 
 - User-facing app: Next.js App Router, TypeScript, deployed on Vercel.
 - Data platform: Supabase PostgreSQL + pgvector + Supabase Storage.
-- Ingestion runtime: dedicated background worker service for long-running tasks.
+- Ingestion runtime: Vercel-executed ingestion runner + cron (`/api/internal/ingestion/run`) for production.
+- Worker runtime: fallback-only rollback path, not a production prerequisite.
 - Retrieval: hybrid retrieval (vector + keyword) and reranking are mandatory.
 - Retrieval cache: mandatory, executed before retrieval and reranking.
 - Contextual chunk summaries: mandatory during ingestion.
@@ -63,7 +64,7 @@ All ingestion, retrieval, and evaluation flows must support the same language se
 
 - `app/`: Next.js UI and API routes.
 - `lib/`: retrieval, cache, provider abstraction, shared app logic.
-- `worker/`: ingestion worker runtime and pipeline orchestration.
+- `worker/`: ingestion fallback runtime retained for rollback scenarios.
 - `database/`: SQL migrations, indexes, RLS policies.
 - `evaluation/`: evaluation datasets, benchmark runners, reports.
 - `prompts/`: system prompts and templates.
@@ -72,7 +73,7 @@ All ingestion, retrieval, and evaluation flows must support the same language se
 ## Coding and Module Rules
 
 - TypeScript is required in the Next.js codebase.
-- Worker may use Python for extraction robustness.
+- Fallback worker may use Python for extraction robustness.
 - File size target: under 400 lines.
 - Single responsibility per module.
 - Runtime configuration must be validated at startup.

@@ -20,8 +20,10 @@ const files = fs
   .filter((file) => file.endsWith(".sql"))
   .sort();
 
-if (files.length < 4) {
-  fail("Expected at least four migration files (phase 2 + phase 3 + phase 7 + phase 12).\n");
+if (files.length < 6) {
+  fail(
+    "Expected at least six migration files (phase 2 + phase 3 + phase 7 + phase 12 + phase 12 ingestion RPC + ACL hardening).\n",
+  );
 }
 
 const expectedFiles = [
@@ -29,6 +31,8 @@ const expectedFiles = [
   "202603060002_phase3_core_schema.sql",
   "202603060003_phase7_retrieval_rpc.sql",
   "202603060004_phase12_openai_byok_vault.sql",
+  "202603060005_phase12_ingestion_job_rpc.sql",
+  "202603060006_phase12_ingestion_job_rpc_acl_fix.sql",
 ];
 
 for (const expected of expectedFiles) {
@@ -104,6 +108,52 @@ const missingPhase12Patterns = phase12Patterns.filter((pattern) => !pattern.test
 if (missingPhase12Patterns.length > 0) {
   fail(
     `Phase 12 migration is missing BYOK vault elements:\n${missingPhase12Patterns
+      .map((pattern) => `- ${pattern}`)
+      .join("\n")}`,
+  );
+}
+
+const phase12RpcPath = path.join(migrationsDir, "202603060005_phase12_ingestion_job_rpc.sql");
+const phase12RpcSql = fs.readFileSync(phase12RpcPath, "utf8");
+
+const phase12RpcPatterns = [
+  /create or replace function public\.claim_ingestion_jobs/i,
+  /for update skip locked/i,
+  /create or replace function public\.complete_ingestion_job/i,
+  /create or replace function public\.fail_ingestion_job/i,
+  /grant execute on function public\.claim_ingestion_jobs/i,
+  /grant execute on function public\.complete_ingestion_job/i,
+  /grant execute on function public\.fail_ingestion_job/i,
+];
+
+const missingPhase12RpcPatterns = phase12RpcPatterns.filter((pattern) => !pattern.test(phase12RpcSql));
+if (missingPhase12RpcPatterns.length > 0) {
+  fail(
+    `Phase 12 ingestion RPC migration is missing required elements:\n${missingPhase12RpcPatterns
+      .map((pattern) => `- ${pattern}`)
+      .join("\n")}`,
+  );
+}
+
+const phase12AclPath = path.join(migrationsDir, "202603060006_phase12_ingestion_job_rpc_acl_fix.sql");
+const phase12AclSql = fs.readFileSync(phase12AclPath, "utf8");
+
+const phase12AclPatterns = [
+  /revoke execute on function public\.claim_ingestion_jobs/i,
+  /revoke execute on function public\.complete_ingestion_job/i,
+  /revoke execute on function public\.fail_ingestion_job/i,
+  /from anon/i,
+  /from authenticated/i,
+  /grant execute on function public\.claim_ingestion_jobs/i,
+  /grant execute on function public\.complete_ingestion_job/i,
+  /grant execute on function public\.fail_ingestion_job/i,
+  /to service_role/i,
+];
+
+const missingPhase12AclPatterns = phase12AclPatterns.filter((pattern) => !pattern.test(phase12AclSql));
+if (missingPhase12AclPatterns.length > 0) {
+  fail(
+    `Phase 12 ingestion RPC ACL migration is missing required elements:\n${missingPhase12AclPatterns
       .map((pattern) => `- ${pattern}`)
       .join("\n")}`,
   );

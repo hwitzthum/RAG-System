@@ -43,12 +43,22 @@
     },
     {
       "id": "ingestion-throughput",
-      "title": "Ingestion Throughput and Failures",
+      "title": "Ingestion Throughput, Queue, and Failures",
       "type": "timeseries",
       "metrics": [
         "ingestion_jobs_completed",
         "ingestion_jobs_failed",
-        "ingestion_jobs_dead_letter"
+        "ingestion_jobs_dead_letter",
+        "ingestion_jobs_queued",
+        "ingestion_jobs_processing_stale"
+      ]
+    },
+    {
+      "id": "ingestion-cron-health",
+      "title": "Ingestion Cron Health",
+      "type": "timeseries",
+      "metrics": [
+        "ingestion_cron_run_failures"
       ]
     },
     {

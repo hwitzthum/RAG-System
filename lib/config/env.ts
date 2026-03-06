@@ -3,6 +3,10 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
+  INGESTION_RUNTIME_MODE: z.enum(["worker", "vercel"]).default("worker"),
+  INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(1),
+  INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(900),
+  CRON_SECRET: z.string().min(16).optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -31,6 +35,10 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV,
   NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
+  INGESTION_RUNTIME_MODE: process.env.INGESTION_RUNTIME_MODE,
+  INGESTION_BATCH_SIZE: process.env.INGESTION_BATCH_SIZE,
+  INGESTION_LOCK_TIMEOUT_SECONDS: process.env.INGESTION_LOCK_TIMEOUT_SECONDS,
+  CRON_SECRET: process.env.CRON_SECRET,
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -80,6 +88,10 @@ if (config.OPENAI_BYOK_VAULT_KEY && Buffer.from(config.OPENAI_BYOK_VAULT_KEY, "b
 
 if (config.NODE_ENV === "production" && !config.OPENAI_BYOK_VAULT_KEY) {
   throw new Error("OPENAI_BYOK_VAULT_KEY must be configured in production");
+}
+
+if (config.INGESTION_RUNTIME_MODE === "vercel" && !config.CRON_SECRET) {
+  throw new Error("CRON_SECRET must be configured when INGESTION_RUNTIME_MODE=vercel");
 }
 
 export const env = config;

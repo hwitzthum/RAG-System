@@ -239,6 +239,54 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_ingestion_jobs: {
+        Args: {
+          worker_name: string;
+          batch_size?: number;
+          lock_timeout_seconds?: number;
+        };
+        Returns: {
+          id: string;
+          document_id: string;
+          status: IngestionJobStatus;
+          attempt: number;
+          last_error: string | null;
+          idempotency_key: string | null;
+          locked_at: string | null;
+          locked_by: string | null;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
+      complete_ingestion_job: {
+        Args: {
+          job_id: string;
+        };
+        Returns: {
+          id: string;
+          document_id: string;
+          job_status: IngestionJobStatus;
+          document_status: DocumentStatus;
+          updated_at: string;
+        }[];
+      };
+      fail_ingestion_job: {
+        Args: {
+          job_id: string;
+          error_text: string;
+          max_retries?: number;
+        };
+        Returns: {
+          id: string;
+          document_id: string;
+          job_status: IngestionJobStatus;
+          attempt: number;
+          dead_letter: boolean;
+          document_status: DocumentStatus;
+          last_error: string;
+          updated_at: string;
+        }[];
+      };
       match_document_chunks: {
         Args: {
           query_embedding: number[];

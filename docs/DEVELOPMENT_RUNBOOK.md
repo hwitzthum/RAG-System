@@ -1,16 +1,16 @@
 # DEVELOPMENT_RUNBOOK.md
 
-Version: 2.0  
+Version: 2.2  
 Date: 2026-03-06
 
 ## Purpose
 
-Local setup and validation runbook for Phase 1 to Phase 11 implementation.
+Local setup and validation runbook for Phase 1 to Phase 12 implementation.
 
 ## Prerequisites
 
 - Node.js 20+ and npm
-- Python 3.11+
+- Python 3.11+ (only if you use worker fallback)
 
 ## Web Service Setup
 
@@ -28,7 +28,9 @@ npm run test:security
 npm run infra:check-env:web
 ```
 
-## Worker Setup
+## Worker Fallback Setup (Optional)
+
+Use this only for rollback/fallback scenarios. Production ingestion runtime is Vercel.
 
 ```bash
 cd worker
@@ -39,10 +41,11 @@ cp .env.example .env
 python -m rag_worker.main
 ```
 
-## Worker Validation (Phase 6)
+## Worker Fallback Validation (Optional, Phase 6 parity checks)
 
 ```bash
 python3 -m py_compile worker/src/rag_worker/*.py worker/tests/test_*.py
+npm run infra:check-env:worker
 npm run test:worker
 ```
 
@@ -92,9 +95,11 @@ Artifacts are written to:
 
 ```bash
 npm run obs:validate
+npm run obs:ingestion:check:dry
 npm run perf:load:dry
 npm run perf:resilience:dry
-npm run release:readiness
+npm run perf:soak:verify:dry
+npm run release:readiness:precutover
 ```
 
 For staging hardening execution:
@@ -102,6 +107,15 @@ For staging hardening execution:
 ```bash
 npm run perf:load -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
 npm run perf:resilience -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
+npm run perf:soak:verify -- --window-hours 24 --min-completed-jobs 25 --min-ready-documents 25 --max-p95-completion-ms 900000 --max-dead-letter-growth 0 --max-duplicate-write-errors 0
+npm run release:readiness
+```
+
+Matrix runner shortcuts:
+
+```bash
+npm run release:matrix:precutover
+npm run release:matrix:strict -- --base-url https://<staging-host> --token <reader-or-admin-jwt>
 ```
 
 Artifacts are written to:
@@ -110,13 +124,22 @@ Artifacts are written to:
 - `evaluation/performance/load-test-latest.json`
 - `evaluation/performance/resilience-<timestamp>.json`
 - `evaluation/performance/resilience-latest.json`
+- `evaluation/performance/staging-soak-<timestamp>.json`
+- `evaluation/performance/staging-soak-latest.json`
 - `evaluation/reports/release-readiness-<timestamp>.md`
 - `evaluation/reports/release-readiness-latest.md`
+- `evaluation/reports/validation-matrix-<mode>-<timestamp>.json`
+- `evaluation/reports/validation-matrix-<mode>-latest.json`
+- `evaluation/reports/validation-matrix-latest.json`
+
+Note:
+
+- `perf:soak:verify:dry` writes only timestamped artifacts and does not overwrite `staging-soak-latest.json`.
 
 ## Phase 1 Definition of Done Checklist
 
 - Next.js App Router scaffold in TypeScript
-- Python worker scaffold exists
+- Python worker scaffold exists (fallback path, deprecated for production)
 - Shared contracts exist in `lib/contracts`
 - Environment schema validation exists in `lib/config/env.ts`
 - Local runbook exists and is executable
@@ -209,7 +232,10 @@ Artifacts are written to:
 
 - observability dashboard config exists and validates (`npm run obs:validate`)
 - alert rule config exists and validates (`npm run obs:validate`)
+- ingestion cron/backlog health checks exist and validate (`npm run obs:ingestion:check`)
+- staging soak verification exists and validates (`npm run perf:soak:verify`)
 - load test runner produces artifact in `evaluation/performance/`
 - resilience runner produces artifact in `evaluation/performance/`
 - release readiness report is generated from benchmark + hardening artifacts
+- production readiness gates do not require `infra:check-env:worker`
 - rollback and launch runbook documented in `docs/RELEASE_RUNBOOK.md`

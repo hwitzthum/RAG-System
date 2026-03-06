@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-03-06T16:33:11.767Z",
+  "mode": "precutover",
+  "passed": false,
+  "summary": {
+    "totalSteps": 5,
+    "requiredSteps": 5,
+    "passedSteps": 3,
+    "failedRequiredSteps": 2
+  },
+  "steps": [
+    {
+      "name": "check",
+      "command": "npm run check",
+      "required": true,
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 2305
+    },
+    {
+      "name": "test_security",
+      "command": "npm run test:security",
+      "required": true,
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 979
+    },
+    {
+      "name": "benchmark_dry",
+      "command": "npm run eval:benchmark:dry",
+      "required": true,
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 350
+    },
+    {
+      "name": "soak_verify_live",
+      "command": "npm run perf:soak:verify -- --window-hours 24 --min-completed-jobs 25 --min-ready-documents 25 --max-p95-completion-ms 900000 --max-dead-letter-growth 0 --max-duplicate-write-errors 0",
+      "required": true,
+      "passed": false,
+      "exitCode": 2,
+      "durationMs": 1113
+    },
+    {
+      "name": "release_readiness_precutover",
+      "command": "npm run release:readiness:precutover",
+      "required": true,
+      "passed": false,
+      "exitCode": 2,
+      "durationMs": 329
+    }
+  ]
+}

@@ -71,6 +71,9 @@ function requiredKeysByTarget(target) {
     return [
       "NODE_ENV",
       "NEXT_PUBLIC_APP_NAME",
+      "INGESTION_RUNTIME_MODE",
+      "INGESTION_BATCH_SIZE",
+      "INGESTION_LOCK_TIMEOUT_SECONDS",
       "SUPABASE_URL",
       "SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
@@ -100,6 +103,9 @@ function requiredKeysByTarget(target) {
   return [
     "NODE_ENV",
     "NEXT_PUBLIC_APP_NAME",
+    "INGESTION_RUNTIME_MODE",
+    "INGESTION_BATCH_SIZE",
+    "INGESTION_LOCK_TIMEOUT_SECONDS",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -179,6 +185,18 @@ function run() {
     invalid.push("Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured");
   }
 
+  if (env.INGESTION_RUNTIME_MODE && !["worker", "vercel"].includes(env.INGESTION_RUNTIME_MODE)) {
+    invalid.push("INGESTION_RUNTIME_MODE must be one of worker|vercel");
+  }
+
+  if (target !== "worker" && env.INGESTION_RUNTIME_MODE === "vercel" && !env.CRON_SECRET) {
+    invalid.push("CRON_SECRET must be configured when INGESTION_RUNTIME_MODE=vercel");
+  }
+
+  if (env.CRON_SECRET && env.CRON_SECRET.length < 16) {
+    invalid.push("CRON_SECRET must be at least 16 characters");
+  }
+
   if (env.OPENAI_BYOK_VAULT_KEY && !isValidBase64AesKey(env.OPENAI_BYOK_VAULT_KEY)) {
     invalid.push("OPENAI_BYOK_VAULT_KEY must be a base64-encoded 32-byte key");
   }
@@ -198,6 +216,8 @@ function run() {
     "RAG_MAX_UPLOAD_BYTES",
     "WORKER_POLL_INTERVAL_SECONDS",
     "WORKER_MAX_RETRIES",
+    "INGESTION_BATCH_SIZE",
+    "INGESTION_LOCK_TIMEOUT_SECONDS",
     "OPENAI_BYOK_VAULT_KEY_VERSION",
   ]) {
     if (env[intKey] && !isPositiveInt(env[intKey])) {
