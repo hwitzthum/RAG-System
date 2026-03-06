@@ -85,6 +85,30 @@ function reindexChunks(chunks: ChunkCandidate[]): ChunkCandidate[] {
   });
 }
 
+function buildRelaxedDocumentFallbackChunk(
+  sections: { pageNumber: number; sectionTitle: string; text: string }[],
+  languageHint: SupportedLanguage | null,
+): ChunkCandidate | null {
+  const combinedContent = sections
+    .map((section) => section.text.trim())
+    .filter((value) => value.length > 0)
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!combinedContent) {
+    return null;
+  }
+
+  return {
+    chunkIndex: 0,
+    pageNumber: sections[0]?.pageNumber ?? 1,
+    sectionTitle: "Document",
+    content: combinedContent,
+    language: detectLanguage(combinedContent, languageHint),
+  };
+}
+
 type ExtractPagesFn = typeof extractPages;
 type ContextGeneratorPort = Pick<ContextGenerator, "enrich">;
 type EmbeddingProviderPort = Pick<EmbeddingProvider, "embedTexts">;
@@ -147,7 +171,17 @@ export class IngestionPipeline {
     chunkCandidates = reindexChunks(chunkCandidates);
 
     if (chunkCandidates.length === 0) {
-      throw new Error("No chunks generated from extracted sections");
+      const relaxedFallbackChunk = buildRelaxedDocumentFallbackChunk(sections, document.language);
+      if (!relaxedFallbackChunk) {
+        throw new Error("No chunks generated from extracted sections");
+      }
+
+      chunkCandidates = [relaxedFallbackChunk];
+      this.logger.warn("ingestion_chunk_generation_relaxed_fallback", {
+        jobId: job.id,
+        documentId: document.id,
+        fallbackChars: relaxedFallbackChunk.content.length,
+      });
     }
 
     const chunksWithContext = await this.contextGenerator.enrich(chunkCandidates);
@@ -186,6 +220,16 @@ export class IngestionPipeline {
     );
     await this.repository.setDocumentStatus(document.id, "ready", selectedLanguage);
     await this.repository.markJobCompleted(job.id);
+
+    try {
+      await this.repository.invalidateRetrievalCache();
+    } catch (error) {
+      this.logger.warn("retrieval_cache_invalidation_failed", {
+        jobId: job.id,
+        documentId: document.id,
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
 
     this.logger.info("ingestion_job_completed", {
       jobId: job.id,

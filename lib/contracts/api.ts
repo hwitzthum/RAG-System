@@ -41,6 +41,7 @@ export type UploadStatusResponse = {
 export type QueryRequest = {
   query: string;
   conversationId?: string;
+  documentId?: string;
   languageHint?: SupportedLanguage;
   topK?: number;
 };
@@ -49,6 +50,8 @@ export type QueryResponseMeta = {
   cacheHit: boolean;
   latencyMs: number;
   selectedChunkIds: string[];
+  selectedDocumentIds?: string[];
+  documentScopeId?: string | null;
   retrievalTrace?: RetrievalTrace;
 };
 

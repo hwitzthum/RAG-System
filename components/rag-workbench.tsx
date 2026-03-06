@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { AuthUser } from "@/lib/auth/types";
 import type {
   OpenAiByokStatusResponse,
@@ -54,6 +54,8 @@ type ParsedSseEvent =
   | { event: "final"; payload: QuerySseFinalEvent }
   | { event: "done"; payload: { queryId: string } }
   | null;
+
+const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeId";
 
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -123,6 +125,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadLanguageHint, setUploadLanguageHint] = useState("");
   const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [queryDocumentScopeId, setQueryDocumentScopeId] = useState<string | null>(null);
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
   const canUpload = Boolean(user);
@@ -163,6 +168,30 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const persistedScope = window.localStorage.getItem(QUERY_SCOPE_STORAGE_KEY);
+    if (persistedScope) {
+      setQueryDocumentScopeId(persistedScope);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (queryDocumentScopeId) {
+      window.localStorage.setItem(QUERY_SCOPE_STORAGE_KEY, queryDocumentScopeId);
+      return;
+    }
+
+    window.localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
+  }, [queryDocumentScopeId]);
 
   const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
     if (!user) {
@@ -219,6 +248,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       setOpenAiByokStatus(null);
       setTurns([]);
       setQueryHistory([]);
+      setQueryDocumentScopeId(null);
       setWorkspaceMessage("Session cleared.");
     }
   }
@@ -282,32 +312,71 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
   }
 
-  async function refreshUploadStatus(documentId: string): Promise<void> {
+  async function refreshUploadStatus(documentId: string): Promise<UploadStatusSnapshot | null> {
     const response = await fetch(`/api/upload/${documentId}`, {
       method: "GET",
     });
     if (!response.ok) {
       setWorkspaceMessage("Unable to fetch upload status.");
-      return;
+      return null;
     }
 
     const payload = (await response.json()) as UploadStatusSnapshot;
     setUploadStatus(payload);
+    return payload;
   }
 
-  async function uploadPdf(): Promise<void> {
+  async function waitForUploadTerminalStatus(documentId: string): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const snapshot = await refreshUploadStatus(documentId);
+      if (!snapshot) {
+        return;
+      }
+
+      const documentStatus = snapshot.document.status;
+      const jobStatus = snapshot.latestIngestionJob?.status ?? "unknown";
+      if (documentStatus === "ready") {
+        setWorkspaceMessage(`Upload indexed and ready. documentId=${documentId}`);
+        return;
+      }
+      if (documentStatus === "failed" || jobStatus === "dead_letter") {
+        setWorkspaceMessage(
+          snapshot.latestIngestionJob?.last_error
+            ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
+            : `Upload failed. document status=${documentStatus}, job status=${jobStatus}`,
+        );
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
+    setWorkspaceMessage("Upload queued/processing. Keep refreshing status until ready.");
+  }
+
+  async function uploadPdf(selectedFile?: File): Promise<void> {
     if (!user) {
       setWorkspaceMessage("Create a session before uploading documents.");
       return;
     }
 
-    if (!uploadFile) {
+    const fileToUpload = selectedFile ?? uploadFile;
+    if (!fileToUpload) {
       setWorkspaceMessage("Select a PDF file first.");
       return;
     }
 
+    if (
+      fileToUpload.type !== "application/pdf" &&
+      !fileToUpload.name.toLowerCase().endsWith(".pdf")
+    ) {
+      setWorkspaceMessage("Only PDF files are supported.");
+      return;
+    }
+
+    setUploading(true);
     const formData = new FormData();
-    formData.append("file", uploadFile);
+    formData.append("file", fileToUpload);
     if (uploadTitle.trim()) {
       formData.append("title", uploadTitle.trim());
     }
@@ -315,19 +384,58 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       formData.append("language_hint", uploadLanguageHint);
     }
 
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    const payload = (await response.json()) as { documentId?: string; error?: string };
-    if (!response.ok || !payload.documentId) {
-      setWorkspaceMessage(payload.error ?? "Upload failed.");
+      const payload = (await response.json()) as { documentId?: string; error?: string };
+      if (!response.ok || !payload.documentId) {
+        setWorkspaceMessage(payload.error ?? "Upload failed.");
+        return;
+      }
+
+      setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
+      setQueryDocumentScopeId(payload.documentId);
+      setUploadFile(null);
+      if (uploadFileInputRef.current) {
+        uploadFileInputRef.current.value = "";
+      }
+      await waitForUploadTerminalStatus(payload.documentId);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleUploadFileChange(event: ChangeEvent<HTMLInputElement>): void {
+    const selected = event.target.files?.[0] ?? null;
+    setUploadFile(selected);
+
+    if (!selected) {
       return;
     }
 
-    setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}`);
-    await refreshUploadStatus(payload.documentId);
+    if (!user) {
+      setWorkspaceMessage("File selected. Create a session before uploading.");
+      return;
+    }
+
+    void uploadPdf(selected);
+  }
+
+  function handleUploadButtonClick(): void {
+    if (uploading) {
+      return;
+    }
+
+    if (!uploadFile) {
+      uploadFileInputRef.current?.click();
+      setWorkspaceMessage("Select a PDF file first.");
+      return;
+    }
+
+    void uploadPdf();
   }
 
   async function executeQuery(): Promise<void> {
@@ -363,6 +471,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         body: JSON.stringify({
           query: question,
           conversationId,
+          documentId: (queryDocumentScopeId ?? uploadStatus?.document.id) ?? undefined,
         }),
       });
 
@@ -443,68 +552,120 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
   }
 
+  const vaultStatusText = openAiByokStatus?.vaultEnabled
+    ? openAiByokStatus.configured
+      ? `Configured (****${openAiByokStatus.keyLast4 ?? "????"})`
+      : "Vault enabled, no user key"
+    : "Vault disabled";
+
+  const workspaceToneClass = workspaceMessage.toLowerCase().includes("failed")
+    ? "text-rose-900"
+    : workspaceMessage.toLowerCase().includes("ready") || workspaceMessage.toLowerCase().includes("complete")
+      ? "text-teal-900"
+      : "text-slate-700";
+  const totalCitations = turns.reduce((total, turn) => total + turn.citations.length, 0);
+  const conversationPreview = `${conversationId.slice(0, 8)}...`;
+  const operatorRole = user?.role.toUpperCase() ?? "GUEST";
+  const queryStateLabel = canQuery ? "Query access enabled" : "Query access locked";
+  const effectiveQueryScopeId = queryDocumentScopeId ?? uploadStatus?.document.id ?? null;
+  const queryScopeLabel = effectiveQueryScopeId
+    ? `Document scope: ${effectiveQueryScopeId.slice(0, 8)}...`
+    : "Document scope: all ready documents";
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <section className="space-y-5 rounded-2xl border border-cyan-100 bg-white/85 p-5 shadow-[0_12px_30px_-20px_rgba(8,47,73,0.6)] backdrop-blur">
-        <header className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">Phase 10 Workspace</p>
-          <h2 className="text-2xl font-semibold text-slate-900">Streaming Chat</h2>
-          <p className="text-sm text-slate-600">SSE token stream with citation-linked grounded responses.</p>
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      <section className="relative overflow-hidden rounded-[28px] border border-[#d9c9b4] bg-[linear-gradient(160deg,rgba(255,253,250,0.96),rgba(255,248,238,0.88))] p-5 shadow-[0_32px_80px_-44px_rgba(15,23,42,0.72)] backdrop-blur md:p-7">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(90deg,rgba(13,148,136,0.22),rgba(180,83,9,0.16),transparent)]" />
+        <header className="relative space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Response Workspace</p>
+          <h2 className="font-display text-3xl leading-tight text-slate-900 md:text-4xl">Grounded Answer Operations</h2>
+          <p className="max-w-3xl text-sm leading-relaxed text-slate-700">
+            Secure credentials, evidence-linked generation, and retrieval activity in a single production console.
+          </p>
         </header>
 
-        <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-          <p className="text-sm font-medium text-slate-800">
-            {user ? `Signed in as ${user.role} (${user.email ?? user.id})` : "No active session"}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              placeholder="Paste access token"
-              className="min-w-[240px] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={createSession}
-              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-            >
-              Create Session
-            </button>
-            <button
-              type="button"
-              onClick={clearSession}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
-            >
-              Clear
-            </button>
+        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-[#d8c8b4] bg-white/75 px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Role</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{operatorRole}</p>
+          </article>
+          <article className="rounded-2xl border border-[#d8c8b4] bg-white/75 px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Conversation</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{conversationPreview}</p>
+          </article>
+          <article className="rounded-2xl border border-[#d8c8b4] bg-white/75 px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Turns</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{turns.length}</p>
+          </article>
+          <article className="rounded-2xl border border-[#d8c8b4] bg-white/75 px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Citations</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{totalCitations}</p>
+          </article>
+        </div>
+
+        <div className="relative mt-6 grid gap-4 rounded-2xl border border-[#d8c8b4] bg-white/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="space-y-1.5">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Session Identity</p>
+            <p className="text-sm font-medium text-slate-800">
+              {user ? `Signed in as ${user.role} (${user.email ?? user.id})` : "No active session"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <span className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 text-teal-900">Auth</span>
+            <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-900">Vault</span>
+          </div>
+          <div className="md:col-span-2">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <input
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                placeholder="Paste Supabase access token"
+                className="w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={createSession}
+                  className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
+                  Create Session
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSession}
+                  className="rounded-xl border border-[#d0c0ac] bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#f6efe5]"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-rose-900">OpenAI BYOK Vault</p>
+        <div className="mt-4 grid gap-3 rounded-2xl border border-[#e4c5bc] bg-[linear-gradient(140deg,rgba(255,241,239,0.84),rgba(255,251,248,0.92))] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-rose-950">OpenAI BYOK Vault</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => void loadOpenAiByokStatus()}
                 disabled={!user || openAiByokLoading}
-                className="rounded-lg border border-rose-300 bg-white px-2 py-1 text-xs font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-rose-300 bg-white/90 px-2.5 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Refresh Status
+                Refresh
               </button>
               <button
                 type="button"
                 onClick={deleteOpenAiByokKey}
                 disabled={!openAiByokStatus?.configured || openAiByokLoading}
-                className="rounded-lg border border-rose-300 bg-white px-2 py-1 text-xs font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-rose-300 bg-white/90 px-2.5 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Delete Key
               </button>
             </div>
           </div>
-          <p className="text-xs text-rose-800">
-            Your OpenAI key is encrypted server-side and never exposed in request headers or stored in browser
-            persistence.
+          <p className="text-xs leading-relaxed text-rose-900/90">
+            Keys stay encrypted server-side and are not persisted in browser storage.
           </p>
           <input
             value={openAiByokInput}
@@ -512,43 +673,41 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             type="password"
             placeholder="Enter OpenAI API key (sk-...)"
             disabled={!user}
-            className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-rose-200 bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={saveOpenAiByokKey}
               disabled={openAiByokLoading || !user}
-              className="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="rounded-xl border border-rose-700 bg-rose-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:border-slate-400 disabled:bg-slate-400"
             >
-              {openAiByokLoading ? "Saving..." : "Save OpenAI Key"}
+              {openAiByokLoading ? "Saving..." : "Save Key"}
             </button>
             <button
               type="button"
               onClick={() => setOpenAiByokInput("")}
               disabled={!user}
-              className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800"
+              className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-rose-900 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Clear Input
             </button>
           </div>
-          <p className="text-xs text-rose-700">
-            Vault status:{" "}
-            {openAiByokStatus?.vaultEnabled
-              ? openAiByokStatus.configured
-                ? `configured (****${openAiByokStatus.keyLast4 ?? "????"})`
-                : "enabled, no user key configured"
-              : "disabled"}
-            {openAiByokStatus?.updatedAt ? ` | updated ${formatTime(openAiByokStatus.updatedAt)}` : ""}
+          <p className="text-xs text-rose-800">
+            Status: {vaultStatusText}
+            {openAiByokStatus?.updatedAt ? ` | Updated ${formatTime(openAiByokStatus.updatedAt)}` : ""}
           </p>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="mt-4 grid gap-3 rounded-2xl border border-[#c7d8d4] bg-[linear-gradient(165deg,rgba(238,252,249,0.86),rgba(250,255,254,0.94))] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-800">Conversation {conversationId}</p>
+            <div>
+              <p className="text-xs uppercase tracking-[0.17em] text-teal-900/70">Active Conversation</p>
+              <p className="text-sm font-semibold text-teal-950">{conversationId}</p>
+            </div>
             <button
               type="button"
-              className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800"
+              className="rounded-xl border border-teal-300 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.09em] text-teal-900 transition hover:bg-teal-50"
               onClick={() => {
                 setConversationId(newUuid());
                 setTurns([]);
@@ -561,96 +720,150 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           <textarea
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Ask about documents..."
-            rows={3}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            placeholder="Ask about indexed documents..."
+            rows={4}
+            className="w-full rounded-xl border border-[#a9cbc4] bg-white/95 px-3.5 py-3 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400"
           />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={!canQuery || isStreaming || query.trim().length === 0}
-              onClick={executeQuery}
-              className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {isStreaming ? "Streaming..." : "Send Query"}
-            </button>
-            {!canQuery ? <span className="text-xs text-slate-500">Requires reader/admin role.</span> : null}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-teal-900/80">
+              {queryStateLabel} | {queryScopeLabel} | Prompt length: {query.length} characters
+            </p>
+            <div className="flex items-center gap-2">
+              {effectiveQueryScopeId ? (
+                <button
+                  type="button"
+                  onClick={() => setQueryDocumentScopeId(null)}
+                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-700 transition hover:bg-slate-50"
+                >
+                  Clear Scope
+                </button>
+              ) : null}
+              {!canQuery ? (
+                <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">
+                  Requires reader/admin
+                </span>
+              ) : null}
+              <button
+                type="button"
+                disabled={!canQuery || isStreaming || query.trim().length === 0}
+                onClick={executeQuery}
+                className="rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:border-slate-400 disabled:bg-slate-400"
+              >
+                {isStreaming ? "Streaming..." : "Send Query"}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="mt-5 space-y-3">
           {turns.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-300 bg-white/70 px-4 py-6 text-sm text-slate-500">
-              No conversation turns yet.
+            <p className="rounded-2xl border border-dashed border-[#ccbdac] bg-white/70 px-4 py-10 text-center text-sm text-slate-500">
+              No turns yet. Ask the first question to start a traceable response timeline.
             </p>
           ) : (
-            turns.map((turn) => (
-              <article
-                key={turn.id}
-                className="rounded-xl border border-slate-200 bg-white p-4"
-                onClick={() => setActiveTurnId(turn.id)}
-              >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{formatTime(turn.createdAt)}</p>
-                <p className="text-sm font-medium text-slate-900">{turn.query}</p>
-                <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{turn.answer || "..."}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span>citations: {turn.citations.length}</span>
-                  {turn.retrievalMeta ? <span>cache: {turn.retrievalMeta.cacheHit ? "hit" : "miss"}</span> : null}
-                  {turn.pending ? <span>status: streaming</span> : null}
-                  {turn.failed ? <span>status: failed</span> : null}
-                </div>
-              </article>
-            ))
+            turns.map((turn) => {
+              const isActive = turn.id === activeTurn?.id;
+              return (
+                <article
+                  key={turn.id}
+                  className={`cursor-pointer rounded-2xl border p-4 transition md:p-5 ${
+                    isActive
+                      ? "border-teal-400 bg-teal-50/80 shadow-[0_14px_36px_-22px_rgba(15,118,110,0.8)]"
+                      : "border-[#d8c9b5] bg-white/88 hover:border-[#b7a795] hover:bg-white"
+                  }`}
+                  onClick={() => setActiveTurnId(turn.id)}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{formatTime(turn.createdAt)}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        citations: {turn.citations.length}
+                      </span>
+                      {turn.retrievalMeta ? (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                            turn.retrievalMeta.cacheHit
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                              : "border-amber-300 bg-amber-50 text-amber-800"
+                          }`}
+                        >
+                          cache: {turn.retrievalMeta.cacheHit ? "hit" : "miss"}
+                        </span>
+                      ) : null}
+                      {turn.pending ? (
+                        <span className="rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+                          streaming
+                        </span>
+                      ) : null}
+                      {turn.failed ? (
+                        <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
+                          failed
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <p className="mt-3 font-display text-xl leading-snug text-slate-900">{turn.query}</p>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{turn.answer || "..."}</p>
+                </article>
+              );
+            })
           )}
         </div>
       </section>
 
       <aside className="space-y-5">
-        <section className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-900">Citations</h3>
-          <p className="mt-1 text-xs text-amber-800">Source-linked citations for the selected answer.</p>
+        <section className="rounded-[24px] border border-[#dcc6a8] bg-[linear-gradient(155deg,rgba(255,248,233,0.92),rgba(255,253,246,0.9))] p-4 shadow-[0_20px_40px_-30px_rgba(120,53,15,0.5)]">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-950">Evidence Navigator</h3>
+          <p className="mt-1 text-xs text-amber-900/80">Linked evidence for the currently selected answer.</p>
           <div className="mt-3 space-y-2">
             {activeTurn?.citations.length ? (
               activeTurn.citations.map((citation) => (
                 <a
                   key={`${citation.documentId}:${citation.pageNumber}:${citation.chunkId}`}
-                  className="block rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 hover:bg-amber-50"
+                  className="block rounded-xl border border-amber-200 bg-white/90 px-3 py-2.5 text-xs text-slate-700 transition hover:bg-amber-50"
                   href={`/api/upload/${citation.documentId}`}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <span className="font-semibold">doc:</span> {citation.documentId}
-                  <br />
-                  <span className="font-semibold">page:</span> {citation.pageNumber}
-                  <br />
-                  <span className="font-semibold">chunk:</span> {citation.chunkId}
+                  <p>
+                    <span className="font-semibold">Doc:</span> {citation.documentId}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Page:</span> {citation.pageNumber}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Chunk:</span> {citation.chunkId}
+                  </p>
                 </a>
               ))
             ) : (
-              <p className="text-xs text-slate-500">No citations to display.</p>
+              <p className="rounded-xl border border-dashed border-amber-300/70 bg-white/70 px-3 py-4 text-xs text-slate-500">
+                No citations for this turn yet.
+              </p>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900">Document Upload</h3>
-          <div className="mt-3 space-y-2">
+        <section className="rounded-[24px] border border-[#b7d5c5] bg-[linear-gradient(160deg,rgba(233,250,242,0.9),rgba(247,255,252,0.95))] p-4 shadow-[0_20px_38px_-30px_rgba(5,150,105,0.5)]">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.17em] text-emerald-950">Ingestion Desk</h3>
+          <div className="mt-3 space-y-2.5">
             <input
+              ref={uploadFileInputRef}
               type="file"
               accept=".pdf,application/pdf"
-              className="block w-full text-xs"
-              onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+              className="block w-full text-xs text-emerald-900 file:mr-2 file:rounded-lg file:border file:border-emerald-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-emerald-900 hover:file:bg-emerald-50"
+              onChange={handleUploadFileChange}
             />
             <input
               value={uploadTitle}
               onChange={(event) => setUploadTitle(event.target.value)}
               placeholder="Optional title"
-              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-emerald-200 bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
             />
             <select
               value={uploadLanguageHint}
               onChange={(event) => setUploadLanguageHint(event.target.value)}
-              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-emerald-200 bg-white/95 px-3.5 py-2.5 text-sm text-slate-800"
             >
               <option value="">Language hint (optional)</option>
               <option value="EN">EN</option>
@@ -661,25 +874,28 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             </select>
             <button
               type="button"
-              onClick={uploadPdf}
-              disabled={!uploadFile}
-              className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              onClick={handleUploadButtonClick}
+              disabled={uploading}
+              className="w-full rounded-xl border border-emerald-700 bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:border-slate-400 disabled:bg-slate-400"
             >
-              Upload PDF
+              {uploading ? "Uploading..." : uploadFile ? "Upload PDF" : "Select PDF"}
             </button>
             {!canUpload ? (
-              <p className="text-xs text-emerald-800">
-                Create a session first. Current session role: {user?.role ?? "none"}.
-              </p>
+              <p className="text-xs text-emerald-900/80">Create a session first. Current role: {user?.role ?? "none"}.</p>
             ) : !uploadFile ? (
-              <p className="text-xs text-emerald-800">Select a PDF file first to enable upload.</p>
+              <p className="text-xs text-emerald-900/80">Select a PDF file to enable upload.</p>
             ) : (
-              <p className="text-xs text-emerald-800">Selected file: {uploadFile.name}</p>
+              <p className="text-xs text-emerald-900/80">Selected file: {uploadFile.name}</p>
             )}
+            {effectiveQueryScopeId ? (
+              <p className="text-xs text-emerald-900/80">
+                Query scope active for document {effectiveQueryScopeId}
+              </p>
+            ) : null}
           </div>
 
           {uploadStatus ? (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-700">
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-white/90 p-3 text-xs text-slate-700">
               <p>
                 <span className="font-semibold">Document:</span> {uploadStatus.document.id}
               </p>
@@ -689,17 +905,22 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               <p>
                 <span className="font-semibold">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}
               </p>
+              {uploadStatus.latestIngestionJob?.last_error ? (
+                <p>
+                  <span className="font-semibold">Last error:</span> {uploadStatus.latestIngestionJob.last_error}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-900">Query History</h3>
+        <section className="rounded-[24px] border border-[#d3c4b3] bg-[linear-gradient(165deg,rgba(255,252,248,0.95),rgba(251,247,241,0.95))] p-4 shadow-[0_20px_38px_-30px_rgba(71,85,105,0.55)]">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.17em] text-slate-900">Query Timeline</h3>
             <button
               type="button"
               onClick={() => void loadHistory()}
-              className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700"
+              className="rounded-lg border border-[#d3c4b3] bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-[#f6ede2]"
             >
               Refresh
             </button>
@@ -714,11 +935,13 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                 onClick={() => {
                   setConversationId(item.conversationId ?? newUuid());
                   setQuery(item.query);
+                  const scopedDocumentId = item.citations[0]?.documentId ?? null;
+                  setQueryDocumentScopeId(scopedDocumentId);
                 }}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs hover:bg-slate-100"
+                className="w-full rounded-xl border border-[#ddcec0] bg-white/85 px-3 py-2.5 text-left transition hover:border-[#c4b19d] hover:bg-white"
               >
-                <p className="font-semibold text-slate-800">{item.query}</p>
-                <p className="mt-1 text-slate-600">
+                <p className="text-xs font-semibold text-slate-800">{item.query}</p>
+                <p className="mt-1 text-[11px] text-slate-600">
                   {formatTime(item.createdAt)} | cache: {item.cacheHit ? "hit" : "miss"} | {item.latencyMs}ms
                 </p>
               </button>
@@ -726,9 +949,11 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-900">System</h3>
-          <p className="mt-2 text-xs text-slate-600">{workspaceMessage}</p>
+        <section className="rounded-[24px] border border-[#d3c4b3] bg-[linear-gradient(165deg,rgba(255,252,248,0.95),rgba(251,247,241,0.95))] p-4 shadow-[0_20px_38px_-30px_rgba(51,65,85,0.55)]">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.17em] text-slate-900">Operations Log</h3>
+          <p aria-live="polite" className={`mt-2 text-sm leading-relaxed ${workspaceToneClass}`}>
+            {workspaceMessage}
+          </p>
         </section>
       </aside>
     </div>

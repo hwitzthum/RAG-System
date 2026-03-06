@@ -26,6 +26,7 @@ export interface IngestionRuntimeRepository {
   replaceDocumentChunks(documentId: string, chunks: PreparedChunkRecord[]): Promise<void>;
   markJobCompleted(jobId: string): Promise<void>;
   markJobFailed(job: IngestionJob, errorMessage: string): Promise<boolean>;
+  invalidateRetrievalCache(): Promise<void>;
 }
 
 function toIngestionJob(row: ClaimedJobRow): IngestionJob {
@@ -210,5 +211,12 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     }
 
     return row.dead_letter;
+  }
+
+  async invalidateRetrievalCache(): Promise<void> {
+    const { error } = await this.supabase.from("retrieval_cache").delete().gt("retrieval_version", 0);
+    if (error) {
+      throw new Error(`Failed to invalidate retrieval cache: ${error.message}`);
+    }
   }
 }

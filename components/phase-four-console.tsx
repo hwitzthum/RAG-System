@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Role } from "@/lib/auth/types";
 
 type SessionUser = {
@@ -19,6 +19,7 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
   const [file, setFile] = useState<File | null>(null);
   const [output, setOutput] = useState<string>("");
   const [user, setUser] = useState<SessionUser>(initialUser);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canQuery = useMemo(() => user?.role === "reader" || user?.role === "admin", [user]);
   const canUpload = useMemo(() => Boolean(user), [user]);
@@ -81,10 +82,39 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
     setOutput(JSON.stringify(payload, null, 2));
   }
 
+  async function uploadSelectedFile(selectedFile: File): Promise<void> {
+    setFile(selectedFile);
+    if (!user) {
+      setOutput("Create a session before uploading.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json();
+    setOutput(JSON.stringify(payload, null, 2));
+  }
+
+  function handleUploadButtonClick() {
+    if (!file) {
+      fileInputRef.current?.click();
+      setOutput("Please choose a PDF file first.");
+      return;
+    }
+
+    void uploadPdf();
+  }
+
   return (
     <section className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div>
-        <h2 className="text-lg font-semibold">Phase 4 Security Console</h2>
+        <h2 className="text-lg font-semibold">Security Console</h2>
         <p className="text-sm text-slate-600">
           Session creation, role-gated actions, and secured API routes.
         </p>
@@ -149,18 +179,24 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
       <div className="space-y-2 border-t border-slate-200 pt-4">
         <p className="text-sm font-medium">Upload (authenticated session)</p>
         <input
+          ref={fileInputRef}
           type="file"
           accept="application/pdf"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          onChange={(event) => {
+            const selected = event.target.files?.[0] ?? null;
+            setFile(selected);
+            if (selected) {
+              void uploadSelectedFile(selected);
+            }
+          }}
           className="block w-full text-sm"
         />
         <button
           type="button"
-          className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-          onClick={uploadPdf}
-          disabled={!file}
+          className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white"
+          onClick={handleUploadButtonClick}
         >
-          Upload PDF
+          {file ? "Upload PDF" : "Select PDF"}
         </button>
         {!canUpload ? <p className="text-xs text-slate-500">Create a session before uploading.</p> : null}
       </div>

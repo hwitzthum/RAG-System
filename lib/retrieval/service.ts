@@ -20,6 +20,8 @@ export type RetrieveRankedCandidatesInput = {
   query: string;
   topK: number;
   languageHint?: SupportedLanguage;
+  documentIds?: string[];
+  cacheNamespace?: string;
 };
 
 export type RetrieveRankedCandidatesResult = {
@@ -58,6 +60,35 @@ function getDefaultDependencies(): RetrievalServiceDependencies {
   };
 }
 
+function mergeUniqueChunks(primary: RetrievedChunk[], secondary: RetrievedChunk[]): RetrievedChunk[] {
+  const seen = new Set<string>();
+  const merged: RetrievedChunk[] = [];
+
+  for (const chunk of primary.concat(secondary)) {
+    if (seen.has(chunk.chunkId)) {
+      continue;
+    }
+    seen.add(chunk.chunkId);
+    merged.push(chunk);
+  }
+
+  return merged;
+}
+
+function normalizeDocumentScope(documentIds: string[] | undefined): string[] {
+  if (!documentIds || documentIds.length === 0) {
+    return [];
+  }
+
+  const uniqueIds = new Set(
+    documentIds
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0),
+  );
+
+  return [...uniqueIds].sort();
+}
+
 export async function retrieveRankedCandidates(
   input: RetrieveRankedCandidatesInput,
   overrides: Partial<RetrievalServiceDependencies> = {},
@@ -71,11 +102,18 @@ export async function retrieveRankedCandidates(
   const language = detectQueryLanguage(normalizedQuery, input.languageHint);
   const topK = Math.max(1, input.topK);
   const retrievalVersion = env.RAG_RETRIEVAL_VERSION;
+  const scopedDocumentIds = normalizeDocumentScope(input.documentIds);
+  const scopeKey = input.cacheNamespace?.trim()
+    ? input.cacheNamespace.trim()
+    : scopedDocumentIds.length > 0
+      ? `docs:${scopedDocumentIds.join(",")}`
+      : "scope:all";
   const cacheKey = buildRetrievalCacheKey({
     normalizedQuery,
     language,
     retrievalVersion,
     topK,
+    scopeKey,
   });
 
   // Best-effort cache hygiene for TTL expiry and retrieval version invalidation.
@@ -115,19 +153,48 @@ export async function retrieveRankedCandidates(
   const queryEmbedding = await deps.createEmbedding(normalizedQuery);
   const tokens = extractQueryTokens(normalizedQuery);
 
-  const [vectorCandidates, keywordCandidates] = await Promise.all([
+  const [languageVectorCandidates, languageKeywordCandidates] = await Promise.all([
     deps.searchVector({
       queryEmbedding,
       language,
       limit: candidateLimit,
+      documentIds: scopedDocumentIds,
     }),
     deps.searchKeyword({
       normalizedQuery,
       tokens,
       language,
       limit: candidateLimit,
+      documentIds: scopedDocumentIds,
     }),
   ]);
+
+  let vectorCandidates = languageVectorCandidates;
+  let keywordCandidates = languageKeywordCandidates;
+  const languageConstrainedTotal = languageVectorCandidates.length + languageKeywordCandidates.length;
+  const shouldUseCrossLanguageFallback =
+    languageConstrainedTotal < topK || languageKeywordCandidates.length === 0;
+
+  if (shouldUseCrossLanguageFallback) {
+    const [crossLanguageVectorCandidates, crossLanguageKeywordCandidates] = await Promise.all([
+      deps.searchVector({
+        queryEmbedding,
+        language: null,
+        limit: candidateLimit,
+        documentIds: scopedDocumentIds,
+      }),
+      deps.searchKeyword({
+        normalizedQuery,
+        tokens,
+        language: null,
+        limit: candidateLimit,
+        documentIds: scopedDocumentIds,
+      }),
+    ]);
+
+    vectorCandidates = mergeUniqueChunks(languageVectorCandidates, crossLanguageVectorCandidates);
+    keywordCandidates = mergeUniqueChunks(languageKeywordCandidates, crossLanguageKeywordCandidates);
+  }
 
   const fusedCandidates = reciprocalRankFusion({
     vectorCandidates,

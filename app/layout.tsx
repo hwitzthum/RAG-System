@@ -3,8 +3,8 @@ import "./globals.css";
 import { env } from "@/lib/config/env";
 
 export const metadata: Metadata = {
-  title: "RAG System",
-  description: "Production-ready multilingual RAG system scaffold.",
+  title: "Enterprise Retrieval Command Center",
+  description: "Professional workspace for secure retrieval operations and evidence-grounded AI responses.",
 };
 
 export default function RootLayout({
@@ -17,7 +17,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className="bg-slate-50 text-slate-900 antialiased">{children}</body>
+      <body className="text-slate-900 antialiased">{children}</body>
     </html>
   );
 }

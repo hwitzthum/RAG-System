@@ -25,14 +25,16 @@ type MatchChunkRow = {
 type SearchKeywordCandidatesInput = {
   normalizedQuery: string;
   tokens: string[];
-  language: SupportedLanguage;
+  language?: SupportedLanguage | null;
   limit: number;
+  documentIds?: string[];
 };
 
 type SearchVectorCandidatesInput = {
   queryEmbedding: number[];
-  language: SupportedLanguage;
+  language?: SupportedLanguage | null;
   limit: number;
+  documentIds?: string[];
 };
 
 function normalizeSectionTitle(sectionTitle: string | null): string {
@@ -64,14 +66,22 @@ export async function searchKeywordCandidates(input: SearchKeywordCandidatesInpu
   const textQuery = input.tokens.join(" ");
   const limit = Math.max(1, input.limit);
 
-  const { data, error } = await supabase
+  let baseQuery = supabase
     .from("document_chunks")
     .select("id,document_id,page_number,section_title,content,context,language,documents!inner(status)")
     .eq("documents.status", "ready")
-    .eq("language", input.language)
     .textSearch("tsv", textQuery, { config: "simple", type: "plain" })
-    .limit(limit)
-    .returns<Array<RetrievalChunkRow & { documents: { status: string } | { status: string }[] | null }>>();
+    .limit(limit);
+
+  if (input.documentIds && input.documentIds.length > 0) {
+    baseQuery = baseQuery.in("document_id", input.documentIds);
+  }
+
+  const query = input.language ? baseQuery.eq("language", input.language) : baseQuery;
+
+  const { data, error } = await query.returns<
+    Array<RetrievalChunkRow & { documents: { status: string } | { status: string }[] | null }>
+  >();
 
   if (error) {
     throw new Error(`Keyword retrieval failed: ${error.message}`);
@@ -93,20 +103,25 @@ export async function searchKeywordCandidates(input: SearchKeywordCandidatesInpu
 export async function searchVectorCandidates(input: SearchVectorCandidatesInput): Promise<RetrievedChunk[]> {
   const supabase = getSupabaseAdminClient();
   const limit = Math.max(1, input.limit);
+  const scopedLimit = input.documentIds && input.documentIds.length > 0 ? Math.max(limit * 10, limit + 20) : limit;
 
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: input.queryEmbedding,
-    match_count: limit,
-    filter_language: input.language,
+    match_count: scopedLimit,
+    filter_language: input.language ?? null,
   });
 
   if (error) {
     throw new Error(`Vector retrieval failed: ${error.message}`);
   }
 
-  const rows = (data ?? []) as MatchChunkRow[];
+  let rows = (data ?? []) as MatchChunkRow[];
+  if (input.documentIds && input.documentIds.length > 0) {
+    const allowedIds = new Set(input.documentIds);
+    rows = rows.filter((row) => allowedIds.has(row.document_id));
+  }
 
-  return rows.map((row) => ({
+  return rows.slice(0, limit).map((row) => ({
     chunkId: row.chunk_id,
     documentId: row.document_id,
     pageNumber: row.page_number,

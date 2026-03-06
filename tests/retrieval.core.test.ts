@@ -42,15 +42,36 @@ test("buildRetrievalCacheKey varies by retrieval inputs", () => {
     language: "EN",
     retrievalVersion: 1,
     topK: 8,
+    scopeKey: "scope:all",
   });
   const changed = buildRetrievalCacheKey({
     normalizedQuery: "solar financing",
     language: "EN",
     retrievalVersion: 2,
     topK: 8,
+    scopeKey: "scope:all",
   });
 
   assert.notEqual(base, changed);
+});
+
+test("buildRetrievalCacheKey varies by scope", () => {
+  const allDocs = buildRetrievalCacheKey({
+    normalizedQuery: "solar financing",
+    language: "EN",
+    retrievalVersion: 1,
+    topK: 8,
+    scopeKey: "scope:all",
+  });
+  const scopedDocs = buildRetrievalCacheKey({
+    normalizedQuery: "solar financing",
+    language: "EN",
+    retrievalVersion: 1,
+    topK: 8,
+    scopeKey: "docs:abc,def",
+  });
+
+  assert.notEqual(allDocs, scopedDocs);
 });
 
 test("reciprocalRankFusion fuses vector and keyword rankings", () => {

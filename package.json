@@ -41,6 +41,7 @@
     "release:matrix:strict": "tsx scripts/production/run-validation-matrix.ts --mode strict"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.96",
     "@supabase/supabase-js": "^2.57.2",
     "jose": "^6.0.13",
     "next": "16.1.6",

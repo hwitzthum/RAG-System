@@ -2,6 +2,7 @@ import type { ChunkCandidate, ExtractedPage, Section } from "@/lib/ingestion/run
 import type { SupportedLanguage } from "@/lib/supabase/database.types";
 
 const HEADING_PATTERN = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
+const RELAXED_MIN_CHARS = 20;
 
 function isHeading(line: string): boolean {
   const candidate = line.trim();
@@ -98,9 +99,15 @@ export function chunkSections(input: {
       continue;
     }
 
+    const normalizedSectionText = section.text.replace(/\s+/g, " ").trim();
+    if (!normalizedSectionText) {
+      continue;
+    }
+
     const tokens = tokenize(section.text);
     const totalTokens = tokens.length;
     let start = 0;
+    let emittedSectionChunk = false;
 
     while (start < totalTokens) {
       const end = Math.min(start + targetTokens, totalTokens);
@@ -115,6 +122,7 @@ export function chunkSections(input: {
           language,
         });
         chunkIndex += 1;
+        emittedSectionChunk = true;
       }
 
       if (end >= totalTokens) {
@@ -122,6 +130,18 @@ export function chunkSections(input: {
       }
 
       start = Math.max(end - overlapTokens, start + 1);
+    }
+
+    // Keep short but meaningful sections indexable instead of failing ingestion.
+    if (!emittedSectionChunk && normalizedSectionText.length >= Math.min(minChars, RELAXED_MIN_CHARS)) {
+      chunks.push({
+        chunkIndex,
+        pageNumber: section.pageNumber,
+        sectionTitle: section.sectionTitle,
+        content: normalizedSectionText,
+        language,
+      });
+      chunkIndex += 1;
     }
   }
 

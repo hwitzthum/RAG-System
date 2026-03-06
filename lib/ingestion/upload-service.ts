@@ -35,6 +35,14 @@ type IngestionJobRecord = {
   status: IngestionJobStatus;
 };
 
+function isTerminalFailedStatus(documentStatus: DocumentStatus, latestJobStatus: IngestionJobStatus | null): boolean {
+  return (
+    documentStatus === "failed" ||
+    latestJobStatus === "failed" ||
+    latestJobStatus === "dead_letter"
+  );
+}
+
 function isSupabaseUniqueViolation(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -136,6 +144,48 @@ async function returnExistingDocumentResult(
   documentRecord: DocumentRecord,
 ): Promise<UploadPersistenceResult> {
   const latestJob = await getLatestIngestionJob(supabase, documentRecord.id);
+
+  if (isTerminalFailedStatus(documentRecord.status, latestJob?.status ?? null)) {
+    const { data: requeuedDocument, error: requeueError } = await supabase
+      .from("documents")
+      .update({
+        status: "queued",
+        ingestion_version: documentRecord.ingestion_version + 1,
+      })
+      .eq("id", documentRecord.id)
+      .select("id,status,ingestion_version,storage_path,sha256")
+      .single<DocumentRecord>();
+
+    if (requeueError) {
+      throw requeueError;
+    }
+
+    const idempotencyKey = buildIdempotencyKey(requeuedDocument.sha256, requeuedDocument.ingestion_version);
+    let requeuedJob: IngestionJobRecord;
+    try {
+      requeuedJob = await createIngestionJob(supabase, requeuedDocument.id, idempotencyKey);
+    } catch (error) {
+      if (!isSupabaseUniqueViolation(error)) {
+        throw error;
+      }
+      const racedJob = await getLatestIngestionJob(supabase, requeuedDocument.id);
+      if (!racedJob) {
+        throw error;
+      }
+      requeuedJob = racedJob;
+    }
+
+    return {
+      documentId: requeuedDocument.id,
+      ingestionJobId: requeuedJob.id,
+      documentStatus: requeuedDocument.status,
+      ingestionJobStatus: requeuedJob.status,
+      status: requeuedJob.status,
+      deduplicated: false,
+      storagePath: requeuedDocument.storage_path,
+      checksumSha256: requeuedDocument.sha256,
+    };
+  }
 
   if (latestJob) {
     return {

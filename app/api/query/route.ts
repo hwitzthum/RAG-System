@@ -17,6 +17,7 @@ export const runtime = "nodejs";
 const querySchema = z.object({
   query: z.string().min(1).max(2000),
   conversationId: z.string().uuid().optional(),
+  documentId: z.string().uuid().optional(),
   languageHint: z.enum(["EN", "DE", "FR", "IT", "ES"]).optional(),
   topK: z.number().int().positive().max(20).optional(),
 });
@@ -137,6 +138,8 @@ export async function POST(request: NextRequest) {
           query: requestBody.query,
           topK,
           languageHint: requestBody.languageHint,
+          documentIds: requestBody.documentId ? [requestBody.documentId] : undefined,
+          cacheNamespace: `user:${authResult.user.id}::doc:${requestBody.documentId ?? "all"}`,
         });
 
         const answerResult = await generateGroundedAnswer({
@@ -153,9 +156,11 @@ export async function POST(request: NextRequest) {
           cacheHit: retrievalResult.trace.cacheHit,
           latencyMs,
           selectedChunkIds: retrievalResult.chunks.map((chunk) => chunk.chunkId),
+          selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
           retrievalTrace: retrievalResult.trace,
           insufficientEvidence: answerResult.insufficientEvidence,
           conversationId,
+          documentScopeId: requestBody.documentId ?? null,
           rateLimit: {
             remaining: rate.remaining,
             retryAfterSeconds: rate.retryAfterSeconds,
@@ -216,7 +221,9 @@ export async function POST(request: NextRequest) {
             conversationId: requestBody.conversationId ?? null,
             languageHint: requestBody.languageHint ?? null,
             topK,
+            documentId: requestBody.documentId ?? null,
             selectedChunkCount: retrievalResult.chunks.length,
+            selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
             cacheHit: retrievalResult.trace.cacheHit,
             retrievalVersion: retrievalResult.trace.retrievalVersion,
             insufficientEvidence: answerResult.insufficientEvidence,
