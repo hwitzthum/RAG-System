@@ -135,7 +135,7 @@ vercel deploy --prod
 ### 11. Run smoke checks after deploy
 
 1. `GET https://<your-app>.vercel.app/api/health` -> `status: ok`
-2. login session works
+2. session creation works (paste Supabase access token -> click **Create Session**)
 3. query endpoint works
 4. upload works and ingestion transitions to `ready`
 
@@ -286,7 +286,8 @@ vercel deploy --prod
 ## Step 5: Validate runtime health
 
 1. `GET https://<your-app>.vercel.app/api/health` returns `status: ok`.
-2. Login flow works (`POST /api/auth/session` + cookie set).
+2. Token-based session creation works (`POST /api/auth/session` + cookie set).
+   - this app currently expects you to paste a Supabase access token into the UI and click **Create Session**
 3. Query works (`POST /api/query`, SSE stream visible in UI).
 4. BYOK vault works end-to-end:
    - `GET /api/byok/openai`

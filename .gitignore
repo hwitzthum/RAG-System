@@ -86,3 +86,4 @@ worker/.env.*
 supabase/.temp/
 supabase/.branches/
 supabase/.history/
+.vercel

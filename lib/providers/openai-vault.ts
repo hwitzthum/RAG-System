@@ -3,7 +3,10 @@ import { env } from "@/lib/config/env";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 
-const OPENAI_KEY_PATTERN = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
+const OPENAI_KEY_PREFIX = "sk-";
+const OPENAI_KEY_MIN_LENGTH = 20;
+const OPENAI_KEY_MAX_LENGTH = 512;
+const PRINTABLE_ASCII_NO_SPACES_PATTERN = /^[\x21-\x7E]+$/;
 const AES_ALGORITHM = "aes-256-gcm";
 const AES_IV_BYTES = 12;
 const AES_KEY_BYTES = 32;
@@ -53,7 +56,15 @@ function decodeVaultKey(): Buffer {
 
 function sanitizeOpenAiApiKey(apiKey: string): string {
   const normalized = apiKey.trim();
-  if (!OPENAI_KEY_PATTERN.test(normalized)) {
+  if (!normalized.startsWith(OPENAI_KEY_PREFIX)) {
+    throw new Error("Invalid OpenAI API key format");
+  }
+
+  if (normalized.length < OPENAI_KEY_MIN_LENGTH || normalized.length > OPENAI_KEY_MAX_LENGTH) {
+    throw new Error("Invalid OpenAI API key format");
+  }
+
+  if (!PRINTABLE_ASCII_NO_SPACES_PATTERN.test(normalized)) {
     throw new Error("Invalid OpenAI API key format");
   }
   return normalized;
