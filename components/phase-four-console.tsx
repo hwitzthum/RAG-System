@@ -21,7 +21,7 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
   const [user, setUser] = useState<SessionUser>(initialUser);
 
   const canQuery = useMemo(() => user?.role === "reader" || user?.role === "admin", [user]);
-  const canUpload = useMemo(() => user?.role === "reader" || user?.role === "admin", [user]);
+  const canUpload = useMemo(() => Boolean(user), [user]);
 
   async function createSession() {
     const response = await fetch("/api/auth/session", {
@@ -59,6 +59,11 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
   }
 
   async function uploadPdf() {
+    if (!user) {
+      setOutput("Create a session before uploading.");
+      return;
+    }
+
     if (!file) {
       setOutput("Please choose a PDF file first.");
       return;
@@ -142,7 +147,7 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
       </div>
 
       <div className="space-y-2 border-t border-slate-200 pt-4">
-        <p className="text-sm font-medium">Upload (reader/admin)</p>
+        <p className="text-sm font-medium">Upload (authenticated session)</p>
         <input
           type="file"
           accept="application/pdf"
@@ -153,11 +158,11 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
           type="button"
           className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
           onClick={uploadPdf}
-          disabled={!canUpload || !file}
+          disabled={!file}
         >
           Upload PDF
         </button>
-        {!canUpload ? <p className="text-xs text-slate-500">Requires role reader or admin.</p> : null}
+        {!canUpload ? <p className="text-xs text-slate-500">Create a session before uploading.</p> : null}
       </div>
 
       <div className="space-y-2 border-t border-slate-200 pt-4">

@@ -125,7 +125,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(null);
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
-  const canUpload = user?.role === "reader" || user?.role === "admin";
+  const canUpload = Boolean(user);
 
   const activeTurn = useMemo(() => {
     if (activeTurnId) {
@@ -296,6 +296,11 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   async function uploadPdf(): Promise<void> {
+    if (!user) {
+      setWorkspaceMessage("Create a session before uploading documents.");
+      return;
+    }
+
     if (!uploadFile) {
       setWorkspaceMessage("Select a PDF file first.");
       return;
@@ -633,22 +638,19 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             <input
               type="file"
               accept=".pdf,application/pdf"
-              disabled={!canUpload}
-              className="block w-full text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              className="block w-full text-xs"
               onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
             />
             <input
               value={uploadTitle}
-              disabled={!canUpload}
               onChange={(event) => setUploadTitle(event.target.value)}
               placeholder="Optional title"
-              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
             />
             <select
               value={uploadLanguageHint}
-              disabled={!canUpload}
               onChange={(event) => setUploadLanguageHint(event.target.value)}
-              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Language hint (optional)</option>
               <option value="EN">EN</option>
@@ -660,14 +662,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             <button
               type="button"
               onClick={uploadPdf}
-              disabled={!canUpload || !uploadFile}
+              disabled={!uploadFile}
               className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               Upload PDF
             </button>
             {!canUpload ? (
               <p className="text-xs text-emerald-800">
-                Upload requires `reader` or `admin` role. Current session role: {user?.role ?? "none"}.
+                Create a session first. Current session role: {user?.role ?? "none"}.
               </p>
             ) : !uploadFile ? (
               <p className="text-xs text-emerald-800">Select a PDF file first to enable upload.</p>
