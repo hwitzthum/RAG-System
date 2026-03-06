@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-03-06T10:02:14.565Z",
+  "mode": "dry-run",
+  "baseUrl": "dry-run",
+  "durationSeconds": 60,
+  "concurrency": 20,
+  "totalRequests": 2400,
+  "successResponses": 2388,
+  "nonSuccessResponses": 12,
+  "errorCount": 0,
+  "errorRate": 0.005,
+  "p50LatencyMs": 640,
+  "p95LatencyMs": 1880,
+  "notes": [
+    "Synthetic load test result generated in dry-run mode."
+  ]
+}

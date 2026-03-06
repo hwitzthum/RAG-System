@@ -1,0 +1,45 @@
+version: 1
+service: rag-system
+rules:
+  - name: query_uncached_p95_latency_high
+    description: Uncached query p95 exceeds release SLO.
+    severity: critical
+    threshold: query_latency_ms_p95 >= 7000 for 10m
+    action: page_oncall
+
+  - name: query_cached_p95_latency_high
+    description: Cached query p95 exceeds release SLO.
+    severity: high
+    threshold: cached_query_latency_ms_p95 >= 2500 for 10m
+    action: page_oncall
+
+  - name: retrieval_cache_hit_rate_low
+    description: Retrieval cache hit ratio drops below expected baseline.
+    severity: high
+    threshold: retrieval_cache_hit_rate < 0.30 for 30m
+    action: create_incident
+
+  - name: citation_accuracy_low
+    description: Citation quality below release gate.
+    severity: critical
+    threshold: citation_accuracy < 0.90 for 30m
+    action: create_incident
+
+  - name: hallucination_rate_high
+    description: Grounding quality degraded above threshold.
+    severity: critical
+    threshold: hallucination_rate >= 0.05 for 30m
+    action: create_incident
+
+  - name: provider_error_rate_high
+    description: Provider error rate indicates upstream instability.
+    severity: high
+    threshold: provider_error_rate >= 0.03 for 15m
+    action: page_oncall
+
+  - name: ingestion_dead_letter_detected
+    description: Ingestion dead-letter queue has non-zero jobs.
+    severity: high
+    threshold: ingestion_jobs_dead_letter > 0 for 5m
+    action: create_incident
+

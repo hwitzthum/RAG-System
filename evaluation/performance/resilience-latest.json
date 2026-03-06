@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-03-06T10:02:07.646Z",
+  "mode": "dry-run",
+  "baseUrl": "dry-run",
+  "passed": true,
+  "checks": [
+    {
+      "name": "health_endpoint_available",
+      "passed": true,
+      "statusCode": 200,
+      "detail": "Synthetic health check passed."
+    },
+    {
+      "name": "query_requires_auth",
+      "passed": true,
+      "statusCode": 401,
+      "detail": "Synthetic unauthorized query correctly rejected."
+    },
+    {
+      "name": "invalid_payload_rejected",
+      "passed": true,
+      "statusCode": 400,
+      "detail": "Synthetic invalid payload check passed."
+    }
+  ]
+}

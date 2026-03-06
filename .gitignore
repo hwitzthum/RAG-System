@@ -1,0 +1,88 @@
+# -------------------------
+# OS / editor
+# -------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# -------------------------
+# Node / Next.js
+# -------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+.next/
+out/
+build/
+dist/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# -------------------------
+# Python / worker
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+.venv/
+venv/
+ENV/
+worker/.venv/
+worker/venv/
+
+# -------------------------
+# Logs / runtime artifacts
+# -------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+tmp/
+temp/
+
+# -------------------------
+# Env / secrets
+# -------------------------
+.env
+.env.*
+!.env.example
+!.env.staging.example
+worker/.env
+worker/.env.*
+!worker/.env.example
+!worker/.env.staging.example
+*.pem
+*.key
+*.p12
+
+# -------------------------
+# Deployment / platform state
+# -------------------------
+.vercel/
+.supabase/
+supabase/.temp/
+supabase/.branches/
+supabase/.history/

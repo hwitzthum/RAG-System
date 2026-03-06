@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "name": "rag-system-overview",
+  "description": "Phase 12 production dashboard for retrieval, answering, cache, and ingestion SLOs.",
+  "time_window": "15m",
+  "refresh_interval": "30s",
+  "widgets": [
+    {
+      "id": "query-latency",
+      "title": "Query Latency (p50/p95)",
+      "type": "timeseries",
+      "metrics": [
+        "query_latency_ms_p50",
+        "query_latency_ms_p95",
+        "cached_query_latency_ms_p95"
+      ]
+    },
+    {
+      "id": "cache-hit-rate",
+      "title": "Retrieval Cache Hit Ratio",
+      "type": "timeseries",
+      "metrics": [
+        "retrieval_cache_hit_rate"
+      ]
+    },
+    {
+      "id": "retrieval-quality",
+      "title": "Retrieval Quality (Recall@5 / nDCG@10 / Citation Accuracy)",
+      "type": "timeseries",
+      "metrics": [
+        "retrieval_recall_at_5",
+        "retrieval_ndcg_at_10",
+        "citation_accuracy"
+      ]
+    },
+    {
+      "id": "hallucination-rate",
+      "title": "Hallucination Rate",
+      "type": "timeseries",
+      "metrics": [
+        "hallucination_rate"
+      ]
+    },
+    {
+      "id": "ingestion-throughput",
+      "title": "Ingestion Throughput and Failures",
+      "type": "timeseries",
+      "metrics": [
+        "ingestion_jobs_completed",
+        "ingestion_jobs_failed",
+        "ingestion_jobs_dead_letter"
+      ]
+    },
+    {
+      "id": "provider-errors",
+      "title": "Provider Error and Timeout Rate",
+      "type": "timeseries",
+      "metrics": [
+        "provider_error_rate",
+        "provider_timeout_rate"
+      ]
+    }
+  ]
+}

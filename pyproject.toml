@@ -1,0 +1,6 @@
+[project]
+name = "rag-system"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11.7"
+dependencies = []

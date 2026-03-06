@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --bg-1: #f4fbff;
+  --bg-2: #eef9f1;
+  --ink: #0f172a;
+  --muted: #475569;
+  --ring: rgba(8, 145, 178, 0.24);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1200px 600px at 8% -10%, #bae6fd 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, #bbf7d0 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-2));
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}

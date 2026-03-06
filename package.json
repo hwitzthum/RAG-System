@@ -1,0 +1,51 @@
+{
+  "name": "rag-system",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck",
+    "infra:check-env": "node scripts/infrastructure/validate-env.mjs",
+    "infra:check-env:web": "node scripts/infrastructure/validate-env.mjs --target web --file .env.local",
+    "infra:check-env:worker": "node scripts/infrastructure/validate-env.mjs --target worker --file worker/.env",
+    "infra:check-env:staging": "node scripts/infrastructure/validate-env.mjs --target staging --file .env.staging",
+    "infra:preflight": "bash scripts/infrastructure/preflight.sh",
+    "db:validate:migrations": "node scripts/database/validate-migrations.mjs",
+    "test:security": "tsx --test tests/*.test.ts",
+    "test:worker": "cd worker && PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py'",
+    "eval:dataset:generate": "tsx scripts/evaluation/generate-dataset.ts",
+    "eval:dataset:validate": "tsx scripts/evaluation/validate-dataset.ts",
+    "eval:benchmark": "tsx scripts/evaluation/run-benchmark.ts --mode live",
+    "eval:benchmark:dry": "tsx scripts/evaluation/run-benchmark.ts --mode dry-run --no-fail-on-gate",
+    "eval:smoke": "tsx scripts/evaluation/run-benchmark.ts --mode live --sample 25 --no-fail-on-gate",
+    "obs:validate": "node scripts/production/validate-observability.mjs",
+    "perf:load": "tsx scripts/production/run-load-test.ts --mode live",
+    "perf:load:dry": "tsx scripts/production/run-load-test.ts --mode dry-run --duration-seconds 60 --concurrency 20",
+    "perf:resilience": "tsx scripts/production/run-resilience-checks.ts --mode live",
+    "perf:resilience:dry": "tsx scripts/production/run-resilience-checks.ts --mode dry-run",
+    "release:readiness": "tsx scripts/production/generate-release-readiness.ts"
+  },
+  "dependencies": {
+    "jose": "^6.0.13",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@supabase/supabase-js": "^2.57.2",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.20.5",
+    "typescript": "^5"
+  }
+}

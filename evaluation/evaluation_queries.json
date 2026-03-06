@@ -1,0 +1,3202 @@
+[
+  {
+    "id": "en-doc_company_profile-01",
+    "language": "EN",
+    "question": "What does Company Overview report about ownership structure and leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Company Overview",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Ownership model is documented",
+      "Leadership team responsibilities are listed",
+      "Core business lines are described"
+    ]
+  },
+  {
+    "id": "en-doc_company_profile-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Company Overview for ownership structure and leadership.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Company Overview",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Ownership model is documented",
+      "Leadership team responsibilities are listed",
+      "Core business lines are described"
+    ]
+  },
+  {
+    "id": "en-doc_company_profile-03",
+    "language": "EN",
+    "question": "Which facts in Company Overview support conclusions on ownership structure and leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Company Overview",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Ownership model is documented",
+      "Leadership team responsibilities are listed",
+      "Core business lines are described"
+    ]
+  },
+  {
+    "id": "en-doc_company_profile-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Company Overview concerning ownership structure and leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Company Overview",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Ownership model is documented",
+      "Leadership team responsibilities are listed",
+      "Core business lines are described"
+    ]
+  },
+  {
+    "id": "en-doc_company_profile-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Company Overview about ownership structure and leadership.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Company Overview",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Ownership model is documented",
+      "Leadership team responsibilities are listed",
+      "Core business lines are described"
+    ]
+  },
+  {
+    "id": "en-doc_financial_statements-01",
+    "language": "EN",
+    "question": "What does Financial Performance report about revenue trend and profitability?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Financial Performance",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Year-over-year revenue trend is stated",
+      "Margin movement is quantified",
+      "Main cost drivers are identified"
+    ]
+  },
+  {
+    "id": "en-doc_financial_statements-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Financial Performance for revenue trend and profitability.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Financial Performance",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Year-over-year revenue trend is stated",
+      "Margin movement is quantified",
+      "Main cost drivers are identified"
+    ]
+  },
+  {
+    "id": "en-doc_financial_statements-03",
+    "language": "EN",
+    "question": "Which facts in Financial Performance support conclusions on revenue trend and profitability?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Financial Performance",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Year-over-year revenue trend is stated",
+      "Margin movement is quantified",
+      "Main cost drivers are identified"
+    ]
+  },
+  {
+    "id": "en-doc_financial_statements-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Financial Performance concerning revenue trend and profitability?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Financial Performance",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Year-over-year revenue trend is stated",
+      "Margin movement is quantified",
+      "Main cost drivers are identified"
+    ]
+  },
+  {
+    "id": "en-doc_financial_statements-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Financial Performance about revenue trend and profitability.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Financial Performance",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Year-over-year revenue trend is stated",
+      "Margin movement is quantified",
+      "Main cost drivers are identified"
+    ]
+  },
+  {
+    "id": "en-doc_legal_compliance-01",
+    "language": "EN",
+    "question": "What does Regulatory Compliance report about open legal exposure?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatory Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Applicable regulations are listed",
+      "Open investigations are disclosed",
+      "Mitigation and remediation actions are tracked"
+    ]
+  },
+  {
+    "id": "en-doc_legal_compliance-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Regulatory Compliance for open legal exposure.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatory Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Applicable regulations are listed",
+      "Open investigations are disclosed",
+      "Mitigation and remediation actions are tracked"
+    ]
+  },
+  {
+    "id": "en-doc_legal_compliance-03",
+    "language": "EN",
+    "question": "Which facts in Regulatory Compliance support conclusions on open legal exposure?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatory Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Applicable regulations are listed",
+      "Open investigations are disclosed",
+      "Mitigation and remediation actions are tracked"
+    ]
+  },
+  {
+    "id": "en-doc_legal_compliance-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Regulatory Compliance concerning open legal exposure?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatory Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Applicable regulations are listed",
+      "Open investigations are disclosed",
+      "Mitigation and remediation actions are tracked"
+    ]
+  },
+  {
+    "id": "en-doc_legal_compliance-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Regulatory Compliance about open legal exposure.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatory Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Applicable regulations are listed",
+      "Open investigations are disclosed",
+      "Mitigation and remediation actions are tracked"
+    ]
+  },
+  {
+    "id": "en-doc_market_analysis-01",
+    "language": "EN",
+    "question": "What does Market Positioning report about competitive differentiation?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Market Positioning",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Target segments are defined",
+      "Competitor comparison is provided",
+      "Unique value proposition is articulated"
+    ]
+  },
+  {
+    "id": "en-doc_market_analysis-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Market Positioning for competitive differentiation.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Market Positioning",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Target segments are defined",
+      "Competitor comparison is provided",
+      "Unique value proposition is articulated"
+    ]
+  },
+  {
+    "id": "en-doc_market_analysis-03",
+    "language": "EN",
+    "question": "Which facts in Market Positioning support conclusions on competitive differentiation?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Market Positioning",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Target segments are defined",
+      "Competitor comparison is provided",
+      "Unique value proposition is articulated"
+    ]
+  },
+  {
+    "id": "en-doc_market_analysis-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Market Positioning concerning competitive differentiation?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Market Positioning",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Target segments are defined",
+      "Competitor comparison is provided",
+      "Unique value proposition is articulated"
+    ]
+  },
+  {
+    "id": "en-doc_market_analysis-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Market Positioning about competitive differentiation.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Market Positioning",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Target segments are defined",
+      "Competitor comparison is provided",
+      "Unique value proposition is articulated"
+    ]
+  },
+  {
+    "id": "en-doc_operations_report-01",
+    "language": "EN",
+    "question": "What does Operational Performance report about capacity constraints and delivery quality?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operational Performance",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Capacity utilization is quantified",
+      "Service-level or delivery KPIs are tracked",
+      "Operational bottlenecks and actions are described"
+    ]
+  },
+  {
+    "id": "en-doc_operations_report-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Operational Performance for capacity constraints and delivery quality.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operational Performance",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Capacity utilization is quantified",
+      "Service-level or delivery KPIs are tracked",
+      "Operational bottlenecks and actions are described"
+    ]
+  },
+  {
+    "id": "en-doc_operations_report-03",
+    "language": "EN",
+    "question": "Which facts in Operational Performance support conclusions on capacity constraints and delivery quality?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operational Performance",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Capacity utilization is quantified",
+      "Service-level or delivery KPIs are tracked",
+      "Operational bottlenecks and actions are described"
+    ]
+  },
+  {
+    "id": "en-doc_operations_report-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Operational Performance concerning capacity constraints and delivery quality?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operational Performance",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Capacity utilization is quantified",
+      "Service-level or delivery KPIs are tracked",
+      "Operational bottlenecks and actions are described"
+    ]
+  },
+  {
+    "id": "en-doc_operations_report-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Operational Performance about capacity constraints and delivery quality.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operational Performance",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Capacity utilization is quantified",
+      "Service-level or delivery KPIs are tracked",
+      "Operational bottlenecks and actions are described"
+    ]
+  },
+  {
+    "id": "en-doc_esg_assessment-01",
+    "language": "EN",
+    "question": "What does ESG Assessment report about material sustainability risks?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG Assessment",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Material ESG topics are prioritized",
+      "Baseline indicators are reported",
+      "Improvement roadmap is defined"
+    ]
+  },
+  {
+    "id": "en-doc_esg_assessment-02",
+    "language": "EN",
+    "question": "Summarize key evidence in ESG Assessment for material sustainability risks.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG Assessment",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Material ESG topics are prioritized",
+      "Baseline indicators are reported",
+      "Improvement roadmap is defined"
+    ]
+  },
+  {
+    "id": "en-doc_esg_assessment-03",
+    "language": "EN",
+    "question": "Which facts in ESG Assessment support conclusions on material sustainability risks?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG Assessment",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Material ESG topics are prioritized",
+      "Baseline indicators are reported",
+      "Improvement roadmap is defined"
+    ]
+  },
+  {
+    "id": "en-doc_esg_assessment-04",
+    "language": "EN",
+    "question": "What risks are highlighted in ESG Assessment concerning material sustainability risks?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG Assessment",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Material ESG topics are prioritized",
+      "Baseline indicators are reported",
+      "Improvement roadmap is defined"
+    ]
+  },
+  {
+    "id": "en-doc_esg_assessment-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from ESG Assessment about material sustainability risks.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG Assessment",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Material ESG topics are prioritized",
+      "Baseline indicators are reported",
+      "Improvement roadmap is defined"
+    ]
+  },
+  {
+    "id": "en-doc_risk_register-01",
+    "language": "EN",
+    "question": "What does Risk Register report about top operational and strategic risks?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risk Register",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Risk likelihood and impact are scored",
+      "Risk owners are assigned",
+      "Mitigation status is reported"
+    ]
+  },
+  {
+    "id": "en-doc_risk_register-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Risk Register for top operational and strategic risks.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risk Register",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Risk likelihood and impact are scored",
+      "Risk owners are assigned",
+      "Mitigation status is reported"
+    ]
+  },
+  {
+    "id": "en-doc_risk_register-03",
+    "language": "EN",
+    "question": "Which facts in Risk Register support conclusions on top operational and strategic risks?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risk Register",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Risk likelihood and impact are scored",
+      "Risk owners are assigned",
+      "Mitigation status is reported"
+    ]
+  },
+  {
+    "id": "en-doc_risk_register-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Risk Register concerning top operational and strategic risks?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risk Register",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Risk likelihood and impact are scored",
+      "Risk owners are assigned",
+      "Mitigation status is reported"
+    ]
+  },
+  {
+    "id": "en-doc_risk_register-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Risk Register about top operational and strategic risks.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risk Register",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Risk likelihood and impact are scored",
+      "Risk owners are assigned",
+      "Mitigation status is reported"
+    ]
+  },
+  {
+    "id": "en-doc_customer_contracts-01",
+    "language": "EN",
+    "question": "What does Customer Contracts report about renewal risk and concentration?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Customer Contracts",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top customers and contract share are listed",
+      "Renewal timelines are identified",
+      "Termination or penalty clauses are summarized"
+    ]
+  },
+  {
+    "id": "en-doc_customer_contracts-02",
+    "language": "EN",
+    "question": "Summarize key evidence in Customer Contracts for renewal risk and concentration.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Customer Contracts",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top customers and contract share are listed",
+      "Renewal timelines are identified",
+      "Termination or penalty clauses are summarized"
+    ]
+  },
+  {
+    "id": "en-doc_customer_contracts-03",
+    "language": "EN",
+    "question": "Which facts in Customer Contracts support conclusions on renewal risk and concentration?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Customer Contracts",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top customers and contract share are listed",
+      "Renewal timelines are identified",
+      "Termination or penalty clauses are summarized"
+    ]
+  },
+  {
+    "id": "en-doc_customer_contracts-04",
+    "language": "EN",
+    "question": "What risks are highlighted in Customer Contracts concerning renewal risk and concentration?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Customer Contracts",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top customers and contract share are listed",
+      "Renewal timelines are identified",
+      "Termination or penalty clauses are summarized"
+    ]
+  },
+  {
+    "id": "en-doc_customer_contracts-05",
+    "language": "EN",
+    "question": "Provide a due diligence answer from Customer Contracts about renewal risk and concentration.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Customer Contracts",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top customers and contract share are listed",
+      "Renewal timelines are identified",
+      "Termination or penalty clauses are summarized"
+    ]
+  },
+  {
+    "id": "de-doc_company_profile-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Unternehmensprofil zu Eigentumsstruktur und Fuehrung?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Unternehmensprofil",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Eigentuemerstruktur ist dokumentiert",
+      "Verantwortungen des Fuehrungsteams sind aufgefuehrt",
+      "Kern-Geschaeftsbereiche sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_company_profile-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Unternehmensprofil fuer Eigentumsstruktur und Fuehrung zusammen.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Unternehmensprofil",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Eigentuemerstruktur ist dokumentiert",
+      "Verantwortungen des Fuehrungsteams sind aufgefuehrt",
+      "Kern-Geschaeftsbereiche sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_company_profile-03",
+    "language": "DE",
+    "question": "Welche Fakten in Unternehmensprofil stuetzen Aussagen zu Eigentumsstruktur und Fuehrung?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Unternehmensprofil",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Eigentuemerstruktur ist dokumentiert",
+      "Verantwortungen des Fuehrungsteams sind aufgefuehrt",
+      "Kern-Geschaeftsbereiche sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_company_profile-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Unternehmensprofil im Zusammenhang mit Eigentumsstruktur und Fuehrung genannt?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Unternehmensprofil",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Eigentuemerstruktur ist dokumentiert",
+      "Verantwortungen des Fuehrungsteams sind aufgefuehrt",
+      "Kern-Geschaeftsbereiche sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_company_profile-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Unternehmensprofil zu Eigentumsstruktur und Fuehrung.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Unternehmensprofil",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Eigentuemerstruktur ist dokumentiert",
+      "Verantwortungen des Fuehrungsteams sind aufgefuehrt",
+      "Kern-Geschaeftsbereiche sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_financial_statements-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Finanzielle Entwicklung zu Umsatztrend und Profitabilitaet?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Finanzielle Entwicklung",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Der Umsatztrend im Jahresvergleich ist genannt",
+      "Die Margenentwicklung ist quantifiziert",
+      "Wesentliche Kostentreiber sind benannt"
+    ]
+  },
+  {
+    "id": "de-doc_financial_statements-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Finanzielle Entwicklung fuer Umsatztrend und Profitabilitaet zusammen.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Finanzielle Entwicklung",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Der Umsatztrend im Jahresvergleich ist genannt",
+      "Die Margenentwicklung ist quantifiziert",
+      "Wesentliche Kostentreiber sind benannt"
+    ]
+  },
+  {
+    "id": "de-doc_financial_statements-03",
+    "language": "DE",
+    "question": "Welche Fakten in Finanzielle Entwicklung stuetzen Aussagen zu Umsatztrend und Profitabilitaet?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Finanzielle Entwicklung",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Der Umsatztrend im Jahresvergleich ist genannt",
+      "Die Margenentwicklung ist quantifiziert",
+      "Wesentliche Kostentreiber sind benannt"
+    ]
+  },
+  {
+    "id": "de-doc_financial_statements-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Finanzielle Entwicklung im Zusammenhang mit Umsatztrend und Profitabilitaet genannt?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Finanzielle Entwicklung",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Der Umsatztrend im Jahresvergleich ist genannt",
+      "Die Margenentwicklung ist quantifiziert",
+      "Wesentliche Kostentreiber sind benannt"
+    ]
+  },
+  {
+    "id": "de-doc_financial_statements-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Finanzielle Entwicklung zu Umsatztrend und Profitabilitaet.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Finanzielle Entwicklung",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Der Umsatztrend im Jahresvergleich ist genannt",
+      "Die Margenentwicklung ist quantifiziert",
+      "Wesentliche Kostentreiber sind benannt"
+    ]
+  },
+  {
+    "id": "de-doc_legal_compliance-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Regulatorische Compliance zu offene rechtliche Risiken?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatorische Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Relevante Vorschriften sind aufgefuehrt",
+      "Offene Untersuchungen sind offengelegt",
+      "Massnahmen und Remediation sind nachverfolgt"
+    ]
+  },
+  {
+    "id": "de-doc_legal_compliance-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Regulatorische Compliance fuer offene rechtliche Risiken zusammen.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatorische Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Relevante Vorschriften sind aufgefuehrt",
+      "Offene Untersuchungen sind offengelegt",
+      "Massnahmen und Remediation sind nachverfolgt"
+    ]
+  },
+  {
+    "id": "de-doc_legal_compliance-03",
+    "language": "DE",
+    "question": "Welche Fakten in Regulatorische Compliance stuetzen Aussagen zu offene rechtliche Risiken?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatorische Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Relevante Vorschriften sind aufgefuehrt",
+      "Offene Untersuchungen sind offengelegt",
+      "Massnahmen und Remediation sind nachverfolgt"
+    ]
+  },
+  {
+    "id": "de-doc_legal_compliance-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Regulatorische Compliance im Zusammenhang mit offene rechtliche Risiken genannt?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatorische Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Relevante Vorschriften sind aufgefuehrt",
+      "Offene Untersuchungen sind offengelegt",
+      "Massnahmen und Remediation sind nachverfolgt"
+    ]
+  },
+  {
+    "id": "de-doc_legal_compliance-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Regulatorische Compliance zu offene rechtliche Risiken.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Regulatorische Compliance",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Relevante Vorschriften sind aufgefuehrt",
+      "Offene Untersuchungen sind offengelegt",
+      "Massnahmen und Remediation sind nachverfolgt"
+    ]
+  },
+  {
+    "id": "de-doc_market_analysis-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Marktpositionierung zu wettbewerbliche Differenzierung?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Marktpositionierung",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Zielsegmente sind definiert",
+      "Wettbewerbsvergleich ist vorhanden",
+      "Einzigartige Wertposition ist klar beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_market_analysis-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Marktpositionierung fuer wettbewerbliche Differenzierung zusammen.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Marktpositionierung",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Zielsegmente sind definiert",
+      "Wettbewerbsvergleich ist vorhanden",
+      "Einzigartige Wertposition ist klar beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_market_analysis-03",
+    "language": "DE",
+    "question": "Welche Fakten in Marktpositionierung stuetzen Aussagen zu wettbewerbliche Differenzierung?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Marktpositionierung",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Zielsegmente sind definiert",
+      "Wettbewerbsvergleich ist vorhanden",
+      "Einzigartige Wertposition ist klar beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_market_analysis-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Marktpositionierung im Zusammenhang mit wettbewerbliche Differenzierung genannt?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Marktpositionierung",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Zielsegmente sind definiert",
+      "Wettbewerbsvergleich ist vorhanden",
+      "Einzigartige Wertposition ist klar beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_market_analysis-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Marktpositionierung zu wettbewerbliche Differenzierung.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Marktpositionierung",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Zielsegmente sind definiert",
+      "Wettbewerbsvergleich ist vorhanden",
+      "Einzigartige Wertposition ist klar beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_operations_report-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Operative Leistung zu Kapazitaetsengpaesse und Lieferqualitaet?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operative Leistung",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Kapazitaetsauslastung ist quantifiziert",
+      "Service- und Liefer-KPIs werden verfolgt",
+      "Operative Engpaesse und Massnahmen sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_operations_report-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Operative Leistung fuer Kapazitaetsengpaesse und Lieferqualitaet zusammen.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operative Leistung",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Kapazitaetsauslastung ist quantifiziert",
+      "Service- und Liefer-KPIs werden verfolgt",
+      "Operative Engpaesse und Massnahmen sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_operations_report-03",
+    "language": "DE",
+    "question": "Welche Fakten in Operative Leistung stuetzen Aussagen zu Kapazitaetsengpaesse und Lieferqualitaet?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operative Leistung",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Kapazitaetsauslastung ist quantifiziert",
+      "Service- und Liefer-KPIs werden verfolgt",
+      "Operative Engpaesse und Massnahmen sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_operations_report-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Operative Leistung im Zusammenhang mit Kapazitaetsengpaesse und Lieferqualitaet genannt?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operative Leistung",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Kapazitaetsauslastung ist quantifiziert",
+      "Service- und Liefer-KPIs werden verfolgt",
+      "Operative Engpaesse und Massnahmen sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_operations_report-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Operative Leistung zu Kapazitaetsengpaesse und Lieferqualitaet.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Operative Leistung",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "Kapazitaetsauslastung ist quantifiziert",
+      "Service- und Liefer-KPIs werden verfolgt",
+      "Operative Engpaesse und Massnahmen sind beschrieben"
+    ]
+  },
+  {
+    "id": "de-doc_esg_assessment-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt ESG-Bewertung zu wesentliche Nachhaltigkeitsrisiken?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG-Bewertung",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Wesentliche ESG-Themen sind priorisiert",
+      "Basisindikatoren sind berichtet",
+      "Verbesserungs-Roadmap ist definiert"
+    ]
+  },
+  {
+    "id": "de-doc_esg_assessment-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in ESG-Bewertung fuer wesentliche Nachhaltigkeitsrisiken zusammen.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG-Bewertung",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Wesentliche ESG-Themen sind priorisiert",
+      "Basisindikatoren sind berichtet",
+      "Verbesserungs-Roadmap ist definiert"
+    ]
+  },
+  {
+    "id": "de-doc_esg_assessment-03",
+    "language": "DE",
+    "question": "Welche Fakten in ESG-Bewertung stuetzen Aussagen zu wesentliche Nachhaltigkeitsrisiken?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG-Bewertung",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Wesentliche ESG-Themen sind priorisiert",
+      "Basisindikatoren sind berichtet",
+      "Verbesserungs-Roadmap ist definiert"
+    ]
+  },
+  {
+    "id": "de-doc_esg_assessment-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in ESG-Bewertung im Zusammenhang mit wesentliche Nachhaltigkeitsrisiken genannt?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG-Bewertung",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Wesentliche ESG-Themen sind priorisiert",
+      "Basisindikatoren sind berichtet",
+      "Verbesserungs-Roadmap ist definiert"
+    ]
+  },
+  {
+    "id": "de-doc_esg_assessment-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus ESG-Bewertung zu wesentliche Nachhaltigkeitsrisiken.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "ESG-Bewertung",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Wesentliche ESG-Themen sind priorisiert",
+      "Basisindikatoren sind berichtet",
+      "Verbesserungs-Roadmap ist definiert"
+    ]
+  },
+  {
+    "id": "de-doc_risk_register-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Risikoregister zu wichtigste operative und strategische Risiken?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risikoregister",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Eintrittswahrscheinlichkeit und Auswirkung sind bewertet",
+      "Risikoeigentuemer sind zugewiesen",
+      "Status der Massnahmen ist berichtet"
+    ]
+  },
+  {
+    "id": "de-doc_risk_register-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Risikoregister fuer wichtigste operative und strategische Risiken zusammen.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risikoregister",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Eintrittswahrscheinlichkeit und Auswirkung sind bewertet",
+      "Risikoeigentuemer sind zugewiesen",
+      "Status der Massnahmen ist berichtet"
+    ]
+  },
+  {
+    "id": "de-doc_risk_register-03",
+    "language": "DE",
+    "question": "Welche Fakten in Risikoregister stuetzen Aussagen zu wichtigste operative und strategische Risiken?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risikoregister",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Eintrittswahrscheinlichkeit und Auswirkung sind bewertet",
+      "Risikoeigentuemer sind zugewiesen",
+      "Status der Massnahmen ist berichtet"
+    ]
+  },
+  {
+    "id": "de-doc_risk_register-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Risikoregister im Zusammenhang mit wichtigste operative und strategische Risiken genannt?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risikoregister",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Eintrittswahrscheinlichkeit und Auswirkung sind bewertet",
+      "Risikoeigentuemer sind zugewiesen",
+      "Status der Massnahmen ist berichtet"
+    ]
+  },
+  {
+    "id": "de-doc_risk_register-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Risikoregister zu wichtigste operative und strategische Risiken.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Risikoregister",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Eintrittswahrscheinlichkeit und Auswirkung sind bewertet",
+      "Risikoeigentuemer sind zugewiesen",
+      "Status der Massnahmen ist berichtet"
+    ]
+  },
+  {
+    "id": "de-doc_customer_contracts-01",
+    "language": "DE",
+    "question": "Was berichtet der Abschnitt Kundenvertraege zu Verlaengerungsrisiko und Konzentration?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Kundenvertraege",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top-Kunden und Vertragsanteile sind aufgefuehrt",
+      "Verlaengerungszeitpunkte sind identifiziert",
+      "Kuendigungs- oder Strafklauseln sind zusammengefasst"
+    ]
+  },
+  {
+    "id": "de-doc_customer_contracts-02",
+    "language": "DE",
+    "question": "Fasse die wichtigsten Belege in Kundenvertraege fuer Verlaengerungsrisiko und Konzentration zusammen.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Kundenvertraege",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top-Kunden und Vertragsanteile sind aufgefuehrt",
+      "Verlaengerungszeitpunkte sind identifiziert",
+      "Kuendigungs- oder Strafklauseln sind zusammengefasst"
+    ]
+  },
+  {
+    "id": "de-doc_customer_contracts-03",
+    "language": "DE",
+    "question": "Welche Fakten in Kundenvertraege stuetzen Aussagen zu Verlaengerungsrisiko und Konzentration?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Kundenvertraege",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top-Kunden und Vertragsanteile sind aufgefuehrt",
+      "Verlaengerungszeitpunkte sind identifiziert",
+      "Kuendigungs- oder Strafklauseln sind zusammengefasst"
+    ]
+  },
+  {
+    "id": "de-doc_customer_contracts-04",
+    "language": "DE",
+    "question": "Welche Risiken werden in Kundenvertraege im Zusammenhang mit Verlaengerungsrisiko und Konzentration genannt?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Kundenvertraege",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top-Kunden und Vertragsanteile sind aufgefuehrt",
+      "Verlaengerungszeitpunkte sind identifiziert",
+      "Kuendigungs- oder Strafklauseln sind zusammengefasst"
+    ]
+  },
+  {
+    "id": "de-doc_customer_contracts-05",
+    "language": "DE",
+    "question": "Gib eine Due-Diligence-Antwort aus Kundenvertraege zu Verlaengerungsrisiko und Konzentration.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Kundenvertraege",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Top-Kunden und Vertragsanteile sind aufgefuehrt",
+      "Verlaengerungszeitpunkte sind identifiziert",
+      "Kuendigungs- oder Strafklauseln sind zusammengefasst"
+    ]
+  },
+  {
+    "id": "fr-doc_company_profile-01",
+    "language": "FR",
+    "question": "Que dit la section Profil de l entreprise sur structure de propriete et direction ?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profil de l entreprise",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Le modele de propriete est documente",
+      "Les responsabilites de la direction sont listees",
+      "Les activites principales sont decrites"
+    ]
+  },
+  {
+    "id": "fr-doc_company_profile-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Profil de l entreprise concernant structure de propriete et direction.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profil de l entreprise",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Le modele de propriete est documente",
+      "Les responsabilites de la direction sont listees",
+      "Les activites principales sont decrites"
+    ]
+  },
+  {
+    "id": "fr-doc_company_profile-03",
+    "language": "FR",
+    "question": "Quels faits dans Profil de l entreprise soutiennent les conclusions sur structure de propriete et direction ?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profil de l entreprise",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Le modele de propriete est documente",
+      "Les responsabilites de la direction sont listees",
+      "Les activites principales sont decrites"
+    ]
+  },
+  {
+    "id": "fr-doc_company_profile-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Profil de l entreprise au sujet de structure de propriete et direction ?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profil de l entreprise",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Le modele de propriete est documente",
+      "Les responsabilites de la direction sont listees",
+      "Les activites principales sont decrites"
+    ]
+  },
+  {
+    "id": "fr-doc_company_profile-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Profil de l entreprise sur structure de propriete et direction.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profil de l entreprise",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Le modele de propriete est documente",
+      "Les responsabilites de la direction sont listees",
+      "Les activites principales sont decrites"
+    ]
+  },
+  {
+    "id": "fr-doc_financial_statements-01",
+    "language": "FR",
+    "question": "Que dit la section Performance financiere sur tendance du chiffre d affaires et rentabilite ?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance financiere",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendance des revenus annuels est indiquee",
+      "L evolution des marges est quantifiee",
+      "Les principaux facteurs de cout sont identifies"
+    ]
+  },
+  {
+    "id": "fr-doc_financial_statements-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Performance financiere concernant tendance du chiffre d affaires et rentabilite.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance financiere",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendance des revenus annuels est indiquee",
+      "L evolution des marges est quantifiee",
+      "Les principaux facteurs de cout sont identifies"
+    ]
+  },
+  {
+    "id": "fr-doc_financial_statements-03",
+    "language": "FR",
+    "question": "Quels faits dans Performance financiere soutiennent les conclusions sur tendance du chiffre d affaires et rentabilite ?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance financiere",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendance des revenus annuels est indiquee",
+      "L evolution des marges est quantifiee",
+      "Les principaux facteurs de cout sont identifies"
+    ]
+  },
+  {
+    "id": "fr-doc_financial_statements-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Performance financiere au sujet de tendance du chiffre d affaires et rentabilite ?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance financiere",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendance des revenus annuels est indiquee",
+      "L evolution des marges est quantifiee",
+      "Les principaux facteurs de cout sont identifies"
+    ]
+  },
+  {
+    "id": "fr-doc_financial_statements-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Performance financiere sur tendance du chiffre d affaires et rentabilite.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance financiere",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendance des revenus annuels est indiquee",
+      "L evolution des marges est quantifiee",
+      "Les principaux facteurs de cout sont identifies"
+    ]
+  },
+  {
+    "id": "fr-doc_legal_compliance-01",
+    "language": "FR",
+    "question": "Que dit la section Conformite reglementaire sur exposition juridique ouverte ?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformite reglementaire",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Les regles applicables sont listees",
+      "Les enquetes en cours sont divulguees",
+      "Les actions de remediation sont suivies"
+    ]
+  },
+  {
+    "id": "fr-doc_legal_compliance-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Conformite reglementaire concernant exposition juridique ouverte.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformite reglementaire",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Les regles applicables sont listees",
+      "Les enquetes en cours sont divulguees",
+      "Les actions de remediation sont suivies"
+    ]
+  },
+  {
+    "id": "fr-doc_legal_compliance-03",
+    "language": "FR",
+    "question": "Quels faits dans Conformite reglementaire soutiennent les conclusions sur exposition juridique ouverte ?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformite reglementaire",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Les regles applicables sont listees",
+      "Les enquetes en cours sont divulguees",
+      "Les actions de remediation sont suivies"
+    ]
+  },
+  {
+    "id": "fr-doc_legal_compliance-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Conformite reglementaire au sujet de exposition juridique ouverte ?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformite reglementaire",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Les regles applicables sont listees",
+      "Les enquetes en cours sont divulguees",
+      "Les actions de remediation sont suivies"
+    ]
+  },
+  {
+    "id": "fr-doc_legal_compliance-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Conformite reglementaire sur exposition juridique ouverte.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformite reglementaire",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Les regles applicables sont listees",
+      "Les enquetes en cours sont divulguees",
+      "Les actions de remediation sont suivies"
+    ]
+  },
+  {
+    "id": "fr-doc_market_analysis-01",
+    "language": "FR",
+    "question": "Que dit la section Positionnement sur le marche sur differenciation concurrentielle ?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Positionnement sur le marche",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Les segments cibles sont definis",
+      "Une comparaison concurrentielle est fournie",
+      "La proposition de valeur unique est formulee"
+    ]
+  },
+  {
+    "id": "fr-doc_market_analysis-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Positionnement sur le marche concernant differenciation concurrentielle.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Positionnement sur le marche",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Les segments cibles sont definis",
+      "Une comparaison concurrentielle est fournie",
+      "La proposition de valeur unique est formulee"
+    ]
+  },
+  {
+    "id": "fr-doc_market_analysis-03",
+    "language": "FR",
+    "question": "Quels faits dans Positionnement sur le marche soutiennent les conclusions sur differenciation concurrentielle ?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Positionnement sur le marche",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Les segments cibles sont definis",
+      "Une comparaison concurrentielle est fournie",
+      "La proposition de valeur unique est formulee"
+    ]
+  },
+  {
+    "id": "fr-doc_market_analysis-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Positionnement sur le marche au sujet de differenciation concurrentielle ?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Positionnement sur le marche",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Les segments cibles sont definis",
+      "Une comparaison concurrentielle est fournie",
+      "La proposition de valeur unique est formulee"
+    ]
+  },
+  {
+    "id": "fr-doc_market_analysis-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Positionnement sur le marche sur differenciation concurrentielle.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Positionnement sur le marche",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Les segments cibles sont definis",
+      "Une comparaison concurrentielle est fournie",
+      "La proposition de valeur unique est formulee"
+    ]
+  },
+  {
+    "id": "fr-doc_operations_report-01",
+    "language": "FR",
+    "question": "Que dit la section Performance operationnelle sur contraintes de capacite et qualite de livraison ?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operationnelle",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilisation de capacite est quantifiee",
+      "Les KPI de service ou livraison sont suivis",
+      "Les goulets operationnels et actions sont decrits"
+    ]
+  },
+  {
+    "id": "fr-doc_operations_report-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Performance operationnelle concernant contraintes de capacite et qualite de livraison.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operationnelle",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilisation de capacite est quantifiee",
+      "Les KPI de service ou livraison sont suivis",
+      "Les goulets operationnels et actions sont decrits"
+    ]
+  },
+  {
+    "id": "fr-doc_operations_report-03",
+    "language": "FR",
+    "question": "Quels faits dans Performance operationnelle soutiennent les conclusions sur contraintes de capacite et qualite de livraison ?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operationnelle",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilisation de capacite est quantifiee",
+      "Les KPI de service ou livraison sont suivis",
+      "Les goulets operationnels et actions sont decrits"
+    ]
+  },
+  {
+    "id": "fr-doc_operations_report-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Performance operationnelle au sujet de contraintes de capacite et qualite de livraison ?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operationnelle",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilisation de capacite est quantifiee",
+      "Les KPI de service ou livraison sont suivis",
+      "Les goulets operationnels et actions sont decrits"
+    ]
+  },
+  {
+    "id": "fr-doc_operations_report-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Performance operationnelle sur contraintes de capacite et qualite de livraison.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operationnelle",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilisation de capacite est quantifiee",
+      "Les KPI de service ou livraison sont suivis",
+      "Les goulets operationnels et actions sont decrits"
+    ]
+  },
+  {
+    "id": "fr-doc_esg_assessment-01",
+    "language": "FR",
+    "question": "Que dit la section Evaluation ESG sur risques de durabilite materiels ?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluation ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Les sujets ESG materiels sont priorises",
+      "Les indicateurs de base sont rapportes",
+      "La feuille de route d amelioration est definie"
+    ]
+  },
+  {
+    "id": "fr-doc_esg_assessment-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Evaluation ESG concernant risques de durabilite materiels.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluation ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Les sujets ESG materiels sont priorises",
+      "Les indicateurs de base sont rapportes",
+      "La feuille de route d amelioration est definie"
+    ]
+  },
+  {
+    "id": "fr-doc_esg_assessment-03",
+    "language": "FR",
+    "question": "Quels faits dans Evaluation ESG soutiennent les conclusions sur risques de durabilite materiels ?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluation ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Les sujets ESG materiels sont priorises",
+      "Les indicateurs de base sont rapportes",
+      "La feuille de route d amelioration est definie"
+    ]
+  },
+  {
+    "id": "fr-doc_esg_assessment-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Evaluation ESG au sujet de risques de durabilite materiels ?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluation ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Les sujets ESG materiels sont priorises",
+      "Les indicateurs de base sont rapportes",
+      "La feuille de route d amelioration est definie"
+    ]
+  },
+  {
+    "id": "fr-doc_esg_assessment-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Evaluation ESG sur risques de durabilite materiels.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluation ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Les sujets ESG materiels sont priorises",
+      "Les indicateurs de base sont rapportes",
+      "La feuille de route d amelioration est definie"
+    ]
+  },
+  {
+    "id": "fr-doc_risk_register-01",
+    "language": "FR",
+    "question": "Que dit la section Registre des risques sur principaux risques operationnels et strategiques ?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registre des risques",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilite et l impact des risques sont notes",
+      "Les proprietaires de risques sont attribues",
+      "Le statut des mitigations est rapporte"
+    ]
+  },
+  {
+    "id": "fr-doc_risk_register-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Registre des risques concernant principaux risques operationnels et strategiques.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registre des risques",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilite et l impact des risques sont notes",
+      "Les proprietaires de risques sont attribues",
+      "Le statut des mitigations est rapporte"
+    ]
+  },
+  {
+    "id": "fr-doc_risk_register-03",
+    "language": "FR",
+    "question": "Quels faits dans Registre des risques soutiennent les conclusions sur principaux risques operationnels et strategiques ?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registre des risques",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilite et l impact des risques sont notes",
+      "Les proprietaires de risques sont attribues",
+      "Le statut des mitigations est rapporte"
+    ]
+  },
+  {
+    "id": "fr-doc_risk_register-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Registre des risques au sujet de principaux risques operationnels et strategiques ?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registre des risques",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilite et l impact des risques sont notes",
+      "Les proprietaires de risques sont attribues",
+      "Le statut des mitigations est rapporte"
+    ]
+  },
+  {
+    "id": "fr-doc_risk_register-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Registre des risques sur principaux risques operationnels et strategiques.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registre des risques",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilite et l impact des risques sont notes",
+      "Les proprietaires de risques sont attribues",
+      "Le statut des mitigations est rapporte"
+    ]
+  },
+  {
+    "id": "fr-doc_customer_contracts-01",
+    "language": "FR",
+    "question": "Que dit la section Contrats clients sur risque de renouvellement et concentration ?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contrats clients",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Les principaux clients et parts de contrat sont listes",
+      "Les echeances de renouvellement sont identifiees",
+      "Les clauses de resiliation ou penalites sont resumees"
+    ]
+  },
+  {
+    "id": "fr-doc_customer_contracts-02",
+    "language": "FR",
+    "question": "Resume les preuves cles de Contrats clients concernant risque de renouvellement et concentration.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contrats clients",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Les principaux clients et parts de contrat sont listes",
+      "Les echeances de renouvellement sont identifiees",
+      "Les clauses de resiliation ou penalites sont resumees"
+    ]
+  },
+  {
+    "id": "fr-doc_customer_contracts-03",
+    "language": "FR",
+    "question": "Quels faits dans Contrats clients soutiennent les conclusions sur risque de renouvellement et concentration ?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contrats clients",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Les principaux clients et parts de contrat sont listes",
+      "Les echeances de renouvellement sont identifiees",
+      "Les clauses de resiliation ou penalites sont resumees"
+    ]
+  },
+  {
+    "id": "fr-doc_customer_contracts-04",
+    "language": "FR",
+    "question": "Quels risques sont signales dans Contrats clients au sujet de risque de renouvellement et concentration ?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contrats clients",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Les principaux clients et parts de contrat sont listes",
+      "Les echeances de renouvellement sont identifiees",
+      "Les clauses de resiliation ou penalites sont resumees"
+    ]
+  },
+  {
+    "id": "fr-doc_customer_contracts-05",
+    "language": "FR",
+    "question": "Donne une reponse de due diligence depuis Contrats clients sur risque de renouvellement et concentration.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contrats clients",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Les principaux clients et parts de contrat sont listes",
+      "Les echeances de renouvellement sont identifiees",
+      "Les clauses de resiliation ou penalites sont resumees"
+    ]
+  },
+  {
+    "id": "it-doc_company_profile-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Profilo aziendale su struttura proprietaria e leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profilo aziendale",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Il modello proprietario e documentato",
+      "Le responsabilita del management sono elencate",
+      "Le linee di business principali sono descritte"
+    ]
+  },
+  {
+    "id": "it-doc_company_profile-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Profilo aziendale per struttura proprietaria e leadership.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profilo aziendale",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Il modello proprietario e documentato",
+      "Le responsabilita del management sono elencate",
+      "Le linee di business principali sono descritte"
+    ]
+  },
+  {
+    "id": "it-doc_company_profile-03",
+    "language": "IT",
+    "question": "Quali fatti in Profilo aziendale supportano le conclusioni su struttura proprietaria e leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profilo aziendale",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Il modello proprietario e documentato",
+      "Le responsabilita del management sono elencate",
+      "Le linee di business principali sono descritte"
+    ]
+  },
+  {
+    "id": "it-doc_company_profile-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Profilo aziendale riguardo a struttura proprietaria e leadership?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profilo aziendale",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Il modello proprietario e documentato",
+      "Le responsabilita del management sono elencate",
+      "Le linee di business principali sono descritte"
+    ]
+  },
+  {
+    "id": "it-doc_company_profile-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Profilo aziendale su struttura proprietaria e leadership.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Profilo aziendale",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "Il modello proprietario e documentato",
+      "Le responsabilita del management sono elencate",
+      "Le linee di business principali sono descritte"
+    ]
+  },
+  {
+    "id": "it-doc_financial_statements-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Performance finanziaria su trend dei ricavi e redditivita?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance finanziaria",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Il trend dei ricavi anno su anno e indicato",
+      "La variazione dei margini e quantificata",
+      "I principali driver di costo sono identificati"
+    ]
+  },
+  {
+    "id": "it-doc_financial_statements-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Performance finanziaria per trend dei ricavi e redditivita.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance finanziaria",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Il trend dei ricavi anno su anno e indicato",
+      "La variazione dei margini e quantificata",
+      "I principali driver di costo sono identificati"
+    ]
+  },
+  {
+    "id": "it-doc_financial_statements-03",
+    "language": "IT",
+    "question": "Quali fatti in Performance finanziaria supportano le conclusioni su trend dei ricavi e redditivita?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance finanziaria",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Il trend dei ricavi anno su anno e indicato",
+      "La variazione dei margini e quantificata",
+      "I principali driver di costo sono identificati"
+    ]
+  },
+  {
+    "id": "it-doc_financial_statements-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Performance finanziaria riguardo a trend dei ricavi e redditivita?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance finanziaria",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Il trend dei ricavi anno su anno e indicato",
+      "La variazione dei margini e quantificata",
+      "I principali driver di costo sono identificati"
+    ]
+  },
+  {
+    "id": "it-doc_financial_statements-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Performance finanziaria su trend dei ricavi e redditivita.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Performance finanziaria",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "Il trend dei ricavi anno su anno e indicato",
+      "La variazione dei margini e quantificata",
+      "I principali driver di costo sono identificati"
+    ]
+  },
+  {
+    "id": "it-doc_legal_compliance-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Conformita normativa su esposizione legale aperta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformita normativa",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Le normative applicabili sono elencate",
+      "Le indagini aperte sono dichiarate",
+      "Le azioni di mitigazione sono monitorate"
+    ]
+  },
+  {
+    "id": "it-doc_legal_compliance-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Conformita normativa per esposizione legale aperta.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformita normativa",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Le normative applicabili sono elencate",
+      "Le indagini aperte sono dichiarate",
+      "Le azioni di mitigazione sono monitorate"
+    ]
+  },
+  {
+    "id": "it-doc_legal_compliance-03",
+    "language": "IT",
+    "question": "Quali fatti in Conformita normativa supportano le conclusioni su esposizione legale aperta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformita normativa",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Le normative applicabili sono elencate",
+      "Le indagini aperte sono dichiarate",
+      "Le azioni di mitigazione sono monitorate"
+    ]
+  },
+  {
+    "id": "it-doc_legal_compliance-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Conformita normativa riguardo a esposizione legale aperta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformita normativa",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Le normative applicabili sono elencate",
+      "Le indagini aperte sono dichiarate",
+      "Le azioni di mitigazione sono monitorate"
+    ]
+  },
+  {
+    "id": "it-doc_legal_compliance-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Conformita normativa su esposizione legale aperta.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Conformita normativa",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Le normative applicabili sono elencate",
+      "Le indagini aperte sono dichiarate",
+      "Le azioni di mitigazione sono monitorate"
+    ]
+  },
+  {
+    "id": "it-doc_market_analysis-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Posizionamento di mercato su differenziazione competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posizionamento di mercato",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "I segmenti target sono definiti",
+      "E presente un confronto con i concorrenti",
+      "La proposta di valore unica e descritta"
+    ]
+  },
+  {
+    "id": "it-doc_market_analysis-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Posizionamento di mercato per differenziazione competitiva.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posizionamento di mercato",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "I segmenti target sono definiti",
+      "E presente un confronto con i concorrenti",
+      "La proposta di valore unica e descritta"
+    ]
+  },
+  {
+    "id": "it-doc_market_analysis-03",
+    "language": "IT",
+    "question": "Quali fatti in Posizionamento di mercato supportano le conclusioni su differenziazione competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posizionamento di mercato",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "I segmenti target sono definiti",
+      "E presente un confronto con i concorrenti",
+      "La proposta di valore unica e descritta"
+    ]
+  },
+  {
+    "id": "it-doc_market_analysis-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Posizionamento di mercato riguardo a differenziazione competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posizionamento di mercato",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "I segmenti target sono definiti",
+      "E presente un confronto con i concorrenti",
+      "La proposta di valore unica e descritta"
+    ]
+  },
+  {
+    "id": "it-doc_market_analysis-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Posizionamento di mercato su differenziazione competitiva.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posizionamento di mercato",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "I segmenti target sono definiti",
+      "E presente un confronto con i concorrenti",
+      "La proposta di valore unica e descritta"
+    ]
+  },
+  {
+    "id": "it-doc_operations_report-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Performance operativa su vincoli di capacita e qualita di consegna?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operativa",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilizzo della capacita e quantificato",
+      "I KPI di servizio o consegna sono monitorati",
+      "I colli di bottiglia operativi e le azioni sono descritti"
+    ]
+  },
+  {
+    "id": "it-doc_operations_report-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Performance operativa per vincoli di capacita e qualita di consegna.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operativa",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilizzo della capacita e quantificato",
+      "I KPI di servizio o consegna sono monitorati",
+      "I colli di bottiglia operativi e le azioni sono descritti"
+    ]
+  },
+  {
+    "id": "it-doc_operations_report-03",
+    "language": "IT",
+    "question": "Quali fatti in Performance operativa supportano le conclusioni su vincoli di capacita e qualita di consegna?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operativa",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilizzo della capacita e quantificato",
+      "I KPI di servizio o consegna sono monitorati",
+      "I colli di bottiglia operativi e le azioni sono descritti"
+    ]
+  },
+  {
+    "id": "it-doc_operations_report-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Performance operativa riguardo a vincoli di capacita e qualita di consegna?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operativa",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilizzo della capacita e quantificato",
+      "I KPI di servizio o consegna sono monitorati",
+      "I colli di bottiglia operativi e le azioni sono descritti"
+    ]
+  },
+  {
+    "id": "it-doc_operations_report-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Performance operativa su vincoli di capacita e qualita di consegna.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Performance operativa",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "L utilizzo della capacita e quantificato",
+      "I KPI di servizio o consegna sono monitorati",
+      "I colli di bottiglia operativi e le azioni sono descritti"
+    ]
+  },
+  {
+    "id": "it-doc_esg_assessment-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Valutazione ESG su rischi di sostenibilita materiali?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Valutazione ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "I temi ESG materiali sono prioritizzati",
+      "Gli indicatori di base sono riportati",
+      "La roadmap di miglioramento e definita"
+    ]
+  },
+  {
+    "id": "it-doc_esg_assessment-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Valutazione ESG per rischi di sostenibilita materiali.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Valutazione ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "I temi ESG materiali sono prioritizzati",
+      "Gli indicatori di base sono riportati",
+      "La roadmap di miglioramento e definita"
+    ]
+  },
+  {
+    "id": "it-doc_esg_assessment-03",
+    "language": "IT",
+    "question": "Quali fatti in Valutazione ESG supportano le conclusioni su rischi di sostenibilita materiali?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Valutazione ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "I temi ESG materiali sono prioritizzati",
+      "Gli indicatori di base sono riportati",
+      "La roadmap di miglioramento e definita"
+    ]
+  },
+  {
+    "id": "it-doc_esg_assessment-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Valutazione ESG riguardo a rischi di sostenibilita materiali?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Valutazione ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "I temi ESG materiali sono prioritizzati",
+      "Gli indicatori di base sono riportati",
+      "La roadmap di miglioramento e definita"
+    ]
+  },
+  {
+    "id": "it-doc_esg_assessment-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Valutazione ESG su rischi di sostenibilita materiali.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Valutazione ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "I temi ESG materiali sono prioritizzati",
+      "Gli indicatori di base sono riportati",
+      "La roadmap di miglioramento e definita"
+    ]
+  },
+  {
+    "id": "it-doc_risk_register-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Registro dei rischi su principali rischi operativi e strategici?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro dei rischi",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Probabilita e impatto dei rischi sono valutati",
+      "I responsabili dei rischi sono assegnati",
+      "Lo stato delle mitigazioni e riportato"
+    ]
+  },
+  {
+    "id": "it-doc_risk_register-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Registro dei rischi per principali rischi operativi e strategici.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro dei rischi",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Probabilita e impatto dei rischi sono valutati",
+      "I responsabili dei rischi sono assegnati",
+      "Lo stato delle mitigazioni e riportato"
+    ]
+  },
+  {
+    "id": "it-doc_risk_register-03",
+    "language": "IT",
+    "question": "Quali fatti in Registro dei rischi supportano le conclusioni su principali rischi operativi e strategici?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro dei rischi",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Probabilita e impatto dei rischi sono valutati",
+      "I responsabili dei rischi sono assegnati",
+      "Lo stato delle mitigazioni e riportato"
+    ]
+  },
+  {
+    "id": "it-doc_risk_register-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Registro dei rischi riguardo a principali rischi operativi e strategici?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro dei rischi",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Probabilita e impatto dei rischi sono valutati",
+      "I responsabili dei rischi sono assegnati",
+      "Lo stato delle mitigazioni e riportato"
+    ]
+  },
+  {
+    "id": "it-doc_risk_register-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Registro dei rischi su principali rischi operativi e strategici.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro dei rischi",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "Probabilita e impatto dei rischi sono valutati",
+      "I responsabili dei rischi sono assegnati",
+      "Lo stato delle mitigazioni e riportato"
+    ]
+  },
+  {
+    "id": "it-doc_customer_contracts-01",
+    "language": "IT",
+    "question": "Cosa riporta la sezione Contratti clienti su rischio di rinnovo e concentrazione?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratti clienti",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "I principali clienti e le quote contrattuali sono elencati",
+      "Le scadenze di rinnovo sono identificate",
+      "Le clausole di recesso o penale sono riassunte"
+    ]
+  },
+  {
+    "id": "it-doc_customer_contracts-02",
+    "language": "IT",
+    "question": "Riassumi le prove chiave in Contratti clienti per rischio di rinnovo e concentrazione.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratti clienti",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "I principali clienti e le quote contrattuali sono elencati",
+      "Le scadenze di rinnovo sono identificate",
+      "Le clausole di recesso o penale sono riassunte"
+    ]
+  },
+  {
+    "id": "it-doc_customer_contracts-03",
+    "language": "IT",
+    "question": "Quali fatti in Contratti clienti supportano le conclusioni su rischio di rinnovo e concentrazione?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratti clienti",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "I principali clienti e le quote contrattuali sono elencati",
+      "Le scadenze di rinnovo sono identificate",
+      "Le clausole di recesso o penale sono riassunte"
+    ]
+  },
+  {
+    "id": "it-doc_customer_contracts-04",
+    "language": "IT",
+    "question": "Quali rischi sono evidenziati in Contratti clienti riguardo a rischio di rinnovo e concentrazione?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratti clienti",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "I principali clienti e le quote contrattuali sono elencati",
+      "Le scadenze di rinnovo sono identificate",
+      "Le clausole di recesso o penale sono riassunte"
+    ]
+  },
+  {
+    "id": "it-doc_customer_contracts-05",
+    "language": "IT",
+    "question": "Fornisci una risposta di due diligence da Contratti clienti su rischio di rinnovo e concentrazione.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratti clienti",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "I principali clienti e le quote contrattuali sono elencati",
+      "Le scadenze di rinnovo sono identificate",
+      "Le clausole di recesso o penale sono riassunte"
+    ]
+  },
+  {
+    "id": "es-doc_company_profile-01",
+    "language": "ES",
+    "question": "Que informa la seccion Perfil de la empresa sobre estructura de propiedad y liderazgo?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Perfil de la empresa",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "El modelo de propiedad esta documentado",
+      "Las responsabilidades del equipo directivo estan listadas",
+      "Las lineas de negocio clave estan descritas"
+    ]
+  },
+  {
+    "id": "es-doc_company_profile-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Perfil de la empresa para estructura de propiedad y liderazgo.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Perfil de la empresa",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "El modelo de propiedad esta documentado",
+      "Las responsabilidades del equipo directivo estan listadas",
+      "Las lineas de negocio clave estan descritas"
+    ]
+  },
+  {
+    "id": "es-doc_company_profile-03",
+    "language": "ES",
+    "question": "Que hechos en Perfil de la empresa respaldan conclusiones sobre estructura de propiedad y liderazgo?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Perfil de la empresa",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "El modelo de propiedad esta documentado",
+      "Las responsabilidades del equipo directivo estan listadas",
+      "Las lineas de negocio clave estan descritas"
+    ]
+  },
+  {
+    "id": "es-doc_company_profile-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Perfil de la empresa en relacion con estructura de propiedad y liderazgo?",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Perfil de la empresa",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "El modelo de propiedad esta documentado",
+      "Las responsabilidades del equipo directivo estan listadas",
+      "Las lineas de negocio clave estan descritas"
+    ]
+  },
+  {
+    "id": "es-doc_company_profile-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Perfil de la empresa sobre estructura de propiedad y liderazgo.",
+    "expected_document": "doc_company_profile",
+    "expected_section": "Perfil de la empresa",
+    "expected_pages": [
+      1,
+      2
+    ],
+    "acceptable_answer_points": [
+      "El modelo de propiedad esta documentado",
+      "Las responsabilidades del equipo directivo estan listadas",
+      "Las lineas de negocio clave estan descritas"
+    ]
+  },
+  {
+    "id": "es-doc_financial_statements-01",
+    "language": "ES",
+    "question": "Que informa la seccion Rendimiento financiero sobre tendencia de ingresos y rentabilidad?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Rendimiento financiero",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendencia anual de ingresos esta indicada",
+      "La evolucion del margen esta cuantificada",
+      "Los principales impulsores de costos estan identificados"
+    ]
+  },
+  {
+    "id": "es-doc_financial_statements-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Rendimiento financiero para tendencia de ingresos y rentabilidad.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Rendimiento financiero",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendencia anual de ingresos esta indicada",
+      "La evolucion del margen esta cuantificada",
+      "Los principales impulsores de costos estan identificados"
+    ]
+  },
+  {
+    "id": "es-doc_financial_statements-03",
+    "language": "ES",
+    "question": "Que hechos en Rendimiento financiero respaldan conclusiones sobre tendencia de ingresos y rentabilidad?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Rendimiento financiero",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendencia anual de ingresos esta indicada",
+      "La evolucion del margen esta cuantificada",
+      "Los principales impulsores de costos estan identificados"
+    ]
+  },
+  {
+    "id": "es-doc_financial_statements-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Rendimiento financiero en relacion con tendencia de ingresos y rentabilidad?",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Rendimiento financiero",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendencia anual de ingresos esta indicada",
+      "La evolucion del margen esta cuantificada",
+      "Los principales impulsores de costos estan identificados"
+    ]
+  },
+  {
+    "id": "es-doc_financial_statements-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Rendimiento financiero sobre tendencia de ingresos y rentabilidad.",
+    "expected_document": "doc_financial_statements",
+    "expected_section": "Rendimiento financiero",
+    "expected_pages": [
+      8,
+      9
+    ],
+    "acceptable_answer_points": [
+      "La tendencia anual de ingresos esta indicada",
+      "La evolucion del margen esta cuantificada",
+      "Los principales impulsores de costos estan identificados"
+    ]
+  },
+  {
+    "id": "es-doc_legal_compliance-01",
+    "language": "ES",
+    "question": "Que informa la seccion Cumplimiento regulatorio sobre exposicion legal abierta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Cumplimiento regulatorio",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Las regulaciones aplicables estan listadas",
+      "Las investigaciones abiertas estan reveladas",
+      "Las acciones de mitigacion y remediacion estan registradas"
+    ]
+  },
+  {
+    "id": "es-doc_legal_compliance-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Cumplimiento regulatorio para exposicion legal abierta.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Cumplimiento regulatorio",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Las regulaciones aplicables estan listadas",
+      "Las investigaciones abiertas estan reveladas",
+      "Las acciones de mitigacion y remediacion estan registradas"
+    ]
+  },
+  {
+    "id": "es-doc_legal_compliance-03",
+    "language": "ES",
+    "question": "Que hechos en Cumplimiento regulatorio respaldan conclusiones sobre exposicion legal abierta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Cumplimiento regulatorio",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Las regulaciones aplicables estan listadas",
+      "Las investigaciones abiertas estan reveladas",
+      "Las acciones de mitigacion y remediacion estan registradas"
+    ]
+  },
+  {
+    "id": "es-doc_legal_compliance-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Cumplimiento regulatorio en relacion con exposicion legal abierta?",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Cumplimiento regulatorio",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Las regulaciones aplicables estan listadas",
+      "Las investigaciones abiertas estan reveladas",
+      "Las acciones de mitigacion y remediacion estan registradas"
+    ]
+  },
+  {
+    "id": "es-doc_legal_compliance-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Cumplimiento regulatorio sobre exposicion legal abierta.",
+    "expected_document": "doc_legal_compliance",
+    "expected_section": "Cumplimiento regulatorio",
+    "expected_pages": [
+      12,
+      13
+    ],
+    "acceptable_answer_points": [
+      "Las regulaciones aplicables estan listadas",
+      "Las investigaciones abiertas estan reveladas",
+      "Las acciones de mitigacion y remediacion estan registradas"
+    ]
+  },
+  {
+    "id": "es-doc_market_analysis-01",
+    "language": "ES",
+    "question": "Que informa la seccion Posicionamiento de mercado sobre diferenciacion competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posicionamiento de mercado",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Los segmentos objetivo estan definidos",
+      "Se proporciona comparacion con competidores",
+      "La propuesta de valor unica esta formulada"
+    ]
+  },
+  {
+    "id": "es-doc_market_analysis-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Posicionamiento de mercado para diferenciacion competitiva.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posicionamiento de mercado",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Los segmentos objetivo estan definidos",
+      "Se proporciona comparacion con competidores",
+      "La propuesta de valor unica esta formulada"
+    ]
+  },
+  {
+    "id": "es-doc_market_analysis-03",
+    "language": "ES",
+    "question": "Que hechos en Posicionamiento de mercado respaldan conclusiones sobre diferenciacion competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posicionamiento de mercado",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Los segmentos objetivo estan definidos",
+      "Se proporciona comparacion con competidores",
+      "La propuesta de valor unica esta formulada"
+    ]
+  },
+  {
+    "id": "es-doc_market_analysis-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Posicionamiento de mercado en relacion con diferenciacion competitiva?",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posicionamiento de mercado",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Los segmentos objetivo estan definidos",
+      "Se proporciona comparacion con competidores",
+      "La propuesta de valor unica esta formulada"
+    ]
+  },
+  {
+    "id": "es-doc_market_analysis-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Posicionamiento de mercado sobre diferenciacion competitiva.",
+    "expected_document": "doc_market_analysis",
+    "expected_section": "Posicionamiento de mercado",
+    "expected_pages": [
+      16,
+      17
+    ],
+    "acceptable_answer_points": [
+      "Los segmentos objetivo estan definidos",
+      "Se proporciona comparacion con competidores",
+      "La propuesta de valor unica esta formulada"
+    ]
+  },
+  {
+    "id": "es-doc_operations_report-01",
+    "language": "ES",
+    "question": "Que informa la seccion Rendimiento operativo sobre restricciones de capacidad y calidad de entrega?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Rendimiento operativo",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "La utilizacion de capacidad esta cuantificada",
+      "Se monitorean KPI de servicio o entrega",
+      "Se describen cuellos de botella operativos y acciones"
+    ]
+  },
+  {
+    "id": "es-doc_operations_report-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Rendimiento operativo para restricciones de capacidad y calidad de entrega.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Rendimiento operativo",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "La utilizacion de capacidad esta cuantificada",
+      "Se monitorean KPI de servicio o entrega",
+      "Se describen cuellos de botella operativos y acciones"
+    ]
+  },
+  {
+    "id": "es-doc_operations_report-03",
+    "language": "ES",
+    "question": "Que hechos en Rendimiento operativo respaldan conclusiones sobre restricciones de capacidad y calidad de entrega?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Rendimiento operativo",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "La utilizacion de capacidad esta cuantificada",
+      "Se monitorean KPI de servicio o entrega",
+      "Se describen cuellos de botella operativos y acciones"
+    ]
+  },
+  {
+    "id": "es-doc_operations_report-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Rendimiento operativo en relacion con restricciones de capacidad y calidad de entrega?",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Rendimiento operativo",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "La utilizacion de capacidad esta cuantificada",
+      "Se monitorean KPI de servicio o entrega",
+      "Se describen cuellos de botella operativos y acciones"
+    ]
+  },
+  {
+    "id": "es-doc_operations_report-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Rendimiento operativo sobre restricciones de capacidad y calidad de entrega.",
+    "expected_document": "doc_operations_report",
+    "expected_section": "Rendimiento operativo",
+    "expected_pages": [
+      20,
+      21
+    ],
+    "acceptable_answer_points": [
+      "La utilizacion de capacidad esta cuantificada",
+      "Se monitorean KPI de servicio o entrega",
+      "Se describen cuellos de botella operativos y acciones"
+    ]
+  },
+  {
+    "id": "es-doc_esg_assessment-01",
+    "language": "ES",
+    "question": "Que informa la seccion Evaluacion ESG sobre riesgos materiales de sostenibilidad?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluacion ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Los temas ESG materiales estan priorizados",
+      "Los indicadores base estan reportados",
+      "La hoja de ruta de mejora esta definida"
+    ]
+  },
+  {
+    "id": "es-doc_esg_assessment-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Evaluacion ESG para riesgos materiales de sostenibilidad.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluacion ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Los temas ESG materiales estan priorizados",
+      "Los indicadores base estan reportados",
+      "La hoja de ruta de mejora esta definida"
+    ]
+  },
+  {
+    "id": "es-doc_esg_assessment-03",
+    "language": "ES",
+    "question": "Que hechos en Evaluacion ESG respaldan conclusiones sobre riesgos materiales de sostenibilidad?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluacion ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Los temas ESG materiales estan priorizados",
+      "Los indicadores base estan reportados",
+      "La hoja de ruta de mejora esta definida"
+    ]
+  },
+  {
+    "id": "es-doc_esg_assessment-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Evaluacion ESG en relacion con riesgos materiales de sostenibilidad?",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluacion ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Los temas ESG materiales estan priorizados",
+      "Los indicadores base estan reportados",
+      "La hoja de ruta de mejora esta definida"
+    ]
+  },
+  {
+    "id": "es-doc_esg_assessment-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Evaluacion ESG sobre riesgos materiales de sostenibilidad.",
+    "expected_document": "doc_esg_assessment",
+    "expected_section": "Evaluacion ESG",
+    "expected_pages": [
+      24,
+      25
+    ],
+    "acceptable_answer_points": [
+      "Los temas ESG materiales estan priorizados",
+      "Los indicadores base estan reportados",
+      "La hoja de ruta de mejora esta definida"
+    ]
+  },
+  {
+    "id": "es-doc_risk_register-01",
+    "language": "ES",
+    "question": "Que informa la seccion Registro de riesgos sobre principales riesgos operativos y estrategicos?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro de riesgos",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilidad e impacto de riesgos estan evaluados",
+      "Los propietarios de riesgo estan asignados",
+      "El estado de mitigaciones esta reportado"
+    ]
+  },
+  {
+    "id": "es-doc_risk_register-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Registro de riesgos para principales riesgos operativos y estrategicos.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro de riesgos",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilidad e impacto de riesgos estan evaluados",
+      "Los propietarios de riesgo estan asignados",
+      "El estado de mitigaciones esta reportado"
+    ]
+  },
+  {
+    "id": "es-doc_risk_register-03",
+    "language": "ES",
+    "question": "Que hechos en Registro de riesgos respaldan conclusiones sobre principales riesgos operativos y estrategicos?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro de riesgos",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilidad e impacto de riesgos estan evaluados",
+      "Los propietarios de riesgo estan asignados",
+      "El estado de mitigaciones esta reportado"
+    ]
+  },
+  {
+    "id": "es-doc_risk_register-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Registro de riesgos en relacion con principales riesgos operativos y estrategicos?",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro de riesgos",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilidad e impacto de riesgos estan evaluados",
+      "Los propietarios de riesgo estan asignados",
+      "El estado de mitigaciones esta reportado"
+    ]
+  },
+  {
+    "id": "es-doc_risk_register-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Registro de riesgos sobre principales riesgos operativos y estrategicos.",
+    "expected_document": "doc_risk_register",
+    "expected_section": "Registro de riesgos",
+    "expected_pages": [
+      27,
+      28
+    ],
+    "acceptable_answer_points": [
+      "La probabilidad e impacto de riesgos estan evaluados",
+      "Los propietarios de riesgo estan asignados",
+      "El estado de mitigaciones esta reportado"
+    ]
+  },
+  {
+    "id": "es-doc_customer_contracts-01",
+    "language": "ES",
+    "question": "Que informa la seccion Contratos de clientes sobre riesgo de renovacion y concentracion?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratos de clientes",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Los principales clientes y cuota contractual estan listados",
+      "Los plazos de renovacion estan identificados",
+      "Las clausulas de terminacion o penalizacion estan resumidas"
+    ]
+  },
+  {
+    "id": "es-doc_customer_contracts-02",
+    "language": "ES",
+    "question": "Resume la evidencia clave en Contratos de clientes para riesgo de renovacion y concentracion.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratos de clientes",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Los principales clientes y cuota contractual estan listados",
+      "Los plazos de renovacion estan identificados",
+      "Las clausulas de terminacion o penalizacion estan resumidas"
+    ]
+  },
+  {
+    "id": "es-doc_customer_contracts-03",
+    "language": "ES",
+    "question": "Que hechos en Contratos de clientes respaldan conclusiones sobre riesgo de renovacion y concentracion?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratos de clientes",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Los principales clientes y cuota contractual estan listados",
+      "Los plazos de renovacion estan identificados",
+      "Las clausulas de terminacion o penalizacion estan resumidas"
+    ]
+  },
+  {
+    "id": "es-doc_customer_contracts-04",
+    "language": "ES",
+    "question": "Que riesgos se destacan en Contratos de clientes en relacion con riesgo de renovacion y concentracion?",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratos de clientes",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Los principales clientes y cuota contractual estan listados",
+      "Los plazos de renovacion estan identificados",
+      "Las clausulas de terminacion o penalizacion estan resumidas"
+    ]
+  },
+  {
+    "id": "es-doc_customer_contracts-05",
+    "language": "ES",
+    "question": "Da una respuesta de due diligence desde Contratos de clientes sobre riesgo de renovacion y concentracion.",
+    "expected_document": "doc_customer_contracts",
+    "expected_section": "Contratos de clientes",
+    "expected_pages": [
+      30,
+      31
+    ],
+    "acceptable_answer_points": [
+      "Los principales clientes y cuota contractual estan listados",
+      "Los plazos de renovacion estan identificados",
+      "Las clausulas de terminacion o penalizacion estan resumidas"
+    ]
+  }
+]
