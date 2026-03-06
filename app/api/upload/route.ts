@@ -15,7 +15,7 @@ const uploadMetadataSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request, ["admin"]);
+  const authResult = await requireAuth(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {

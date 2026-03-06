@@ -258,7 +258,7 @@ python -m rag_worker.main
 
 ## Step 11: Smoke test end-to-end
 
-1. In UI, upload a PDF as admin.
+1. In UI, upload a PDF as an authenticated user (`reader` or `admin`).
 2. Wait for ingestion status to become ready.
 3. Ask a query.
 4. Confirm answer + citations appear.

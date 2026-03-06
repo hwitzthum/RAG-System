@@ -140,7 +140,7 @@ Deliverables:
 
 - chat interface with streaming tokens
 - citation rendering and source linking
-- upload UI for admins
+- upload UI for authenticated users (`reader` and `admin`)
 - query history UI
 
 Definition of done:

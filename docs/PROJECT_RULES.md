@@ -31,7 +31,7 @@ If documents conflict, follow this precedence order.
 
 - Authentication required for all user actions.
 - Role model: `admin`, `reader`.
-- `POST /api/upload` is `admin` only.
+- `POST /api/upload` is available to `reader` and `admin`.
 - Query endpoints are `reader` and `admin`.
 - Rate limiting required for query endpoints.
 - Audit logging required for uploads, queries, and role-protected actions.

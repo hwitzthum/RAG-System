@@ -62,7 +62,7 @@ Primary goals:
 
 ## Public APIs
 
-### `POST /api/upload` (`admin`)
+### `POST /api/upload` (`reader`, `admin`)
 
 Purpose: upload PDF and enqueue ingestion.
 

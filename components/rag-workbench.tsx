@@ -125,7 +125,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(null);
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
-  const canUpload = user?.role === "admin";
+  const canUpload = user?.role === "reader" || user?.role === "admin";
 
   const activeTurn = useMemo(() => {
     if (activeTurnId) {
@@ -627,59 +627,69 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           </div>
         </section>
 
-        {canUpload ? (
-          <section className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900">Admin Upload</h3>
-            <div className="mt-3 space-y-2">
-              <input
-                type="file"
-                accept="application/pdf"
-                className="block w-full text-xs"
-                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
-              />
-              <input
-                value={uploadTitle}
-                onChange={(event) => setUploadTitle(event.target.value)}
-                placeholder="Optional title"
-                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
-              />
-              <select
-                value={uploadLanguageHint}
-                onChange={(event) => setUploadLanguageHint(event.target.value)}
-                className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Language hint (optional)</option>
-                <option value="EN">EN</option>
-                <option value="DE">DE</option>
-                <option value="FR">FR</option>
-                <option value="IT">IT</option>
-                <option value="ES">ES</option>
-              </select>
-              <button
-                type="button"
-                onClick={uploadPdf}
-                disabled={!uploadFile}
-                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                Upload PDF
-              </button>
-            </div>
+        <section className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900">Document Upload</h3>
+          <div className="mt-3 space-y-2">
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              disabled={!canUpload}
+              className="block w-full text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+            />
+            <input
+              value={uploadTitle}
+              disabled={!canUpload}
+              onChange={(event) => setUploadTitle(event.target.value)}
+              placeholder="Optional title"
+              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <select
+              value={uploadLanguageHint}
+              disabled={!canUpload}
+              onChange={(event) => setUploadLanguageHint(event.target.value)}
+              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">Language hint (optional)</option>
+              <option value="EN">EN</option>
+              <option value="DE">DE</option>
+              <option value="FR">FR</option>
+              <option value="IT">IT</option>
+              <option value="ES">ES</option>
+            </select>
+            <button
+              type="button"
+              onClick={uploadPdf}
+              disabled={!canUpload || !uploadFile}
+              className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              Upload PDF
+            </button>
+            {!canUpload ? (
+              <p className="text-xs text-emerald-800">
+                Upload requires `reader` or `admin` role. Current session role: {user?.role ?? "none"}.
+              </p>
+            ) : !uploadFile ? (
+              <p className="text-xs text-emerald-800">Select a PDF file first to enable upload.</p>
+            ) : (
+              <p className="text-xs text-emerald-800">Selected file: {uploadFile.name}</p>
+            )}
+          </div>
 
-            {uploadStatus ? (
-              <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-700">
-                <p>
-                  <span className="font-semibold">Document:</span> {uploadStatus.document.id}
-                </p>
-                <p>
-                  <span className="font-semibold">Status:</span> {uploadStatus.document.status}
-                </p>
-                <p>
-                  <span className="font-semibold">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}
-                </p>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
+          {uploadStatus ? (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-700">
+              <p>
+                <span className="font-semibold">Document:</span> {uploadStatus.document.id}
+              </p>
+              <p>
+                <span className="font-semibold">Status:</span> {uploadStatus.document.status}
+              </p>
+              <p>
+                <span className="font-semibold">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}
+              </p>
+            </div>
+          ) : null}
+        </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">

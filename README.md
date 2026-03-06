@@ -60,7 +60,7 @@ npm run test:worker
 
 ## Upload API (Phase 5)
 
-- `POST /api/upload` (`admin`): stores PDF in Supabase Storage and enqueues ingestion job
+- `POST /api/upload` (`reader|admin`): stores PDF in Supabase Storage and enqueues ingestion job
 - `GET /api/upload/{documentId}` (`reader|admin`): returns document + latest ingestion job status
 
 ## Worker Fallback Quick Start (Optional)
