@@ -55,7 +55,8 @@ function decodeVaultKey(): Buffer {
 }
 
 function sanitizeOpenAiApiKey(apiKey: string): string {
-  const normalized = apiKey.trim();
+  // Normalize common copy/paste variants without widening accepted key classes.
+  const normalized = apiKey.trim().replace(/^Bearer\s+/i, "").replace(/\s+/g, "");
   if (!normalized.startsWith(OPENAI_KEY_PREFIX)) {
     throw new Error("Invalid OpenAI API key format");
   }
