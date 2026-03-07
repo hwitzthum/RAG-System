@@ -20,6 +20,20 @@ export function buildStoragePath(checksumSha256: string, fileName: string): stri
   return `uploads/${checksumSha256}-${safeName}.pdf`;
 }
 
+export function looksLikePdfUpload(fileName: string, mimeType: string): boolean {
+  return (
+    mimeType === "application/pdf" ||
+    fileName.toLowerCase().endsWith(".pdf")
+  );
+}
+
+const PDF_MAGIC = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
+
+export function hasPdfSignature(bytes: Uint8Array): boolean {
+  if (bytes.length < PDF_MAGIC.length) return false;
+  return PDF_MAGIC.every((b, i) => bytes[i] === b);
+}
+
 export function normalizeLanguageHint(value: string | null | undefined): SupportedLanguage | null {
   if (!value) {
     return null;

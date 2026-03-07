@@ -13,6 +13,8 @@ import { extractQueryTokens, normalizeQuery } from "@/lib/retrieval/query";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 import { searchKeywordCandidates, searchVectorCandidates } from "@/lib/retrieval/repository";
 import { buildRetrievalCacheKey } from "@/lib/retrieval/trace";
+import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
+import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 
 const MIN_CANDIDATE_LIMIT = 20;
 
@@ -202,12 +204,29 @@ export async function retrieveRankedCandidates(
     rrfK: env.RAG_RRF_K,
   });
 
-  const rerankedCandidates = await deps.rerankCandidates({
+  let rerankedCandidates = await deps.rerankCandidates({
     normalizedQuery,
     candidates: fusedCandidates,
     poolSize: env.RAG_RERANK_POOL_SIZE,
     topK,
   });
+
+  if (env.RAG_CROSS_ENCODER_ENABLED) {
+    try {
+      rerankedCandidates = await crossEncoderRerank({
+        query: normalizedQuery,
+        chunks: rerankedCandidates,
+        model: env.RAG_CROSS_ENCODER_MODEL,
+        topK,
+      });
+    } catch {
+      // Fall back to existing rerank order if cross-encoder fails.
+    }
+  }
+
+  if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
+    rerankedCandidates = applyContextualGrouping(rerankedCandidates);
+  }
 
   const candidateCounts: RetrievalTrace["candidateCounts"] = {
     vector: vectorCandidates.length,

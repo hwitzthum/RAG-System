@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { env } from "@/lib/config/env";
 
 export const metadata: Metadata = {
   title: "Enterprise Retrieval Command Center",
@@ -12,9 +11,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Force startup-time validation in the Next.js runtime.
-  void env;
-
   return (
     <html lang="en">
       <body className="text-slate-900 antialiased">{children}</body>

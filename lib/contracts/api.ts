@@ -1,4 +1,7 @@
 import type { RetrievalTrace, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type { WebSource } from "@/lib/web-research/types";
+
+export type { WebSource } from "@/lib/web-research/types";
 
 export type Role = "admin" | "reader";
 
@@ -84,6 +87,8 @@ export type QuerySseFinalEvent = {
     chunkId: string;
   }>;
   retrievalMeta: QuerySseMetaEvent["retrievalMeta"];
+  webSources?: WebSource[];
+  queryHistoryId?: string;
 };
 
 export type QuerySseDoneEvent = {

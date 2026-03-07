@@ -9,6 +9,7 @@ import type {
   QuerySseFinalEvent,
   QuerySseMetaEvent,
   QuerySseTokenEvent,
+  WebSource,
 } from "@/lib/contracts/api";
 import type { Citation } from "@/lib/contracts/retrieval";
 
@@ -26,6 +27,8 @@ type Turn = {
   failed: boolean;
   retrievalMeta: QuerySseMetaEvent["retrievalMeta"] | null;
   createdAt: string;
+  queryHistoryId?: string;
+  webSources?: WebSource[];
 };
 
 type UploadStatusSnapshot = {
@@ -120,6 +123,11 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [workspaceMessage, setWorkspaceMessage] = useState("Ready.");
+
+  const [enableWebResearch, setEnableWebResearch] = useState(false);
+
+  const [batchFiles, setBatchFiles] = useState<Array<{ file: File; status: string; error?: string; documentId?: string }>>([]);
+  const batchFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
@@ -438,6 +446,70 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     void uploadPdf();
   }
 
+  async function handleBatchUpload(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !user) return;
+
+    const entries = Array.from(files).map((file) => ({ file, status: "pending" as string }));
+    setBatchFiles(entries);
+
+    for (let i = 0; i < entries.length; i++) {
+      setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "uploading" } : e)));
+
+      const formData = new FormData();
+      formData.append("file", entries[i].file);
+
+      try {
+        const response = await fetch("/api/upload/batch", { method: "POST", body: formData });
+        const payload = (await response.json()) as { documentId?: string; error?: string };
+
+        if (!response.ok || !payload.documentId) {
+          setBatchFiles((prev) =>
+            prev.map((e, j) => (j === i ? { ...e, status: "failed", error: payload.error ?? "Upload failed" } : e)),
+          );
+        } else {
+          setBatchFiles((prev) =>
+            prev.map((e, j) => (j === i ? { ...e, status: "queued", documentId: payload.documentId } : e)),
+          );
+        }
+      } catch {
+        setBatchFiles((prev) =>
+          prev.map((e, j) => (j === i ? { ...e, status: "failed", error: "Network error" } : e)),
+        );
+      }
+    }
+
+    setWorkspaceMessage(`Batch upload complete: ${entries.length} files processed.`);
+  }
+
+  async function downloadReport(queryHistoryId: string, format: "docx" | "pdf"): Promise<void> {
+    setWorkspaceMessage(`Generating ${format.toUpperCase()} report...`);
+    try {
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queryHistoryId, format }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        setWorkspaceMessage(payload.error ?? "Report generation failed.");
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `report-${queryHistoryId.slice(0, 8)}.${format}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setWorkspaceMessage(`${format.toUpperCase()} report downloaded.`);
+    } catch {
+      setWorkspaceMessage("Report download failed.");
+    }
+  }
+
   async function executeQuery(): Promise<void> {
     if (!canQuery || !query.trim() || isStreaming) {
       return;
@@ -472,6 +544,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           query: question,
           conversationId,
           documentId: (queryDocumentScopeId ?? uploadStatus?.document.id) ?? undefined,
+          enableWebResearch: enableWebResearch || undefined,
         }),
       });
 
@@ -526,6 +599,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               citations: parsed.payload.citations,
               retrievalMeta: parsed.payload.retrievalMeta,
               pending: false,
+              queryHistoryId: parsed.payload.queryHistoryId,
+              webSources: parsed.payload.webSources,
             }));
           } else if (parsed.event === "done") {
             patchTurn(turnId, (turn) => ({
@@ -743,6 +818,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                   Requires reader/admin
                 </span>
               ) : null}
+              <label className="flex items-center gap-1.5 text-xs text-teal-900/80">
+                <input
+                  type="checkbox"
+                  checked={enableWebResearch}
+                  onChange={(e) => setEnableWebResearch(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-teal-400 text-teal-700"
+                  data-testid="web-research-toggle"
+                />
+                Web Research
+              </label>
               <button
                 type="button"
                 disabled={!canQuery || isStreaming || query.trim().length === 0}
@@ -804,6 +889,43 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                   </div>
                   <p className="mt-3 font-display text-xl leading-snug text-slate-900">{turn.query}</p>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{turn.answer || "..."}</p>
+                  {turn.webSources && turn.webSources.length > 0 ? (
+                    <div className="mt-3 space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-800">Web Sources</p>
+                      {turn.webSources.map((source) => (
+                        <a
+                          key={source.url}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-1.5 text-xs text-blue-900 hover:bg-blue-100"
+                        >
+                          <span className="mr-1.5 inline-block rounded-full border border-blue-300 bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                            external
+                          </span>
+                          {source.title}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                  {!turn.pending && !turn.failed && turn.queryHistoryId ? (
+                    <div className="mt-3 flex gap-2" data-testid="report-downloads">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void downloadReport(turn.queryHistoryId!, "docx"); }}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Download DOCX
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void downloadReport(turn.queryHistoryId!, "pdf"); }}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               );
             })
@@ -891,6 +1013,41 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               <p className="text-xs text-emerald-900/80">
                 Query scope active for document {effectiveQueryScopeId}
               </p>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-900/70">Batch Upload</p>
+            <input
+              ref={batchFileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              multiple
+              className="block w-full text-xs text-emerald-900 file:mr-2 file:rounded-lg file:border file:border-emerald-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-emerald-900 hover:file:bg-emerald-50"
+              onChange={handleBatchUpload}
+              data-testid="batch-upload-input"
+            />
+            {batchFiles.length > 0 ? (
+              <div className="space-y-1">
+                {batchFiles.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2 text-xs">
+                    <span className="truncate text-slate-700">{entry.file.name}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        entry.status === "failed"
+                          ? "border border-rose-300 bg-rose-50 text-rose-800"
+                          : entry.status === "queued"
+                            ? "border border-emerald-300 bg-emerald-50 text-emerald-800"
+                            : entry.status === "uploading"
+                              ? "border border-amber-300 bg-amber-50 text-amber-800"
+                              : "border border-slate-300 bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      {entry.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : null}
           </div>
 

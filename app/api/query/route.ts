@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
-import { generateGroundedAnswer } from "@/lib/answering/service";
+import { generateGroundedAnswer, generateWebAugmentedAnswer } from "@/lib/answering/service";
 import { requireAuth } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
@@ -11,6 +11,8 @@ import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
 import { queryRateLimiter } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { performWebResearch } from "@/lib/web-research/service";
+import type { WebSource } from "@/lib/web-research/types";
 
 export const runtime = "nodejs";
 
@@ -20,6 +22,7 @@ const querySchema = z.object({
   documentId: z.string().uuid().optional(),
   languageHint: z.enum(["EN", "DE", "FR", "IT", "ES"]).optional(),
   topK: z.number().int().positive().max(20).optional(),
+  enableWebResearch: z.boolean().optional(),
 });
 
 const sseEncoder = new TextEncoder();
@@ -142,14 +145,33 @@ export async function POST(request: NextRequest) {
           cacheNamespace: `user:${authResult.user.id}::doc:${requestBody.documentId ?? "all"}`,
         });
 
-        const answerResult = await generateGroundedAnswer({
-          query: requestBody.query,
-          language: retrievalResult.trace.language,
-          chunks: retrievalResult.chunks,
-          minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-          minRerankScore: env.RAG_MIN_RERANK_SCORE,
-          maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-        });
+        let webSources: WebSource[] = [];
+        if (requestBody.enableWebResearch && env.RAG_WEB_SEARCH_ENABLED) {
+          try {
+            webSources = await performWebResearch(requestBody.query);
+          } catch {
+            // Continue without web sources if search fails.
+          }
+        }
+
+        const answerResult = webSources.length > 0
+          ? await generateWebAugmentedAnswer({
+              query: requestBody.query,
+              language: retrievalResult.trace.language,
+              chunks: retrievalResult.chunks,
+              minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+              minRerankScore: env.RAG_MIN_RERANK_SCORE,
+              maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+              webSources,
+            })
+          : await generateGroundedAnswer({
+              query: requestBody.query,
+              language: retrievalResult.trace.language,
+              chunks: retrievalResult.chunks,
+              minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+              minRerankScore: env.RAG_MIN_RERANK_SCORE,
+              maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+            });
         const latencyMs = Date.now() - startedAt;
 
         const retrievalMeta = {
@@ -168,30 +190,38 @@ export async function POST(request: NextRequest) {
         };
 
         const supabase = getSupabaseAdminClient();
-        void supabase
-          .from("query_history")
-          .insert({
-            user_id: authResult.user.id,
-            conversation_id: conversationId,
-            query: requestBody.query,
-            answer: answerResult.answer,
-            citations: answerResult.citations,
-            latency_ms: latencyMs,
-            cache_hit: retrievalResult.trace.cacheHit,
-          })
-          .then(({ error }) => {
-            if (error) {
-              logAuditEvent({
-                action: "query.history.write",
-                actorId: authResult.user.id,
-                actorRole: authResult.user.role,
-                outcome: "failure",
-                resource: "query_history",
-                ipAddress,
-                metadata: { reason: "query_history_insert_failed", message: error.message },
-              });
-            }
-          });
+        let queryHistoryId: string | undefined;
+        try {
+          const { data: historyRow, error: historyError } = await supabase
+            .from("query_history")
+            .insert({
+              user_id: authResult.user.id,
+              conversation_id: conversationId,
+              query: requestBody.query,
+              answer: answerResult.answer,
+              citations: answerResult.citations,
+              latency_ms: latencyMs,
+              cache_hit: retrievalResult.trace.cacheHit,
+            })
+            .select("id")
+            .single();
+
+          if (historyError) {
+            logAuditEvent({
+              action: "query.history.write",
+              actorId: authResult.user.id,
+              actorRole: authResult.user.role,
+              outcome: "failure",
+              resource: "query_history",
+              ipAddress,
+              metadata: { reason: "query_history_insert_failed", message: historyError.message },
+            });
+          } else {
+            queryHistoryId = historyRow?.id;
+          }
+        } catch {
+          // Continue response path if history write fails entirely.
+        }
 
         if (userOpenAiApiKey) {
           void markUserOpenAiApiKeyUsed(authResult.user.id).catch((touchError) => {
@@ -257,6 +287,8 @@ export async function POST(request: NextRequest) {
                 answer: answerResult.answer,
                 citations: answerResult.citations,
                 retrievalMeta,
+                webSources: webSources.length > 0 ? webSources : undefined,
+                queryHistoryId,
               }),
             );
             controller.enqueue(encodeSseEvent("done", { queryId }));
