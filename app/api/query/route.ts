@@ -5,10 +5,11 @@ import { generateGroundedAnswer, generateWebAugmentedAnswer } from "@/lib/answer
 import { requireAuth } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
 import { markUserOpenAiApiKeyUsed, resolveUserOpenAiApiKey } from "@/lib/providers/openai-vault";
 import { retrieveRankedCandidates } from "@/lib/retrieval/service";
 import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
-import { queryRateLimiter } from "@/lib/security/rate-limit";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { performWebResearch } from "@/lib/web-research/service";
@@ -57,10 +58,10 @@ export async function POST(request: NextRequest) {
     return authResult.response;
   }
 
-  const rate = queryRateLimiter.consume(
+  const rate = await consumeSharedRateLimit(
     `${authResult.user.id}:${ipAddress}`,
     env.AUTH_RATE_LIMIT_MAX_REQUESTS,
-    env.AUTH_RATE_LIMIT_WINDOW_SECONDS * 1000,
+    env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
   );
 
   if (!rate.allowed) {
@@ -173,6 +174,9 @@ export async function POST(request: NextRequest) {
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
             });
         const latencyMs = Date.now() - startedAt;
+
+        emitQueryLatency(latencyMs, { userId: authResult.user.id });
+        emitCacheHit(retrievalResult.trace.cacheHit, { userId: authResult.user.id });
 
         const retrievalMeta = {
           cacheHit: retrievalResult.trace.cacheHit,

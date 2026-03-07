@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Only PDF files are supported" }, { status: 400 });
   }
 
+  if (file.size === 0) {
+    return NextResponse.json({ error: "File is empty" }, { status: 400 });
+  }
+
   if (file.size > env.RAG_MAX_UPLOAD_BYTES) {
     return NextResponse.json(
       {
@@ -70,6 +74,23 @@ export async function POST(request: NextRequest) {
       },
       { status: 413 },
     );
+  }
+
+  // Validate PDF magic bytes (%PDF-)
+  const headerBytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  const pdfMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+  const isValidPdfSignature = headerBytes.length >= 5 && headerBytes.every((b, i) => b === pdfMagic[i]);
+  if (!isValidPdfSignature) {
+    logAuditEvent({
+      action: "upload.create",
+      actorId: authResult.user.id,
+      actorRole: authResult.user.role,
+      outcome: "failure",
+      resource: "upload",
+      ipAddress,
+      metadata: { reason: "invalid_pdf_signature", fileName: file.name },
+    });
+    return NextResponse.json({ error: "File does not have a valid PDF signature" }, { status: 400 });
   }
 
   const rawLanguageHint = typeof languageRaw === "string" ? languageRaw : null;
