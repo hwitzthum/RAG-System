@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { generateGroundedAnswer, generateWebAugmentedAnswer } from "@/lib/answering/service";
-import { requireAuth } from "@/lib/auth/request-auth";
+import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
@@ -41,7 +41,7 @@ function chunkAnswerText(answer: string): string[] {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
+  const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {

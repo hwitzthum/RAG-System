@@ -63,16 +63,80 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && !isPublicPath(pathname)) {
+    // Allow pending-approval page for unauthenticated users (they'll redirect to login)
+    if (pathname === "/pending-approval") {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      return NextResponse.redirect(loginUrl);
+    }
+
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && isPublicPath(pathname)) {
-    const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/";
-    return NextResponse.redirect(homeUrl);
+  if (user) {
+    const role = user.app_metadata?.role as string | undefined;
+
+    // Suspended users: clear session and redirect to login
+    if (role === "suspended") {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("error", "suspended");
+      const response = NextResponse.redirect(loginUrl);
+      // Clear Supabase auth cookies
+      for (const cookie of request.cookies.getAll()) {
+        if (cookie.name.startsWith("sb-") || cookie.name === "rag_access_token" || cookie.name === "__Host-rag_access_token") {
+          response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" });
+        }
+      }
+      return response;
+    }
+
+    // Pending users: redirect to pending-approval unless already there
+    if (role === "pending" && pathname !== "/pending-approval") {
+      const pendingUrl = request.nextUrl.clone();
+      pendingUrl.pathname = "/pending-approval";
+      return NextResponse.redirect(pendingUrl);
+    }
+
+    // Non-pending users shouldn't be on the pending page
+    if (role !== "pending" && pathname === "/pending-approval") {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      return NextResponse.redirect(homeUrl);
+    }
+
+    // Admin page: only accessible by admins
+    if (pathname.startsWith("/admin") && role !== "admin") {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      return NextResponse.redirect(homeUrl);
+    }
+
+    // Redirect authenticated active users away from public auth pages
+    if (isPublicPath(pathname)) {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      return NextResponse.redirect(homeUrl);
+    }
+
+    // Sync the access token to our session cookie for API route auth
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.access_token) {
+      const isProduction = process.env.NODE_ENV === "production";
+      const cookieName = isProduction ? "__Host-rag_access_token" : "rag_access_token";
+      supabaseResponse.cookies.set({
+        name: cookieName,
+        value: sessionData.session.access_token,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: isProduction,
+        path: "/",
+        maxAge: 60 * 60, // 1 hour
+      });
+    }
   }
 
   return supabaseResponse;

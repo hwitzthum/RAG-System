@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function SignUpForm() {
   const [email, setEmail] = useState("");
@@ -16,11 +15,17 @@ export default function SignUpForm() {
     setLoading(true);
 
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { error: authError } = await supabase.auth.signUp({ email, password });
+      // Call server-side signup for rate limiting and admin email check
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (authError) {
-        setError(authError.message);
+      const data = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        setError(data.error ?? "Signup failed");
         return;
       }
 
@@ -34,9 +39,12 @@ export default function SignUpForm() {
     return (
       <>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-900">Check Your Email</h1>
+        <h1 className="mt-1 text-3xl font-bold text-slate-900">Account Created</h1>
         <p className="mt-4 text-sm leading-relaxed text-slate-700">
-          We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then sign in.
+          Your account has been created. An administrator will review your request and approve your access.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-700">
+          You&apos;ll be able to sign in once your account is approved.
         </p>
         <a
           href="/login"
@@ -52,7 +60,7 @@ export default function SignUpForm() {
     <>
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
       <h1 className="mt-1 text-3xl font-bold text-slate-900">Create Account</h1>
-      <p className="mt-2 text-sm text-slate-600">Sign up to access the retrieval workspace.</p>
+      <p className="mt-2 text-sm text-slate-600">Sign up to request access to the retrieval workspace.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>

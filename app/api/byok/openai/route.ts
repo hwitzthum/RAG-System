@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth } from "@/lib/auth/request-auth";
+import { requireAuth, requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { logAuditEvent } from "@/lib/observability/audit";
 import {
   deleteUserOpenAiApiKey,
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
+  const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {
@@ -121,7 +121,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
+  const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {

@@ -18,6 +18,33 @@ function LoginFormInner() {
     setLoading(true);
 
     try {
+      // Step 1: Server-side login for rate limiting and role checks
+      const serverResponse = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const serverData = (await serverResponse.json()) as {
+        status?: string;
+        error?: string;
+        redirect?: string;
+      };
+
+      if (!serverResponse.ok) {
+        setError(serverData.error ?? "Login failed");
+        return;
+      }
+
+      if (serverData.status === "pending") {
+        // Still sign in via Supabase to create browser session for pending page
+        const supabase = getSupabaseBrowserClient();
+        await supabase.auth.signInWithPassword({ email, password });
+        router.push("/pending-approval");
+        return;
+      }
+
+      // Step 2: Create Supabase browser session (sets cookies for middleware)
       const supabase = getSupabaseBrowserClient();
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -26,7 +53,7 @@ function LoginFormInner() {
         return;
       }
 
-      const next = searchParams?.get("next") || "/";
+      const next = searchParams?.get("next") || serverData.redirect || "/";
       router.push(next);
       router.refresh();
     } finally {

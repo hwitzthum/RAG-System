@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth } from "@/lib/auth/request-auth";
+import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { hasPdfSignature, looksLikePdfUpload } from "@/lib/ingestion/upload-helpers";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
@@ -16,7 +16,7 @@ type BatchResult = {
 };
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
+  const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {

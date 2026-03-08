@@ -1,12 +1,15 @@
 import { cookies } from "next/headers";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
+import { SESSION_COOKIE_NAME, getSessionCookieName } from "@/lib/auth/constants";
 import { resolveEmailFromClaims, resolveRoleFromClaims } from "@/lib/auth/claims";
 import type { AuthUser } from "@/lib/auth/types";
 import { verifyAccessToken } from "@/lib/auth/verify";
 
 export async function getServerSessionUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  // Check production cookie name first, then fall back to legacy
+  const token =
+    cookieStore.get(getSessionCookieName(true))?.value ??
+    cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
     return null;

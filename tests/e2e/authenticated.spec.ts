@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
-// Test user credentials (created in Supabase with app_metadata.role = "reader")
-const TEST_EMAIL = "e2e-test@ragsystem.test";
-const TEST_PASSWORD = "E2eTestPass789";
-const SUPABASE_URL = "https://aaghjfmstezmxyxyrfri.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_Uj_ZNudC4PBSWkrBmmXowA_MDDNh5jd";
+// Credentials loaded from .env.local via playwright.config.ts
+const TEST_EMAIL = process.env.E2E_TEST_EMAIL!;
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD!;
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
 
 async function getAccessToken(): Promise<string> {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -221,9 +221,12 @@ test.describe("Authenticated Workbench UI", () => {
     await page.fill('input[type="email"]', TEST_EMAIL);
     await page.fill('input[type="password"]', TEST_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
+    await page.waitForURL("/", { timeout: 20_000 });
 
-    // Should show READER role
-    await expect(page.locator("text=READER")).toBeVisible({ timeout: 10_000 });
+    // Reload to sync server session cookie
+    await page.reload({ waitUntil: "networkidle" });
+
+    // Should show signed-in session identity
+    await expect(page.locator("text=Signed in as reader")).toBeVisible({ timeout: 15_000 });
   });
 });

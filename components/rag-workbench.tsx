@@ -104,6 +104,17 @@ function parseSseEventBlock(rawBlock: string): ParsedSseEvent {
   }
 }
 
+function getCsrfToken(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|;\s*)(?:csrf_token|__Host-csrf)=([^;]*)/);
+  return match?.[1] ?? "";
+}
+
+function csrfHeaders(): Record<string, string> {
+  const token = getCsrfToken();
+  return token ? { "X-CSRF-Token": token } : {};
+}
+
 function formatTime(iso: string): string {
   const date = new Date(iso);
   return date.toLocaleString();
@@ -234,7 +245,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   async function createSession(): Promise<void> {
     const response = await fetch("/api/auth/session", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ accessToken: token }),
     });
 
@@ -249,7 +260,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   async function clearSession(): Promise<void> {
-    const response = await fetch("/api/auth/session", { method: "DELETE" });
+    const response = await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
     if (response.ok) {
       setUser(null);
       setOpenAiByokInput("");
@@ -276,7 +287,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/byok/openai", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({
           apiKey: openAiByokInput,
         }),
@@ -305,6 +316,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/byok/openai", {
         method: "DELETE",
+        headers: csrfHeaders(),
       });
       const payload = (await response.json()) as OpenAiByokStatusResponse & { error?: string };
 
@@ -395,6 +407,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: csrfHeaders(),
         body: formData,
       });
 
@@ -460,7 +473,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       formData.append("file", entries[i].file);
 
       try {
-        const response = await fetch("/api/upload/batch", { method: "POST", body: formData });
+        const response = await fetch("/api/upload/batch", { method: "POST", headers: csrfHeaders(), body: formData });
         const payload = (await response.json()) as { documentId?: string; error?: string };
 
         if (!response.ok || !payload.documentId) {
@@ -487,7 +500,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/reports", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ queryHistoryId, format }),
       });
 
@@ -539,7 +552,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({
           query: question,
           conversationId,
@@ -688,6 +701,15 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
             <span className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 text-teal-900">Auth</span>
             <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-900">Vault</span>
+            {user?.role === "admin" && (
+              <a
+                href="/admin"
+                className="rounded-full border border-purple-300 bg-purple-50 px-3 py-1 text-purple-900 transition hover:bg-purple-100"
+                data-testid="admin-link"
+              >
+                Admin
+              </a>
+            )}
           </div>
           <div className="md:col-span-2">
             <div className="flex flex-col gap-3 md:flex-row md:items-center">

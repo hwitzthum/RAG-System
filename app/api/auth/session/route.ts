@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
+import { SESSION_COOKIE_NAME, getSessionCookieName } from "@/lib/auth/constants";
 import { resolveEmailFromClaims, resolveRoleFromClaims } from "@/lib/auth/claims";
 import { verifyAccessToken } from "@/lib/auth/verify";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { generateCsrfToken, getCsrfCookieName } from "@/lib/security/csrf";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Token missing required claims");
     }
 
+    const isProduction = env.NODE_ENV === "production";
     const response = NextResponse.json({
       user: {
         id: payload.sub,
@@ -51,13 +53,24 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set({
-      name: SESSION_COOKIE_NAME,
+      name: getSessionCookieName(isProduction),
       value: requestBody.accessToken,
       httpOnly: true,
       sameSite: "lax",
-      secure: env.NODE_ENV === "production",
+      secure: isProduction,
       path: "/",
-      maxAge: 60 * 60 * 8,
+      maxAge: 60 * 60, // 1 hour
+    });
+
+    // Set CSRF cookie
+    response.cookies.set({
+      name: getCsrfCookieName(),
+      value: generateCsrfToken(),
+      httpOnly: false,
+      sameSite: "lax",
+      secure: isProduction,
+      path: "/",
+      maxAge: 60 * 60,
     });
 
     logAuditEvent({
@@ -86,7 +99,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  // Check both cookie names for backward compat
+  const productionCookieName = getSessionCookieName(true);
+  const token =
+    request.cookies.get(productionCookieName)?.value ??
+    request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
     return NextResponse.json({ user: null }, { status: 200 });
@@ -113,15 +130,41 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const isProduction = env.NODE_ENV === "production";
   const response = NextResponse.json({ status: "ok" });
   const ipAddress = getClientIp(request);
 
+  // Clear both cookie names
   response.cookies.set({
-    name: SESSION_COOKIE_NAME,
+    name: getSessionCookieName(isProduction),
     value: "",
     httpOnly: true,
     sameSite: "lax",
-    secure: env.NODE_ENV === "production",
+    secure: isProduction,
+    path: "/",
+    maxAge: 0,
+  });
+
+  // Also clear legacy cookie name if different
+  if (getSessionCookieName(isProduction) !== SESSION_COOKIE_NAME) {
+    response.cookies.set({
+      name: SESSION_COOKIE_NAME,
+      value: "",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+      path: "/",
+      maxAge: 0,
+    });
+  }
+
+  // Clear CSRF cookie
+  response.cookies.set({
+    name: getCsrfCookieName(),
+    value: "",
+    httpOnly: false,
+    sameSite: "lax",
+    secure: isProduction,
     path: "/",
     maxAge: 0,
   });

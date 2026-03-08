@@ -51,6 +51,7 @@ const envSchema = z.object({
   RAG_WEB_SEARCH_MAX_RESULTS: z.coerce.number().int().positive().default(5),
   RAG_MAX_BATCH_UPLOAD_COUNT: z.coerce.number().int().positive().default(10),
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: z.string().min(1).optional(),
+  ADMIN_EMAIL: z.string().email().optional(),
 });
 
 const parsed = envSchema.safeParse({
@@ -92,6 +93,7 @@ const parsed = envSchema.safeParse({
   RAG_WEB_SEARCH_MAX_RESULTS: process.env.RAG_WEB_SEARCH_MAX_RESULTS,
   RAG_MAX_BATCH_UPLOAD_COUNT: process.env.RAG_MAX_BATCH_UPLOAD_COUNT,
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: process.env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN || undefined,
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
 });
 
 if (!parsed.success) {

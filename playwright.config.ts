@@ -1,4 +1,8 @@
 import { defineConfig } from "@playwright/test";
+import { config } from "dotenv";
+
+// Load .env.local for test credentials
+config({ path: ".env.local" });
 
 export default defineConfig({
   testDir: "./tests/e2e",

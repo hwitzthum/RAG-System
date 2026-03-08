@@ -1,4 +1,4 @@
-export type Role = "admin" | "reader";
+export type Role = "admin" | "reader" | "pending" | "suspended";
 
 export type AuthUser = {
   id: string;

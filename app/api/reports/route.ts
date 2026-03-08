@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth } from "@/lib/auth/request-auth";
+import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { generateDocxReport } from "@/lib/reports/docx-generator";
 import { generatePdfReport } from "@/lib/reports/pdf-generator";
@@ -16,7 +16,7 @@ const reportRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
+  const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
   if (!authResult.ok) {

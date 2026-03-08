@@ -15,7 +15,12 @@ export function resolveRoleFromClaims(payload: ClaimsLike): Role | null {
 
   const roleCandidate = roleFromAppMetadata ?? payload.role ?? null;
 
-  if (roleCandidate === "admin" || roleCandidate === "reader") {
+  if (
+    roleCandidate === "admin" ||
+    roleCandidate === "reader" ||
+    roleCandidate === "pending" ||
+    roleCandidate === "suspended"
+  ) {
     return roleCandidate;
   }
 
