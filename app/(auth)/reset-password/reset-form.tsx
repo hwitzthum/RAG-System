@@ -1,37 +1,105 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+type Mode = "request" | "set-password" | "success-request" | "success-set";
+
 export default function ResetForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<Mode>("request");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Detect recovery token in URL (PKCE code or implicit access_token hash)
+  useEffect(() => {
+    const code = searchParams?.get("code");
+
+    async function handleCode() {
+      if (!code) return;
+      const supabase = getSupabaseBrowserClient();
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) {
+        setError("Invalid or expired reset link. Please request a new one.");
+      } else {
+        setMode("set-password");
+      }
+    }
+
+    if (code) {
+      void handleCode();
+      return; // eslint-disable-line no-useless-return
+    }
+
+    // Implicit flow: access_token in URL hash (e.g. #access_token=...&type=recovery)
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash.includes("type=recovery") || hash.includes("access_token=")) {
+        // Supabase JS SDK auto-detects hash tokens on getSession()
+        const supabase = getSupabaseBrowserClient();
+        supabase.auth.getSession().then(({ data }) => {
+          if (data.session) {
+            setMode("set-password");
+          }
+        });
+      }
+    }
+  }, [searchParams]);
+
+  // --- Request reset email ---
+  async function handleRequestReset(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       const supabase = getSupabaseBrowserClient();
       const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
-
       if (authError) {
         setError(authError.message);
         return;
       }
-
-      setSent(true);
+      setMode("success-request");
     } finally {
       setLoading(false);
     }
   }
 
-  if (sent) {
+  // --- Set new password ---
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      setMode("success-set");
+      setTimeout(() => router.push("/"), 2000);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // --- Render ---
+  if (mode === "success-request") {
     return (
       <>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
@@ -49,13 +117,77 @@ export default function ResetForm() {
     );
   }
 
+  if (mode === "success-set") {
+    return (
+      <>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-900">Password Updated</h1>
+        <p className="mt-4 text-sm leading-relaxed text-slate-700">
+          Your password has been set. Redirecting to the workbench…
+        </p>
+      </>
+    );
+  }
+
+  if (mode === "set-password") {
+    return (
+      <>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-900">Set New Password</h1>
+        <p className="mt-2 text-sm text-slate-600">Choose a new password for your account.</p>
+
+        <form onSubmit={handleSetPassword} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+              New Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800"
+            />
+          </div>
+          <div>
+            <label htmlFor="confirm" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Confirm Password
+            </label>
+            <input
+              id="confirm"
+              type="password"
+              required
+              minLength={6}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800"
+            />
+          </div>
+
+          {error && <p className="text-sm text-rose-700">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Updating…" : "Set Password"}
+          </button>
+        </form>
+      </>
+    );
+  }
+
+  // Default: request reset email
   return (
     <>
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
       <h1 className="mt-1 text-3xl font-bold text-slate-900">Reset Password</h1>
       <p className="mt-2 text-sm text-slate-600">Enter your email to receive a password reset link.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
         <div>
           <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
             Email
@@ -78,7 +210,7 @@ export default function ResetForm() {
           disabled={loading}
           className="w-full rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Sending..." : "Send Reset Link"}
+          {loading ? "Sending…" : "Send Reset Link"}
         </button>
       </form>
 

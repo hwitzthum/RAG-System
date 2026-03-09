@@ -41,14 +41,19 @@ export async function POST(request: NextRequest) {
   const { email, password } = parsed.data;
 
   // Call Supabase Auth REST API for signup
-  const signupResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: env.SUPABASE_ANON_KEY,
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+  const emailRedirectTo = `${appUrl}/reset-password`;
+  const signupResponse = await fetch(
+    `${env.SUPABASE_URL}/auth/v1/signup?email_redirect_to=${encodeURIComponent(emailRedirectTo)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ email, password }),
     },
-    body: JSON.stringify({ email, password }),
-  });
+  );
 
   if (!signupResponse.ok) {
     const errorBody = await signupResponse.json().catch(() => ({ msg: "Signup failed" })) as { msg?: string };
