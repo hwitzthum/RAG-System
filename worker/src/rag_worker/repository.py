@@ -64,7 +64,6 @@ class WorkerRepository:
                 .eq("id", row["id"])
                 .eq("status", row["status"])
                 .is_("locked_at", "null")
-                .select("id,document_id,status,attempt")
                 .execute()
             )
 
@@ -106,7 +105,6 @@ class WorkerRepository:
                 .eq("id", row["id"])
                 .eq("status", "processing")
                 .lte("locked_at", stale_cutoff)
-                .select("id,document_id,status,attempt")
                 .execute()
             )
 

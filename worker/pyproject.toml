@@ -12,6 +12,12 @@ dependencies = [
   "tiktoken>=0.8.0"
 ]
 
+[project.optional-dependencies]
+ocr = [
+  "pdf2image>=1.17.0",
+  "pytesseract>=0.3.13",
+]
+
 [project.scripts]
 rag-worker = "rag_worker.main:main"
 
