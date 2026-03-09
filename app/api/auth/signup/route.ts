@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   // Call Supabase Auth REST API for signup
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
-  const emailRedirectTo = `${appUrl}/reset-password`;
+  const emailRedirectTo = `${appUrl}/auth/callback`;
   const signupResponse = await fetch(
     `${env.SUPABASE_URL}/auth/v1/signup?email_redirect_to=${encodeURIComponent(emailRedirectTo)}`,
     {

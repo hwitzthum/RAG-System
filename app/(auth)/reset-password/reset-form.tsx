@@ -16,10 +16,18 @@ export default function ResetForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Detect recovery token in URL (PKCE code or implicit access_token hash)
+  // Detect recovery session in URL
   useEffect(() => {
     const code = searchParams?.get("code");
+    const verified = searchParams?.get("verified"); // set by /auth/callback after code exchange
 
+    // Session already established by /auth/callback (server-side exchange)
+    if (verified === "true") {
+      setMode("set-password");
+      return;
+    }
+
+    // Direct PKCE code (e.g. from browser-initiated reset)
     async function handleCode() {
       if (!code) return;
       const supabase = getSupabaseBrowserClient();
@@ -33,14 +41,13 @@ export default function ResetForm() {
 
     if (code) {
       void handleCode();
-      return; // eslint-disable-line no-useless-return
+      return;
     }
 
     // Implicit flow: access_token in URL hash (e.g. #access_token=...&type=recovery)
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
       if (hash.includes("type=recovery") || hash.includes("access_token=")) {
-        // Supabase JS SDK auto-detects hash tokens on getSession()
         const supabase = getSupabaseBrowserClient();
         supabase.auth.getSession().then(({ data }) => {
           if (data.session) {
@@ -59,7 +66,7 @@ export default function ResetForm() {
     try {
       const supabase = getSupabaseBrowserClient();
       const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password%3Fverified%3Dtrue`,
       });
       if (authError) {
         setError(authError.message);

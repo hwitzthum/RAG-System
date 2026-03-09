@@ -61,11 +61,30 @@ function LoginFormInner() {
     }
   }
 
+  const confirmed = searchParams?.get("confirmed") === "true";
+  const urlError = searchParams?.get("error");
+
   return (
     <>
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
       <h1 className="mt-1 text-3xl font-bold text-slate-900">Sign In</h1>
       <p className="mt-2 text-sm text-slate-600">Enter your credentials to access the workspace.</p>
+
+      {confirmed && (
+        <p className="mt-4 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-800">
+          Email confirmed — you can now sign in.
+        </p>
+      )}
+      {urlError === "suspended" && (
+        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+          Your account has been suspended. Contact an administrator.
+        </p>
+      )}
+      {urlError === "confirmation_failed" && (
+        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+          Email confirmation failed or the link has expired. Please try signing up again.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
