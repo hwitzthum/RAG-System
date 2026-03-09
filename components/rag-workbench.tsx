@@ -14,6 +14,7 @@ import type {
   WebSource,
 } from "@/lib/contracts/api";
 import type { Citation } from "@/lib/contracts/retrieval";
+import type { Database } from "@/lib/supabase/database.types";
 
 type RagWorkbenchProps = {
   initialUser: AuthUser | null;
@@ -62,13 +63,10 @@ type ParsedSseEvent =
 
 const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeId";
 
-interface DocumentListItem {
-  id: string;
-  title: string | null;
-  status: "queued" | "processing" | "ready" | "failed";
-  created_at: string;
-  storage_path: string;
-}
+type DocumentListItem = Pick<
+  Database["public"]["Tables"]["documents"]["Row"],
+  "id" | "title" | "status" | "created_at" | "storage_path"
+>;
 
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -229,10 +227,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setDocumentsLoading(true);
     try {
       const res = await fetch("/api/documents");
-      if (res.ok) {
-        const json = (await res.json()) as { documents: DocumentListItem[] };
-        setDocuments(json.documents);
+      if (!res.ok) {
+        setWorkspaceMessage("Failed to load documents.");
+        return;
       }
+      const json = (await res.json()) as { documents: DocumentListItem[] };
+      setDocuments(json.documents);
     } finally {
       setDocumentsLoading(false);
     }
@@ -315,7 +315,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   async function clearSession(): Promise<void> {
-    const response = await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
+    await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
     // Sign out of Supabase browser session too (clears its localStorage/cookie)
     await getSupabaseBrowserClient().auth.signOut().catch(() => null);
     setUser(null);
@@ -324,11 +324,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setTurns([]);
     setQueryHistory([]);
     setQueryDocumentScopeId(null);
-    if (response.ok) {
-      router.push("/login");
-    } else {
-      setWorkspaceMessage("Session cleared.");
-    }
+    router.push("/login");
   }
 
   async function saveOpenAiByokKey(): Promise<void> {
@@ -574,10 +570,6 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
   }
 
-  async function handleDeleteDocument(): Promise<void> {
-    if (!uploadStatus) return;
-    await handleDeleteDocumentById(uploadStatus.document.id);
-  }
 
   async function downloadReport(queryHistoryId: string, format: "docx" | "pdf"): Promise<void> {
     setWorkspaceMessage(`Generating ${format.toUpperCase()} report...`);
@@ -1185,7 +1177,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               ) : null}
               <button
                 type="button"
-                onClick={() => void handleDeleteDocument()}
+                onClick={() => uploadStatus && void handleDeleteDocumentById(uploadStatus.document.id)}
                 className="mt-2 w-full rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
                 data-testid="delete-document-button"
               >

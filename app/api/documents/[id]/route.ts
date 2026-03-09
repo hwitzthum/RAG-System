@@ -26,18 +26,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
-  // Remove file from Supabase Storage
-  if (doc.storage_path) {
-    await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([doc.storage_path]);
-  }
+  // Remove storage file + related records in parallel (all independent of each other)
+  await Promise.all([
+    doc.storage_path ? supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([doc.storage_path]) : Promise.resolve(),
+    supabase.from("ingestion_jobs").delete().eq("document_id", id),
+    supabase.from("document_chunks").delete().eq("document_id", id),
+  ]);
 
-  // Delete related ingestion jobs
-  await supabase.from("ingestion_jobs").delete().eq("document_id", id);
-
-  // Delete document chunks
-  await supabase.from("document_chunks").delete().eq("document_id", id);
-
-  // Delete document record
+  // Delete document record last (after foreign-key dependents are gone)
   const { error: deleteError } = await supabase.from("documents").delete().eq("id", id);
 
   if (deleteError) {
