@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Determine where to send the user after exchange
-  if (next) {
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
     return NextResponse.redirect(`${origin}${next}`);
   }
 

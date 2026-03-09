@@ -4,26 +4,17 @@ import { env } from "@/lib/config/env";
 import { runIngestionBatch } from "@/lib/ingestion/runtime/runner";
 import { resolveIngestionRuntimeSettings } from "@/lib/ingestion/runtime/types";
 import { getClientIp } from "@/lib/security/request";
+import { extractBearerTokenString } from "@/lib/security/token";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-function extractBearerToken(request: NextRequest): string | null {
-  const authorization = request.headers.get("authorization");
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authorization.slice("Bearer ".length).trim();
-  return token.length > 0 ? token : null;
-}
 
 function isCronAuthorized(request: NextRequest): boolean {
   if (!env.CRON_SECRET) {
     return false;
   }
 
-  const token = extractBearerToken(request);
+  const token = extractBearerTokenString(request);
   if (!token) {
     return false;
   }
@@ -66,9 +57,7 @@ async function executeRun(request: NextRequest) {
     return NextResponse.json(
       {
         status: metrics.claimed === 0 ? "idle" : "processed",
-        mode: env.INGESTION_RUNTIME_MODE,
-        ipAddress,
-        metrics,
+        claimed: metrics.claimed,
       },
       { status: 200 },
     );

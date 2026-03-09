@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 export const CSRF_HEADER_NAME = "X-CSRF-Token";
@@ -21,15 +21,12 @@ export function validateCsrf(request: NextRequest): boolean {
     return false;
   }
 
-  // Constant-time comparison
-  if (cookieValue.length !== headerValue.length) {
+  const cookieBuffer = Buffer.from(cookieValue, "utf8");
+  const headerBuffer = Buffer.from(headerValue, "utf8");
+
+  if (cookieBuffer.length !== headerBuffer.length) {
     return false;
   }
 
-  let mismatch = 0;
-  for (let i = 0; i < cookieValue.length; i++) {
-    mismatch |= cookieValue.charCodeAt(i) ^ headerValue.charCodeAt(i);
-  }
-
-  return mismatch === 0;
+  return timingSafeEqual(cookieBuffer, headerBuffer);
 }

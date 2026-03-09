@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, getSessionCookieName } from "@/lib/auth/constants";
 import { resolveEmailFromClaims, resolveRoleFromClaims } from "@/lib/auth/claims";
+import type { Role } from "@/lib/auth/types";
 import { verifyAccessToken } from "@/lib/auth/verify";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
@@ -96,12 +97,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  // Check both cookie names for backward compat
+function getSessionToken(request: NextRequest): string | undefined {
   const productionCookieName = getSessionCookieName(true);
-  const token =
+  return (
     request.cookies.get(productionCookieName)?.value ??
-    request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    request.cookies.get(SESSION_COOKIE_NAME)?.value
+  );
+}
+
+export async function GET(request: NextRequest) {
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ user: null }, { status: 200 });
@@ -131,6 +136,26 @@ export async function DELETE(request: NextRequest) {
   const isProduction = env.NODE_ENV === "production";
   const response = NextResponse.json({ status: "ok" });
   const ipAddress = getClientIp(request);
+
+  // Extract actor info from token payload (without full verification — token is being discarded)
+  let actorId: string | null = null;
+  let actorRole: Role | "anonymous" = "anonymous";
+  const sessionToken = getSessionToken(request);
+
+  if (sessionToken) {
+    try {
+      const parts = sessionToken.split(".");
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+        if (payload.sub) {
+          actorId = payload.sub;
+          actorRole = resolveRoleFromClaims(payload) ?? "anonymous";
+        }
+      }
+    } catch {
+      // Malformed token — log as anonymous
+    }
+  }
 
   // Clear both cookie names
   response.cookies.set({
@@ -169,8 +194,8 @@ export async function DELETE(request: NextRequest) {
 
   logAuditEvent({
     action: "auth.session.delete",
-    actorId: null,
-    actorRole: "anonymous",
+    actorId,
+    actorRole,
     outcome: "success",
     resource: "session",
     ipAddress,

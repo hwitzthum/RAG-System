@@ -13,12 +13,29 @@ export type InMemoryRateLimiter = {
   consume: (key: string, maxRequests: number, windowMs: number) => RateLimitDecision;
 };
 
+const PRUNE_THRESHOLD = 1000;
+
 export function createInMemoryRateLimiter(): InMemoryRateLimiter {
   const state = new Map<string, RateState>();
+  let callsSincePrune = 0;
+
+  function pruneExpired(now: number) {
+    if (state.size <= PRUNE_THRESHOLD) return;
+    for (const [key, entry] of state) {
+      if (entry.resetAtMs <= now) {
+        state.delete(key);
+      }
+    }
+  }
 
   return {
     consume(key: string, maxRequests: number, windowMs: number): RateLimitDecision {
       const now = Date.now();
+      if (++callsSincePrune >= 100) {
+        pruneExpired(now);
+        callsSincePrune = 0;
+      }
+
       const existing = state.get(key);
 
       if (!existing || existing.resetAtMs <= now) {

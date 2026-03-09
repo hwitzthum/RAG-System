@@ -3,6 +3,7 @@ import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
 import { getClientIp } from "@/lib/security/request";
+import { extractBearerTokenString } from "@/lib/security/token";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -17,22 +18,12 @@ const metricEventSchema = z.object({
   tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
-function extractBearerToken(request: NextRequest): string | null {
-  const authorization = request.headers.get("authorization");
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authorization.slice("Bearer ".length).trim();
-  return token.length > 0 ? token : null;
-}
-
 function isMetricsSinkAuthorized(request: NextRequest): boolean {
   if (!env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN) {
     return false;
   }
 
-  const token = extractBearerToken(request);
+  const token = extractBearerTokenString(request);
   if (!token) {
     return false;
   }

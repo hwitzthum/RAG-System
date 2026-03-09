@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   // Fetch query history entry.
   const { data: historyRow, error: historyError } = await supabase
     .from("query_history")
-    .select("*")
+    .select("id, query, answer, citations, created_at, user_id")
     .eq("id", queryHistoryId)
     .eq("user_id", authResult.user.id)
     .single();

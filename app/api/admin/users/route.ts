@@ -6,6 +6,9 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+const DEFAULT_PER_PAGE = 50;
+const MAX_PER_PAGE = 200;
+
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request, ["admin"]);
   const ipAddress = getClientIp(request);
@@ -23,9 +26,16 @@ export async function GET(request: NextRequest) {
     return authResult.response;
   }
 
+  const url = request.nextUrl;
+  const page = Math.max(parseInt(url.searchParams.get("page") ?? "", 10) || 1, 1);
+  const perPage = Math.min(
+    Math.max(parseInt(url.searchParams.get("perPage") ?? "", 10) || DEFAULT_PER_PAGE, 1),
+    MAX_PER_PAGE,
+  );
+
   try {
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase.auth.admin.listUsers();
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
 
     if (error) {
       throw error;
@@ -39,9 +49,6 @@ export async function GET(request: NextRequest) {
       last_sign_in_at: u.last_sign_in_at ?? null,
     }));
 
-    // Sort by created_at descending
-    users.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
     logAuditEvent({
       action: "admin.users.list",
       actorId: authResult.user.id,
@@ -49,10 +56,10 @@ export async function GET(request: NextRequest) {
       outcome: "success",
       resource: "admin",
       ipAddress,
-      metadata: { userCount: users.length },
+      metadata: { userCount: users.length, page, perPage },
     });
 
-    return NextResponse.json({ users });
+    return NextResponse.json({ users, page, perPage });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     logAuditEvent({
