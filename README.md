@@ -74,71 +74,162 @@ You should see `{"status":"ok", ...}` with current configuration values.
 
 ## Authentication
 
-The system uses **Supabase Auth** for all user management. Every page and API route is protected — unauthenticated users are redirected to `/login`.
+The system uses **Supabase Auth** for all user management with a **pending-approval workflow** — new accounts require an administrator to grant access before they can use the app. Every page and API route is protected.
 
-### Creating an account
+### User roles
 
-1. Open the app in your browser — you'll be redirected to `/login`
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **pending** | Default for new sign-ups | Can only see the pending-approval page; no API access |
+| **reader** | Approved by an admin | Upload PDFs, query documents, download reports, manage BYOK keys |
+| **admin** | Elevated access | Everything a reader can do, plus manage users at `/admin` |
+| **suspended** | Revoked access | Redirected to login; all API calls return 403 |
+
+Roles are stored in `app_metadata.role` on the Supabase user object and are enforced on every API request via JWT claims.
+
+---
+
+### Step 1 — Sign up
+
+1. Open the app — you'll be redirected to `/login`
 2. Click **Sign up** to go to `/signup`
 3. Enter your email and a password (minimum 6 characters)
-4. Check your email for a confirmation link and click it
-5. Return to `/login` and sign in with your credentials
+4. Click **Sign Up** — you'll see: *"Account created. An administrator will review your request."*
+5. Check your email for a confirmation link and click it
 
-New users are automatically assigned the **reader** role (via a database trigger), which grants access to:
-- Uploading PDF documents
-- Querying the knowledge base
-- Downloading reports
-- Managing personal OpenAI BYOK keys
+> **First admin:** Set `ADMIN_EMAIL` in `.env.local` before the first sign-up. When a user registers with that email they are automatically promoted to `admin` instead of `pending`.
 
-### Signing in
+---
+
+### Step 2 — Wait for approval (pending users)
+
+After signing up, you land on the `/pending-approval` page:
+
+```
+Your account is pending approval by an administrator.
+```
+
+Two actions are available:
+
+- **Check Status** — refreshes your session JWT. If an admin has approved your account, you are redirected to the workbench automatically.
+- **Sign Out** — clears your session and returns to `/login`.
+
+While `pending`, all API calls return `403 Forbidden`. You cannot access any workbench page.
+
+---
+
+### Step 3 — Admin approves the account
+
+An administrator visits `/admin` and sees the user management table:
+
+| Email | Role | Created | Actions |
+|-------|------|---------|---------|
+| user@example.com | pending | 2026-03-09 | **Approve** |
+
+Clicking **Approve** changes the role from `pending` → `reader` via `PATCH /api/admin/users/:id`. The user's next **Check Status** click (or page reload after a new login) picks up the updated role from the refreshed JWT.
+
+Available admin actions per user:
+
+| Current role | Available actions |
+|---|---|
+| pending | Approve (→ reader) |
+| reader | Promote to Admin / Suspend |
+| admin | Demote to Reader *(disabled for self)* |
+| suspended | Reactivate (→ reader) |
+
+---
+
+### Step 4 — Sign in
 
 1. Go to `/login`
 2. Enter your email and password
 3. Click **Sign In**
 
-On successful login, Supabase sets session cookies automatically. The middleware refreshes these cookies on every request — you stay signed in until you explicitly sign out or the session expires (8 hours).
+The login flow:
+1. The form calls `POST /api/auth/login` (rate-limited: 20 attempts per 5 min per IP + email)
+2. If the account is `pending` → redirected to `/pending-approval`
+3. If the account is `suspended` → error shown, no session created
+4. If `reader` or `admin` → Supabase session cookies are set, redirected to `/`
 
-### Signing out
+Session cookies expire after **1 hour** and are transparently refreshed by the middleware on every request while you are active.
 
-Click **Clear** in the Session Identity panel on the workbench, or delete your session via the API:
+---
+
+### Step 5 — Sign out
+
+Click **Clear** in the Session Identity panel on the workbench, or call the API:
 
 ```bash
-curl -X DELETE http://localhost:3000/api/auth/session
+curl -X DELETE http://localhost:3000/api/auth/session \
+  -H "Cookie: rag_access_token=<your-token>" \
+  -H "X-CSRF-Token: <csrf-token>"
 ```
 
-### Roles
+---
 
-| Role | Permissions |
-|------|-------------|
-| **reader** | Upload PDFs, query documents, download reports, manage BYOK keys |
-| **admin** | Everything a reader can do (admin-specific features reserved for future use) |
+### Promoting the first admin (CLI)
 
-Roles are stored in `app_metadata.role` on the Supabase user object. To promote a user to admin, update their metadata via the Supabase dashboard or admin API.
+If you did not set `ADMIN_EMAIL` before signing up, promote a user via the Supabase admin API:
+
+```bash
+curl -X PATCH https://your-project.supabase.co/auth/v1/admin/users/<user-id> \
+  -H "apikey: your-service-role-key" \
+  -H "Authorization: Bearer your-service-role-key" \
+  -H "Content-Type: application/json" \
+  -d '{"app_metadata": {"role": "admin"}}'
+```
+
+---
 
 ### API authentication
 
-API routes accept authentication via:
+API routes accept two authentication methods:
 
-1. **Session cookie** (automatic after browser login)
-2. **Bearer token** in the `Authorization` header (for programmatic access)
+#### 1. Session cookie (browser)
 
-To get a Bearer token programmatically:
+After signing in via the browser, Supabase sets session cookies automatically. All `fetch` calls from the workbench include a `X-CSRF-Token` header to prevent CSRF attacks. State-changing routes (`POST`, `PUT`, `DELETE`) require this header when using cookie auth.
+
+#### 2. Bearer token (programmatic access)
+
+Get a token from Supabase Auth:
 
 ```bash
 curl -X POST https://your-project.supabase.co/auth/v1/token?grant_type=password \
   -H "apikey: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"your-password"}'
+# Returns: {"access_token":"eyJ...", "expires_in":3600, ...}
 ```
 
-Use the returned `access_token` in API calls:
+Use the `access_token` in API calls. Bearer token auth is **exempt from CSRF** (not a browser session):
 
 ```bash
+# Query the knowledge base
 curl -X POST http://localhost:3000/api/query \
-  -H "Authorization: Bearer <access_token>" \
+  -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '{"query": "What does the document say about X?"}'
+
+# Upload a document
+curl -X POST http://localhost:3000/api/upload \
+  -H "Authorization: Bearer eyJ..." \
+  -F "file=@/path/to/document.pdf"
+
+# Batch upload
+curl -X POST http://localhost:3000/api/upload/batch \
+  -H "Authorization: Bearer eyJ..." \
+  -F "files=@/path/to/doc1.pdf" \
+  -F "files=@/path/to/doc2.pdf"
 ```
+
+#### Rate limits
+
+| Endpoint | Limit |
+|---|---|
+| `POST /api/auth/login` | 20 attempts per 5 min per IP + email |
+| `POST /api/auth/signup` | 3 sign-ups per hour per IP |
+
+Exceeding the limit returns `429 Too Many Requests`.
 
 ---
 
@@ -176,17 +267,23 @@ All endpoints require authentication unless noted.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/health` | No | Health check with config summary |
+| `POST` | `/api/auth/login` | No | Rate-limited login; checks pending/suspended |
+| `POST` | `/api/auth/signup` | No | Rate-limited sign-up; auto-promotes admin email |
 | `POST` | `/api/auth/session` | No | Create session from access token |
 | `GET` | `/api/auth/session` | Cookie | Get current session user |
-| `DELETE` | `/api/auth/session` | Cookie | Clear session |
-| `POST` | `/api/query` | Yes | Execute RAG query (SSE stream) |
+| `DELETE` | `/api/auth/session` | Cookie + CSRF | Clear session |
+| `POST` | `/api/query` | Yes + CSRF | Execute RAG query (SSE stream) |
 | `GET` | `/api/query-history` | Yes | List past queries |
-| `POST` | `/api/upload` | Yes | Upload a PDF document |
+| `POST` | `/api/upload` | Yes + CSRF | Upload a PDF document |
 | `GET` | `/api/upload/:id` | Yes | Get upload/ingestion status |
-| `POST` | `/api/upload/batch` | Yes | Batch upload PDFs |
-| `POST` | `/api/reports` | Yes | Generate DOCX/PDF report |
-| `GET/PUT/DELETE` | `/api/byok/openai` | Yes | Manage OpenAI BYOK key |
+| `POST` | `/api/upload/batch` | Yes + CSRF | Batch upload PDFs |
+| `POST` | `/api/reports` | Yes + CSRF | Generate DOCX/PDF report |
+| `GET/PUT/DELETE` | `/api/byok/openai` | Yes + CSRF | Manage OpenAI BYOK key |
+| `GET` | `/api/admin/users` | Admin | List all users |
+| `PATCH` | `/api/admin/users/:id` | Admin + CSRF | Update user role |
 | `POST` | `/api/internal/observability/metrics` | Bearer | Ingest metric events |
+
+> **CSRF note:** Routes marked `+ CSRF` require an `X-CSRF-Token` header when called with cookie-based auth. Bearer token auth skips CSRF validation. The CSRF token is set as a cookie (`csrf_token`) on login and must be read client-side and sent as a header.
 
 ### Query request
 
@@ -254,6 +351,7 @@ See `.env.example` for the full list. Key variables:
 | `RAG_CONTEXTUAL_GROUPING_ENABLED` | No | Boost adjacent chunks from same document (default: true) |
 | `RAG_WEB_SEARCH_ENABLED` | No | Enable web research via Tavily (default: false) |
 | `RAG_WEB_SEARCH_API_KEY` | No | Tavily API key (required if web search enabled) |
+| `ADMIN_EMAIL` | No | Email auto-promoted to admin on first sign-up |
 | `AUTH_DEV_INSECURE_BYPASS` | No | Skip auth in development (default: false) |
 
 ---
@@ -267,7 +365,7 @@ npm run typecheck
 # Unit tests (32 tests)
 npx tsx --test tests/*.test.ts
 
-# E2E tests (28 tests — requires dev server running)
+# E2E tests (43 tests — requires dev server running)
 npm run dev &
 npx playwright test
 
