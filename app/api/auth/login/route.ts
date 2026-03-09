@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       secure: isProduction,
       path: "/",
-      maxAge: 60 * 60, // 1 hour
+      // no maxAge: session cookie, deleted on browser close
     });
     return response;
   }
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     redirect: "/",
   });
 
-  // Set session cookie
+  // Set session cookie (no maxAge = session cookie, deleted on browser close)
   response.cookies.set({
     name: getSessionCookieName(isProduction),
     value: tokenData.access_token,
@@ -138,10 +138,9 @@ export async function POST(request: NextRequest) {
     sameSite: "lax",
     secure: isProduction,
     path: "/",
-    maxAge: 60 * 60, // 1 hour
   });
 
-  // Set CSRF cookie (readable by client JS)
+  // Set CSRF cookie (no maxAge = session cookie, deleted on browser close)
   response.cookies.set({
     name: getCsrfCookieName(),
     value: csrfToken,
@@ -149,7 +148,6 @@ export async function POST(request: NextRequest) {
     sameSite: "lax",
     secure: isProduction,
     path: "/",
-    maxAge: 60 * 60, // 1 hour
   });
 
   logAuditEvent({

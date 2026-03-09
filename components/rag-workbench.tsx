@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthUser } from "@/lib/auth/types";
 import type {
   OpenAiByokStatusResponse,
@@ -59,6 +61,14 @@ type ParsedSseEvent =
   | null;
 
 const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeId";
+
+interface DocumentListItem {
+  id: string;
+  title: string | null;
+  status: "queued" | "processing" | "ready" | "failed";
+  created_at: string;
+  storage_path: string;
+}
 
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -121,6 +131,7 @@ function formatTime(iso: string): string {
 }
 
 export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [token, setToken] = useState("");
   const [openAiByokInput, setOpenAiByokInput] = useState("");
@@ -147,6 +158,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [uploading, setUploading] = useState(false);
   const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
   const [queryDocumentScopeId, setQueryDocumentScopeId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<DocumentListItem[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
   const canUpload = Boolean(user);
@@ -212,6 +225,48 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     window.localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
   }, [queryDocumentScopeId]);
 
+  async function fetchDocuments(): Promise<void> {
+    setDocumentsLoading(true);
+    try {
+      const res = await fetch("/api/documents");
+      if (res.ok) {
+        const json = (await res.json()) as { documents: DocumentListItem[] };
+        setDocuments(json.documents);
+      }
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (user) void fetchDocuments();
+    else setDocuments([]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Inactivity logout: sign out after 10 minutes of no user activity
+  useEffect(() => {
+    if (!user) return;
+
+    const INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
+    let timer: ReturnType<typeof setTimeout>;
+
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void clearSession();
+      }, INACTIVITY_MS);
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"] as const;
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset(); // start timer immediately on login
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
     if (!user) {
       setOpenAiByokStatus(null);
@@ -261,13 +316,17 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
   async function clearSession(): Promise<void> {
     const response = await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
+    // Sign out of Supabase browser session too (clears its localStorage/cookie)
+    await getSupabaseBrowserClient().auth.signOut().catch(() => null);
+    setUser(null);
+    setOpenAiByokInput("");
+    setOpenAiByokStatus(null);
+    setTurns([]);
+    setQueryHistory([]);
+    setQueryDocumentScopeId(null);
     if (response.ok) {
-      setUser(null);
-      setOpenAiByokInput("");
-      setOpenAiByokStatus(null);
-      setTurns([]);
-      setQueryHistory([]);
-      setQueryDocumentScopeId(null);
+      router.push("/login");
+    } else {
       setWorkspaceMessage("Session cleared.");
     }
   }
@@ -424,6 +483,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         uploadFileInputRef.current.value = "";
       }
       await waitForUploadTerminalStatus(payload.documentId);
+      await fetchDocuments();
     } finally {
       setUploading(false);
     }
@@ -493,6 +553,30 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
 
     setWorkspaceMessage(`Batch upload complete: ${entries.length} files processed.`);
+    await fetchDocuments();
+  }
+
+  async function handleDeleteDocumentById(docId: string): Promise<void> {
+    const res = await fetch(`/api/documents/${docId}`, {
+      method: "DELETE",
+      headers: csrfHeaders(),
+    });
+    if (res.ok) {
+      if (uploadStatus?.document.id === docId) setUploadStatus(null);
+      if (queryDocumentScopeId === docId) {
+        setQueryDocumentScopeId(null);
+        localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
+      }
+      await fetchDocuments();
+      setWorkspaceMessage("Document deleted.");
+    } else {
+      setWorkspaceMessage("Failed to delete document.");
+    }
+  }
+
+  async function handleDeleteDocument(): Promise<void> {
+    if (!uploadStatus) return;
+    await handleDeleteDocumentById(uploadStatus.document.id);
   }
 
   async function downloadReport(queryHistoryId: string, format: "docx" | "pdf"): Promise<void> {
@@ -709,6 +793,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               >
                 Admin
               </a>
+            )}
+            {user && (
+              <button
+                type="button"
+                onClick={() => void clearSession()}
+                className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-slate-700 transition hover:bg-slate-100"
+                data-testid="sign-out-button"
+              >
+                Sign Out
+              </button>
             )}
           </div>
           <div className="md:col-span-2">
@@ -1089,8 +1183,88 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                   <span className="font-semibold">Last error:</span> {uploadStatus.latestIngestionJob.last_error}
                 </p>
               ) : null}
+              <button
+                type="button"
+                onClick={() => void handleDeleteDocument()}
+                className="mt-2 w-full rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
+                data-testid="delete-document-button"
+              >
+                Delete Document
+              </button>
             </div>
           ) : null}
+        </section>
+
+        {/* Document Library */}
+        <section className="rounded-[24px] border border-[#d3c4b3] bg-[linear-gradient(165deg,rgba(255,252,248,0.95),rgba(251,247,241,0.95))] p-4 shadow-[0_20px_38px_-30px_rgba(71,85,105,0.55)]">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.17em] text-slate-900">Documents</h3>
+            <button
+              type="button"
+              onClick={() => void fetchDocuments()}
+              className="rounded-lg border border-[#d3c4b3] bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-[#f6ede2]"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {documentsLoading && <p className="text-xs text-slate-500">Loading…</p>}
+
+          {!documentsLoading && documents.length === 0 && (
+            <p className="text-xs text-slate-500">No documents ingested yet.</p>
+          )}
+
+          {!documentsLoading && documents.length > 0 && (
+            <ul className="max-h-72 space-y-2 overflow-y-auto">
+              {documents.map((doc) => {
+                const displayName = doc.title ?? doc.storage_path.split("/").pop() ?? doc.id.slice(0, 8);
+                const isScoped = queryDocumentScopeId === doc.id;
+                const statusColor = {
+                  ready: "bg-emerald-100 text-emerald-700",
+                  processing: "bg-amber-100 text-amber-700",
+                  queued: "bg-slate-100 text-slate-500",
+                  failed: "bg-rose-100 text-rose-700",
+                }[doc.status];
+
+                return (
+                  <li key={doc.id} className="flex items-start gap-2 rounded-lg border border-slate-100 bg-white/80 p-2 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-700" title={displayName}>
+                        {displayName}
+                      </p>
+                      <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusColor}`}>
+                        {doc.status}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQueryDocumentScopeId(isScoped ? null : doc.id);
+                        }}
+                        className={`rounded px-2 py-1 text-[10px] font-medium transition ${
+                          isScoped
+                            ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                        title={isScoped ? "Remove scope" : "Scope queries to this document"}
+                      >
+                        {isScoped ? "Scoped" : "Scope"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteDocumentById(doc.id)}
+                        className="rounded px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50"
+                        title="Delete document"
+                      >
+                        Del
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
 
         <section className="rounded-[24px] border border-[#d3c4b3] bg-[linear-gradient(165deg,rgba(255,252,248,0.95),rgba(251,247,241,0.95))] p-4 shadow-[0_20px_38px_-30px_rgba(71,85,105,0.55)]">

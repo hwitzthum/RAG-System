@@ -134,7 +134,7 @@ export async function middleware(request: NextRequest) {
         sameSite: "lax",
         secure: isProduction,
         path: "/",
-        maxAge: 60 * 60, // 1 hour
+        // no maxAge: session cookie, deleted on browser close
       });
     }
   }

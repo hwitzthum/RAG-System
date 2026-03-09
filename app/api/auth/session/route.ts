@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       secure: isProduction,
       path: "/",
-      maxAge: 60 * 60, // 1 hour
     });
 
     // Set CSRF cookie
@@ -70,7 +69,6 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       secure: isProduction,
       path: "/",
-      maxAge: 60 * 60,
     });
 
     logAuditEvent({
