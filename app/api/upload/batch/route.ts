@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     try {
       const persisted = await persistUploadAndQueueJob({
         file,
-        title: null,
+        title: file.name,
         languageHint: null,
       });
 

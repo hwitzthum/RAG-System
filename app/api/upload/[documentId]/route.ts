@@ -32,7 +32,7 @@ export async function GET(
 
   const { data: documentRecord, error: documentError } = await supabase
     .from("documents")
-    .select("id,status,ingestion_version,storage_path,sha256,created_at,updated_at")
+    .select("id,title,status,ingestion_version,storage_path,sha256,created_at,updated_at")
     .eq("id", documentId)
     .maybeSingle();
 

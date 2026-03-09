@@ -37,8 +37,10 @@ type Turn = {
 type UploadStatusSnapshot = {
   document: {
     id: string;
+    title: string | null;
     status: string;
     ingestion_version: number;
+    storage_path: string;
     created_at: string;
     updated_at: string;
   };
@@ -67,6 +69,10 @@ type DocumentListItem = Pick<
   Database["public"]["Tables"]["documents"]["Row"],
   "id" | "title" | "status" | "created_at" | "storage_path"
 >;
+
+function getDocumentDisplayName(doc: { title: string | null; storage_path: string; id: string }): string {
+  return doc.title ?? doc.storage_path.split("/").pop() ?? doc.id.slice(0, 8);
+}
 
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -452,9 +458,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", fileToUpload);
-    if (uploadTitle.trim()) {
-      formData.append("title", uploadTitle.trim());
-    }
+    formData.append("title", uploadTitle.trim() || fileToUpload.name);
     if (uploadLanguageHint) {
       formData.append("language_hint", uploadLanguageHint);
     }
@@ -527,6 +531,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
       const formData = new FormData();
       formData.append("file", entries[i].file);
+      formData.append("title", entries[i].file.name);
 
       try {
         const response = await fetch("/api/upload/batch", { method: "POST", headers: csrfHeaders(), body: formData });
@@ -1162,7 +1167,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           {uploadStatus ? (
             <div className="mt-4 rounded-xl border border-emerald-200 bg-white/90 p-3 text-xs text-slate-700">
               <p>
-                <span className="font-semibold">Document:</span> {uploadStatus.document.id}
+                <span className="font-semibold">Document:</span> {getDocumentDisplayName(uploadStatus.document)}
               </p>
               <p>
                 <span className="font-semibold">Status:</span> {uploadStatus.document.status}
@@ -1209,7 +1214,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           {!documentsLoading && documents.length > 0 && (
             <ul className="max-h-72 space-y-2 overflow-y-auto">
               {documents.map((doc) => {
-                const displayName = doc.title ?? doc.storage_path.split("/").pop() ?? doc.id.slice(0, 8);
+                const displayName = getDocumentDisplayName(doc);
                 const isScoped = queryDocumentScopeId === doc.id;
                 const statusColor = {
                   ready: "bg-emerald-100 text-emerald-700",
