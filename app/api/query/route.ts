@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
           cacheNamespace: `user:${authResult.user.id}::doc:${requestBody.documentId ?? "all"}`,
         });
 
+
         let webSources: WebSource[] = [];
         if (requestBody.enableWebResearch && env.RAG_WEB_SEARCH_ENABLED) {
           try {
