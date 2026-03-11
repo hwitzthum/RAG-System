@@ -246,7 +246,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   useEffect(() => {
     if (user) void fetchDocuments();
     else setDocuments([]);
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Inactivity logout: sign out after 10 minutes of no user activity
   useEffect(() => {
@@ -270,7 +270,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
     if (!user) {

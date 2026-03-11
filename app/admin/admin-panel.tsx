@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 type AdminUser = {
   id: string;
@@ -84,12 +85,12 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Administration</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-900">User Management</h1>
         </div>
-        <a
+        <Link
           href="/"
           className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
           Back to Workbench
-        </a>
+        </Link>
       </div>
 
       {error && (
