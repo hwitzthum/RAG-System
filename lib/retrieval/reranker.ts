@@ -8,6 +8,10 @@ type RerankInput = {
   topK: number;
 };
 
+const RETRIEVAL_WEIGHT = 0.6;
+const LEXICAL_WEIGHT = 0.35;
+const EXACT_MATCH_WEIGHT = 0.05;
+
 function scoreLexicalOverlap(tokens: string[], searchableText: string): number {
   if (tokens.length === 0) {
     return 0;
@@ -45,7 +49,7 @@ export function rerankCandidates(input: RerankInput): RetrievedChunk[] {
       ? candidate.retrievalScore / maxRetrieval
       : 1;
 
-    const rerankScore = normalizedRetrieval * 0.6 + lexical * 0.35 + exactMatch * 0.05;
+    const rerankScore = normalizedRetrieval * RETRIEVAL_WEIGHT + lexical * LEXICAL_WEIGHT + exactMatch * EXACT_MATCH_WEIGHT;
     return { ...candidate, rerankScore };
   });
 

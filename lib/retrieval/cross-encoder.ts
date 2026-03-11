@@ -40,17 +40,24 @@ export async function crossEncoderRerank(input: CrossEncoderInput): Promise<Retr
     ...pairs.map((p, i) => `Passage ${i + 1}:\n${p.text}`),
   ].join("\n");
 
-  const raw = await Promise.race([
-    llm.generateAnswer({
-      systemPrompt: "You are a relevance scorer. Output only valid JSON.",
-      userPrompt: prompt,
-      language: "EN",
-      maxOutputTokens: Math.max(100, cappedChunks.length * 8),
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Cross-encoder timeout")), CROSS_ENCODER_TIMEOUT_MS),
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Cross-encoder timeout")), CROSS_ENCODER_TIMEOUT_MS);
+  });
+  let raw: string;
+  try {
+    raw = await Promise.race([
+      llm.generateAnswer({
+        systemPrompt: "You are a relevance scorer. Output only valid JSON.",
+        userPrompt: prompt,
+        language: "EN",
+        maxOutputTokens: Math.max(100, cappedChunks.length * 8),
+      }),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer!);
+  }
 
   let scores: number[];
   try {

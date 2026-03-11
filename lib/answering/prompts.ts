@@ -10,7 +10,7 @@ export const GROUNDED_ANSWER_SYSTEM_PROMPT = `You are a retrieval-grounded assis
 6. Structure the answer clearly with short paragraphs. Use the requested output language.
 7. Prefer direct quotes or close paraphrases from the evidence over your own phrasing.`;
 
-function formatEvidenceChunk(chunk: RetrievedChunk, index: number): string {
+export function formatEvidenceChunk(chunk: RetrievedChunk, index: number): string {
   return [
     `[${index + 1}] (page ${chunk.pageNumber}, section: ${chunk.sectionTitle})`,
     chunk.content,

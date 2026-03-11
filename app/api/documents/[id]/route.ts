@@ -49,38 +49,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   // Log partial failures but continue — the document record must still be deleted
   // to avoid leaving a dangling reference that blocks re-upload.
-  if (storageResult.error) {
-    logAuditEvent({
-      action: "document.delete",
-      actorId: authResult.user.id,
-      actorRole: authResult.user.role,
-      outcome: "failure",
-      resource: `document:${id}:storage`,
-      ipAddress,
-      metadata: { reason: "storage_delete_failed", message: storageResult.error.message },
-    });
-  }
-  if (jobsResult.error) {
-    logAuditEvent({
-      action: "document.delete",
-      actorId: authResult.user.id,
-      actorRole: authResult.user.role,
-      outcome: "failure",
-      resource: `document:${id}:ingestion_jobs`,
-      ipAddress,
-      metadata: { reason: "jobs_delete_failed", message: jobsResult.error.message },
-    });
-  }
-  if (chunksResult.error) {
-    logAuditEvent({
-      action: "document.delete",
-      actorId: authResult.user.id,
-      actorRole: authResult.user.role,
-      outcome: "failure",
-      resource: `document:${id}:chunks`,
-      ipAddress,
-      metadata: { reason: "chunks_delete_failed", message: chunksResult.error.message },
-    });
+  const deleteSteps = [
+    { result: storageResult, resource: "storage", reason: "storage_delete_failed" },
+    { result: jobsResult, resource: "ingestion_jobs", reason: "jobs_delete_failed" },
+    { result: chunksResult, resource: "chunks", reason: "chunks_delete_failed" },
+  ] as const;
+  for (const step of deleteSteps) {
+    if (step.result.error) {
+      logAuditEvent({
+        action: "document.delete",
+        actorId: authResult.user.id,
+        actorRole: authResult.user.role,
+        outcome: "failure",
+        resource: `document:${id}:${step.resource}`,
+        ipAddress,
+        metadata: { reason: step.reason, message: step.result.error.message },
+      });
+    }
   }
 
   // Delete document record last (after foreign-key dependents are gone)

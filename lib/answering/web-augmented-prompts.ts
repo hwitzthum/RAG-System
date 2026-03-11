@@ -1,4 +1,5 @@
 import type { RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import { formatEvidenceChunk } from "@/lib/answering/prompts";
 import type { WebSource } from "@/lib/web-research/types";
 
 export const WEB_AUGMENTED_SYSTEM_PROMPT = `You are a retrieval-grounded assistant with access to web research. Follow these rules strictly:
@@ -27,10 +28,7 @@ export function buildWebAugmentedUserPrompt(input: {
   webSources: WebSource[];
 }): string {
   const evidenceBlocks = input.chunks
-    .map(
-      (chunk, i) =>
-        `[${i + 1}] (page ${chunk.pageNumber}, section: ${chunk.sectionTitle})\n${chunk.content}${chunk.context ? `\nContext: ${chunk.context}` : ""}`,
-    )
+    .map((chunk, i) => formatEvidenceChunk(chunk, i))
     .join("\n\n---\n\n");
 
   const webBlocks = input.webSources.map((s, i) => formatWebSource(s, i)).join("\n\n");
