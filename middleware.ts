@@ -122,7 +122,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(homeUrl);
     }
 
-    // Sync the access token to our session cookie for API route auth
+    // Sync the access token to our session cookie for API route auth.
+    // After getUser() above, the Supabase SSR client has already refreshed
+    // the session and set updated sb-* cookies on supabaseResponse.
+    // Use getSession() from the *local* client (reads from already-refreshed
+    // in-memory state — no additional network round-trip).
     const { data: sessionData } = await supabase.auth.getSession();
     if (sessionData.session?.access_token) {
       const isProduction = process.env.NODE_ENV === "production";
@@ -134,7 +138,6 @@ export async function middleware(request: NextRequest) {
         sameSite: "lax",
         secure: isProduction,
         path: "/",
-        // no maxAge: session cookie, deleted on browser close
       });
     }
   }

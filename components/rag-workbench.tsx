@@ -40,7 +40,6 @@ type UploadStatusSnapshot = {
     title: string | null;
     status: string;
     ingestion_version: number;
-    storage_path: string;
     created_at: string;
     updated_at: string;
   };
@@ -67,11 +66,11 @@ const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeId";
 
 type DocumentListItem = Pick<
   Database["public"]["Tables"]["documents"]["Row"],
-  "id" | "title" | "status" | "created_at" | "storage_path"
+  "id" | "title" | "status" | "created_at"
 >;
 
-function getDocumentDisplayName(doc: { title: string | null; storage_path: string; id: string }): string {
-  return doc.title ?? doc.storage_path.split("/").pop() ?? doc.id.slice(0, 8);
+function getDocumentDisplayName(doc: { title: string | null; id: string }): string {
+  return doc.title ?? doc.id.slice(0, 8);
 }
 
 function newUuid(): string {

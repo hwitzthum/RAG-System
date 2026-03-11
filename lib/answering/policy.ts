@@ -15,5 +15,15 @@ export function hasSufficientEvidence(input: EvidencePolicyInput): boolean {
     return false;
   }
 
-  return input.chunks.some((chunk) => resolveScore(chunk) >= input.minRerankScore);
+  // At least one chunk must meet the minimum score threshold.
+  const hasStrongChunk = input.chunks.some((chunk) => resolveScore(chunk) >= input.minRerankScore);
+  if (!hasStrongChunk) {
+    return false;
+  }
+
+  // The top chunks (up to minEvidenceChunks) must have a reasonable average score
+  // to avoid answering when only one chunk is marginally relevant.
+  const topChunks = input.chunks.slice(0, Math.max(1, input.minEvidenceChunks));
+  const avgScore = topChunks.reduce((sum, c) => sum + resolveScore(c), 0) / topChunks.length;
+  return avgScore >= input.minRerankScore * 0.5;
 }

@@ -54,40 +54,30 @@ export async function POST(request: NextRequest) {
 
   const citations = (historyRow.citations ?? []) as Array<{ documentId: string; pageNumber: number; chunkId: string }>;
   const chunkIds = citations.map((c) => c.chunkId);
-
-  // Fetch chunk content.
-  let chunks: ReportChunk[] = [];
-  if (chunkIds.length > 0) {
-    const { data: chunkRows } = await supabase
-      .from("document_chunks")
-      .select("id, document_id, page_number, section_title, content")
-      .in("id", chunkIds);
-
-    if (chunkRows) {
-      chunks = chunkRows.map((row) => ({
-        chunkId: row.id,
-        documentId: row.document_id,
-        pageNumber: row.page_number,
-        sectionTitle: row.section_title ?? "",
-        content: row.content,
-      }));
-    }
-  }
-
-  // Fetch document titles.
   const uniqueDocIds = [...new Set(citations.map((c) => c.documentId))];
+
+  // Fetch chunks and document titles in parallel (independent queries).
+  const [chunkResult, docResult] = await Promise.all([
+    chunkIds.length > 0
+      ? supabase.from("document_chunks").select("id, document_id, page_number, section_title, content").in("id", chunkIds)
+      : Promise.resolve({ data: null }),
+    uniqueDocIds.length > 0
+      ? supabase.from("documents").select("id, title").in("id", uniqueDocIds)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const chunks: ReportChunk[] = (chunkResult.data ?? []).map((row) => ({
+    chunkId: row.id,
+    documentId: row.document_id,
+    pageNumber: row.page_number,
+    sectionTitle: row.section_title ?? "",
+    content: row.content,
+  }));
+
   const documentTitles: Record<string, string> = {};
-
-  if (uniqueDocIds.length > 0) {
-    const { data: docRows } = await supabase
-      .from("documents")
-      .select("id, title")
-      .in("id", uniqueDocIds);
-
-    if (docRows) {
-      for (const row of docRows) {
-        documentTitles[row.id] = row.title ?? "Untitled";
-      }
+  if (docResult.data) {
+    for (const row of docResult.data) {
+      documentTitles[row.id] = row.title ?? "Untitled";
     }
   }
 

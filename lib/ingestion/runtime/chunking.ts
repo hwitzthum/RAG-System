@@ -1,7 +1,9 @@
 import type { ChunkCandidate, ExtractedPage, Section } from "@/lib/ingestion/runtime/types";
 import type { SupportedLanguage } from "@/lib/supabase/database.types";
 
-const HEADING_PATTERN = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
+// Match headings in ALL CAPS or Title Case (with optional leading numbering like "1.2 Section Name").
+const HEADING_UPPERCASE = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
+const HEADING_TITLECASE = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+(?:\s+(?:[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+|and|or|of|the|for|in|on|to|with|&|\/|-)){1,10}$/;
 const RELAXED_MIN_CHARS = 20;
 
 function isHeading(line: string): boolean {
@@ -12,7 +14,7 @@ function isHeading(line: string): boolean {
   if (candidate.length > 120) {
     return false;
   }
-  return HEADING_PATTERN.test(candidate);
+  return HEADING_UPPERCASE.test(candidate) || HEADING_TITLECASE.test(candidate);
 }
 
 export function splitIntoSections(page: ExtractedPage): Section[] {

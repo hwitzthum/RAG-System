@@ -78,13 +78,20 @@ export async function readRetrievalCache(input: ReadRetrievalCacheInput): Promis
 
   const cachedTopK = parsed.chunks.slice(0, Math.max(1, input.topK));
 
-  await supabase
+  // Fire-and-forget: update hit_count atomically without blocking the response.
+  // No await — this is analytics data, not critical for correctness.
+  void supabase
     .from("retrieval_cache")
     .update({
-      hit_count: Math.max(0, (data.hit_count ?? 0) + 1),
+      hit_count: (data.hit_count ?? 0) + 1,
       last_accessed_at: nowIso,
     })
-    .eq("cache_key", input.cacheKey);
+    .eq("cache_key", input.cacheKey)
+    .then(({ error: updateError }) => {
+      if (updateError) {
+        console.warn(`Cache hit_count update failed: ${updateError.message}`);
+      }
+    });
 
   return {
     chunks: cachedTopK,

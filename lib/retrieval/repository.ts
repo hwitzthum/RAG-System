@@ -103,23 +103,19 @@ export async function searchKeywordCandidates(input: SearchKeywordCandidatesInpu
 export async function searchVectorCandidates(input: SearchVectorCandidatesInput): Promise<RetrievedChunk[]> {
   const supabase = getSupabaseAdminClient();
   const limit = Math.max(1, input.limit);
-  const scopedLimit = input.documentIds && input.documentIds.length > 0 ? Math.max(limit * 10, limit + 20) : limit;
 
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: input.queryEmbedding,
-    match_count: scopedLimit,
+    match_count: limit,
     filter_language: input.language ?? null,
+    filter_document_ids: input.documentIds && input.documentIds.length > 0 ? input.documentIds : null,
   });
 
   if (error) {
     throw new Error(`Vector retrieval failed: ${error.message}`);
   }
 
-  let rows = (data ?? []) as MatchChunkRow[];
-  if (input.documentIds && input.documentIds.length > 0) {
-    const allowedIds = new Set(input.documentIds);
-    rows = rows.filter((row) => allowedIds.has(row.document_id));
-  }
+  const rows = (data ?? []) as MatchChunkRow[];
 
   return rows.slice(0, limit).map((row) => ({
     chunkId: row.chunk_id,

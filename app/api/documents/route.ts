@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdminClient();
   const { data, error, count } = await supabase
     .from("documents")
-    .select("id, title, status, created_at, storage_path", { count: "planned" })
+    .select("id, title, status, created_at", { count: "planned" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

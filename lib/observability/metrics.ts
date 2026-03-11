@@ -14,10 +14,14 @@ export async function emitMetric(event: MetricEvent): Promise<void> {
     return;
   }
 
-  const baseUrl = `${env.SUPABASE_URL ? "" : "http://localhost:3001"}`;
+  // Use the app's own origin for the internal metrics endpoint.
+  // In production, VERCEL_URL or similar would be available; fall back to localhost.
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : `http://localhost:${process.env.PORT ?? "3001"}`;
 
   try {
-    const url = baseUrl ? `${baseUrl}${METRICS_ENDPOINT}` : METRICS_ENDPOINT;
+    const url = `${baseUrl}${METRICS_ENDPOINT}`;
 
     await fetch(url, {
       method: "POST",

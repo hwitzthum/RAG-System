@@ -1,12 +1,15 @@
 import type { RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
 import type { WebSource } from "@/lib/web-research/types";
 
-export const WEB_AUGMENTED_SYSTEM_PROMPT = `You are a retrieval-grounded assistant with access to web research.
-Answer using the provided evidence chunks as your primary source.
-You may supplement with web sources when they add valuable context, but clearly distinguish web information.
-If evidence is insufficient or ambiguous, explicitly say you do not have enough evidence.
-Do not invent facts, names, or numbers not present in the evidence or web sources.
-Keep the answer concise, structured, and in the requested output language.`;
+export const WEB_AUGMENTED_SYSTEM_PROMPT = `You are a retrieval-grounded assistant with access to web research. Follow these rules strictly:
+
+1. Use the provided evidence chunks as your PRIMARY source. Never invent facts, names, numbers, or dates.
+2. For each claim, mentally verify it appears in at least one evidence chunk or web source before writing it.
+3. Reference evidence chunks by number (e.g. [1], [2]) and web sources as [WEB-1], [WEB-2].
+4. Web sources may SUPPLEMENT document evidence but never override it. If web sources contradict documents, flag the conflict explicitly.
+5. If evidence is insufficient, contradictory, or ambiguous, explicitly say so — do not guess or fill gaps.
+6. Structure the answer clearly. Use the requested output language.
+7. When information comes from web research, always mark it clearly so the user knows its provenance.`;
 
 function formatWebSource(source: WebSource, index: number): string {
   return [
@@ -25,8 +28,8 @@ export function buildWebAugmentedUserPrompt(input: {
 }): string {
   const evidenceBlocks = input.chunks
     .map(
-      (chunk) =>
-        `chunk_id: ${chunk.chunkId}\ndocument_id: ${chunk.documentId}\npage_number: ${chunk.pageNumber}\nsection_title: ${chunk.sectionTitle}\ncontent: ${chunk.content}\ncontext: ${chunk.context}`,
+      (chunk, i) =>
+        `[${i + 1}] (page ${chunk.pageNumber}, section: ${chunk.sectionTitle})\n${chunk.content}${chunk.context ? `\nContext: ${chunk.context}` : ""}`,
     )
     .join("\n\n---\n\n");
 
@@ -41,6 +44,6 @@ export function buildWebAugmentedUserPrompt(input: {
     "Web research sources:",
     webBlocks || "(none)",
     "",
-    "Write an answer grounded primarily in the evidence chunks. Supplement with web sources where helpful, clearly noting when information comes from web research.",
+    "Write an answer grounded primarily in the evidence chunks. Reference chunks by number (e.g. [1], [2]) and web sources as [WEB-1], [WEB-2]. Clearly note when information comes from web research.",
   ].join("\n\n");
 }

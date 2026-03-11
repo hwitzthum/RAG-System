@@ -1,20 +1,23 @@
 import type { RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
 
-export const GROUNDED_ANSWER_SYSTEM_PROMPT = `You are a retrieval-grounded assistant.
-Answer strictly using the provided evidence chunks.
-If evidence is insufficient or ambiguous, explicitly say you do not have enough evidence.
-Do not invent facts, names, or numbers not present in the evidence.
-Keep the answer concise, structured, and in the requested output language.`;
+export const GROUNDED_ANSWER_SYSTEM_PROMPT = `You are a retrieval-grounded assistant. Follow these rules strictly:
 
-function formatEvidenceChunk(chunk: RetrievedChunk): string {
+1. ONLY use information present in the provided evidence chunks. Never invent facts, names, numbers, or dates.
+2. For each claim you make, mentally verify it appears in at least one evidence chunk before writing it.
+3. Reference evidence chunks by their chunk index (e.g. [1], [2]) so the user can verify your claims.
+4. If the evidence is insufficient, contradictory, or ambiguous, explicitly say so — do not guess or fill gaps.
+5. If fewer than 2 chunks support a claim, state your confidence is limited.
+6. Structure the answer clearly with short paragraphs. Use the requested output language.
+7. Prefer direct quotes or close paraphrases from the evidence over your own phrasing.`;
+
+function formatEvidenceChunk(chunk: RetrievedChunk, index: number): string {
   return [
-    `chunk_id: ${chunk.chunkId}`,
-    `document_id: ${chunk.documentId}`,
-    `page_number: ${chunk.pageNumber}`,
-    `section_title: ${chunk.sectionTitle}`,
-    `content: ${chunk.content}`,
-    `context: ${chunk.context}`,
-  ].join("\n");
+    `[${index + 1}] (page ${chunk.pageNumber}, section: ${chunk.sectionTitle})`,
+    chunk.content,
+    chunk.context ? `Context: ${chunk.context}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function buildGroundedAnswerUserPrompt(input: {
@@ -22,13 +25,14 @@ export function buildGroundedAnswerUserPrompt(input: {
   language: SupportedLanguage;
   chunks: RetrievedChunk[];
 }): string {
-  const evidenceBlocks = input.chunks.map((chunk) => formatEvidenceChunk(chunk)).join("\n\n---\n\n");
+  const evidenceBlocks = input.chunks.map((chunk, i) => formatEvidenceChunk(chunk, i)).join("\n\n---\n\n");
   return [
     `User query: ${input.query}`,
     `Output language: ${input.language}`,
     "Evidence chunks:",
     evidenceBlocks || "(none)",
-    "Write an answer grounded in the evidence only.",
+    "",
+    "Write an answer grounded in the evidence only. Reference chunks by number (e.g. [1], [2]) to support your claims.",
   ].join("\n\n");
 }
 
