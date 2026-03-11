@@ -2,6 +2,22 @@
 
 A production-ready multilingual Retrieval-Augmented Generation platform built with Next.js, Supabase, and OpenAI. Upload PDF documents, ask questions, and get grounded answers with citations — optionally augmented with live web research.
 
+---
+
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [Architecture & Pipeline](#architecture--pipeline)
+3. [Authentication](#authentication)
+4. [User Guide](#user-guide)
+5. [API Reference](#api-reference)
+6. [Project Structure](#project-structure)
+7. [Environment Variables](#environment-variables)
+8. [Testing](#testing)
+9. [Production Deployment](#production-deployment)
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -69,6 +85,204 @@ curl http://localhost:3000/api/health
 ```
 
 You should see `{"status":"ok", ...}` with current configuration values.
+
+---
+
+## Architecture & Pipeline
+
+This section explains the concrete technical approaches used in the ingestion, retrieval, and answer generation pipelines, and why each design decision was made.
+
+### Overview
+
+```
+┌─────────────┐    ┌──────────────────────────────────────────────┐
+│  PDF Upload  │───▶│            Ingestion Pipeline                │
+└─────────────┘    │  Extract → Chunk → Embed → Store             │
+                   └──────────────────────────────────────────────┘
+                                        │ document_chunks (pgvector)
+                                        ▼
+┌─────────────┐    ┌──────────────────────────────────────────────┐
+│  User Query  │───▶│            Retrieval Pipeline                │
+└─────────────┘    │  Embed → Hybrid Search → RRF → Rerank        │
+                   │  → (Cross-Encoder) → (Contextual Grouping)   │
+                   └──────────────────────────────────────────────┘
+                                        │ ranked chunks
+                                        ▼
+                   ┌──────────────────────────────────────────────┐
+                   │          Answer Generation                    │
+                   │  Evidence Check → Prompt → LLM → SSE Stream  │
+                   └──────────────────────────────────────────────┘
+```
+
+---
+
+### 1. Ingestion Pipeline
+
+When a PDF is uploaded it goes through a five-stage pipeline before it is queryable.
+
+#### Stage 1 — Validation & Deduplication
+
+Before any processing, the upload route validates the file:
+
+- **PDF magic bytes check**: Confirms the file starts with `%PDF-` to reject non-PDF files even if they have a `.pdf` extension.
+- **SHA-256 deduplication**: A checksum of the full file is computed. If an identical document was already uploaded, the upload is rejected with a clear message rather than creating a duplicate knowledge base entry.
+- **Size limit**: Configurable maximum file size (default 50 MB) enforced server-side.
+
+#### Stage 2 — Text Extraction
+
+The background worker uses `pdfjs-dist` to extract text page-by-page, preserving page number metadata. Pages are then segmented into sections using heading-detection heuristics (regex patterns for common heading formats). This section boundary information flows into the chunker so that chunks do not silently straddle unrelated sections.
+
+#### Stage 3 — Chunking with Overlap
+
+Sections are split into overlapping chunks:
+
+- **Target token size** (default ~512 tokens): Keeps chunks short enough to stay within embedding model context limits and avoids diluting embedding signal with off-topic content.
+- **Overlap** (default ~100 tokens): Adjacent chunks share a window of text so that retrieval can find the full context for a sentence that sits at a chunk boundary.
+- **Sentence-boundary respect**: The chunker avoids cutting mid-sentence, preserving linguistic coherence.
+
+The combination of overlap and sentence-boundary awareness prevents information loss at chunk seams — a common failure mode in naive fixed-size chunking.
+
+#### Stage 4 — Context Generation
+
+Each chunk is augmented with a short context string stored separately from the raw content:
+
+- **LLM-generated** (optional): OpenAI summarises what the surrounding section is about, producing a rich semantic label for the chunk.
+- **Heuristic fallback**: `"{section_title} | page {n}: {first 200 chars}"` is used when LLM context generation is disabled.
+
+This context field is prepended to the chunk text when building the retrieval prompt, helping the model understand a chunk even when it appears out of document context.
+
+#### Stage 5 — Embedding & Storage
+
+Each chunk is embedded with OpenAI `text-embedding-3-small` and stored in the `document_chunks` table alongside:
+
+- The `embedding` column (pgvector, 1536 dimensions) for vector similarity search.
+- A `tsv` column (PostgreSQL `tsvector`, auto-maintained) for full-text keyword search.
+- `language`, `page_number`, `section_title`, and `chunk_index` for filtering and citation generation.
+
+Storing both representations enables the hybrid retrieval approach described below.
+
+---
+
+### 2. Retrieval Pipeline
+
+The retrieval pipeline is the heart of the system. Its goal is to return the most relevant chunks for a given query while maximising recall (finding everything relevant) and precision (ranking the best material first).
+
+```
+Query
+  │
+  ├─▶ Query Normalisation + Language Detection
+  │
+  ├─▶ Cache Lookup (SHA-256 key over query + language + topK + scope)
+  │       └─ Hit: return cached result immediately
+  │
+  └─▶ (Cache Miss)
+          │
+          ├─▶ OpenAI Embedding (text-embedding-3-small)
+          │
+          ├─▶ Token Extraction
+          │
+          ├─▶ Parallel Search
+          │       ├─ Vector Search   (pgvector cosine similarity)
+          │       └─ Keyword Search  (PostgreSQL full-text search)
+          │
+          ├─▶ Cross-Language Fallback (if results < threshold)
+          │
+          ├─▶ Reciprocal Rank Fusion (RRF)
+          │
+          ├─▶ Lexical Reranking
+          │
+          ├─▶ Cross-Encoder Reranking  [opt-in]
+          │
+          ├─▶ Contextual Grouping      [opt-in]
+          │
+          └─▶ Cache Write → Return top-K chunks
+```
+
+#### Hybrid Search: Vector + Keyword
+
+**Why hybrid?** Vector search captures semantic similarity (paraphrases, synonyms, conceptual relationships) but can miss exact terms — especially proper nouns, codes, or domain-specific abbreviations. Keyword search does the opposite: it excels at exact-match retrieval but fails on paraphrase. Running both in parallel and fusing results gives the best of both worlds.
+
+- **Vector search** uses pgvector's cosine similarity index. The query embedding is compared against all chunk embeddings. The pool size is `max(topK × 4, RAG_RERANK_POOL_SIZE, 20)` — deliberately larger than the final `topK` to give the downstream rerankers enough candidates to work with.
+- **Keyword search** uses PostgreSQL's built-in full-text search engine (`tsvector`/`tsquery`) with the `simple` dictionary. Query tokens are matched against the pre-computed `tsv` column.
+- **Language filtering**: Both searches respect a detected or hinted language to avoid surfacing chunks in the wrong language. If a language-filtered search returns too few results, an automatic cross-language fallback repeats both searches without the language constraint and merges the combined pool.
+
+#### Reciprocal Rank Fusion (RRF)
+
+RRF is a rank-combination technique that is robust to score scale differences between retrieval systems. Each candidate chunk receives a score from both the vector and keyword result lists:
+
+```
+RRF score = 1 / (K + vector_rank) + 1 / (K + keyword_rank)
+```
+
+`K` (default 60) dampens the influence of top-ranked results and promotes candidates that appear in both lists. A chunk that ranks 3rd in vector search and 5th in keyword search will outscore a chunk that ranks 1st in only one source. This penalises single-source flukes and rewards consistent evidence.
+
+#### Lexical Reranking
+
+After RRF fusion, each chunk is scored with a weighted blend of three signals:
+
+| Signal | Default weight | What it measures |
+|--------|---------------|-----------------|
+| Retrieval score | 0.60 | Normalised RRF / vector similarity |
+| Lexical overlap | 0.35 | Fraction of query tokens present in chunk |
+| Exact match | 0.05 | Boolean: chunk contains the full query string |
+
+The lexical overlap signal provides a fast, interpretable cross-check against the embedding-based score. A chunk that semantically matches the query but contains none of its words is demoted; one that contains all query words but with weak embedding similarity is promoted slightly.
+
+#### Cross-Encoder Reranking (optional, `RAG_CROSS_ENCODER_ENABLED`)
+
+For the highest quality at higher cost, an LLM-based cross-encoder can re-evaluate the top-20 candidates. Unlike embedding similarity (which scores query and chunk independently), a cross-encoder sees the query and chunk together and returns a fine-grained relevance score (0.0–1.0). This late-stage reranking corrects cases where embedding vectors agree superficially but the content is not actually answerable.
+
+A 3-second timeout with fallback to the previous rank ensures latency is bounded. Enabling this adds one LLM call per query (typically ~0.5–1.0 seconds).
+
+#### Contextual Grouping (default enabled, `RAG_CONTEXTUAL_GROUPING_ENABLED`)
+
+Documents often contain answers spread across adjacent chunks. Contextual grouping gives a score boost (+0.05 per neighbouring chunk, up to ±2 positions) to chunks that sit next to another high-ranking chunk from the same document. This promotes dense, coherent document sections over isolated snippets.
+
+The intuition: if chunk 7 from document A is in the top-5, chunk 6 or 8 from the same document is likely to provide useful surrounding context, so they deserve a slight promotion over an equally-scored chunk from an unrelated document.
+
+#### Result Caching
+
+Retrieval results are cached in the `retrieval_cache` table using a SHA-256 key over:
+
+- Normalised query text
+- Detected language
+- `RAG_RETRIEVAL_VERSION` (increment to invalidate the entire cache after re-ingestion)
+- `topK`
+- Document scope (specific document IDs or global)
+
+Cache TTL defaults to 24 hours. A cache hit returns results immediately without any embedding or database search, making repeated or near-identical queries essentially free.
+
+---
+
+### 3. Answer Generation
+
+#### Evidence Sufficiency Check
+
+Before calling the LLM, the system checks whether the retrieved evidence is sufficient:
+
+- At least `RAG_MIN_EVIDENCE_CHUNKS` chunks (default 2) must be present.
+- At least one chunk must have a rerank score ≥ `RAG_MIN_RERANK_SCORE` (default 0.25).
+
+If the evidence threshold is not met, the system returns a calibrated "insufficient evidence" response rather than hallucinating an answer. This is a deliberate design choice: it is better to say "I don't know" than to fabricate a confident but wrong answer.
+
+#### Prompt Construction
+
+Chunks are concatenated into the user prompt, each prefixed with a citation marker (`[Source N]`) and their context string. The system prompt instructs the model to answer only from the provided sources and to include citation markers in its response. These markers are parsed from the final answer to produce structured `citations` objects (documentId, page number, chunkId) returned to the client.
+
+#### Web-Augmented Answers
+
+When web research is enabled and the user activates it per-query, the system performs a Tavily web search in parallel with retrieval. Web sources with relevance ≥ 0.5 are appended to the prompt after the document chunks with their own citation markers. The model is instructed to prefer document sources but may draw on web content when document coverage is insufficient. Web sources are surfaced separately in the response so users can distinguish document-grounded from web-grounded claims.
+
+#### Streaming (SSE)
+
+The LLM response is streamed token-by-token via Server-Sent Events so the user sees output immediately. The stream emits four event types:
+
+| Event | Content |
+|-------|---------|
+| `meta` | Retrieval metadata (cache hit, latency, chunk counts) |
+| `token` | Individual answer tokens |
+| `final` | Complete answer, citations, web sources, queryHistoryId |
+| `done` | Stream complete signal |
 
 ---
 
@@ -233,30 +447,127 @@ Exceeding the limit returns `429 Too Many Requests`.
 
 ---
 
-## Using the Workbench
+## User Guide
 
-After signing in, you land on the **RAG Workbench** — the main interface with these sections:
+This section walks through every feature of the application as an approved user.
 
-### Querying documents
+### Accessing the workbench
 
-1. Type a question in the query textarea
-2. (Optional) Check **Web Research** to augment answers with live web results
-3. Click **Send Query**
-4. The answer streams in via SSE with citations linked to source documents
+After signing in with an approved account, you land on the **RAG Workbench** — a single-page interface divided into panels. All interactions happen here without page reloads.
+
+---
 
 ### Uploading documents
 
-**Single upload:** Select a PDF in the Ingestion Desk panel. It uploads immediately, and the system tracks ingestion status (queued → processing → ready).
+Before you can query anything, you need to upload at least one PDF document.
 
-**Batch upload:** Use the "Batch Upload" file input to select multiple PDFs at once. Each file uploads sequentially with individual status badges (pending/uploading/queued/failed).
+#### Single upload
+
+1. Find the **Ingestion Desk** panel on the workbench.
+2. Click **Choose File** and select a PDF from your computer.
+3. Optionally enter a title for the document (defaults to the filename).
+4. Click **Upload**.
+5. The document appears in the document list with a status badge:
+   - **queued** — received, waiting for the background worker
+   - **processing** — worker is extracting, chunking, and embedding
+   - **ready** — fully ingested and queryable
+   - **failed** — ingestion error (a **Retry** button appears)
+
+Status updates automatically while the page is open.
+
+#### Batch upload
+
+1. Use the **Batch Upload** file input to select up to 10 PDFs at once.
+2. Click **Upload All**.
+3. Each file gets its own row with individual status tracking. Files are uploaded sequentially and processed in the background.
+
+**Tips:**
+- Only PDF files are accepted. Non-PDF files are rejected at upload time.
+- Uploading the same PDF twice is detected by checksum and rejected with a helpful message.
+- File size limit: 50 MB per file.
+- If ingestion fails, click **Retry** to re-queue the document without re-uploading it.
+
+---
+
+### Asking questions
+
+Once at least one document is in **ready** state, you can query the knowledge base.
+
+1. Type your question in the query text area at the top of the workbench.
+2. Configure optional parameters (see below).
+3. Click **Send Query** or press `Enter`.
+4. The answer streams in word-by-word, followed by numbered citations.
+
+#### Query options
+
+| Option | Description |
+|--------|-------------|
+| **Document scope** | Restrict the search to a single document, or query all documents at once (default). |
+| **Web Research** | When checked, the system also searches the web via Tavily and incorporates relevant results alongside document evidence. |
+| **Language hint** | Manually specify the language of your query (EN/DE/FR/IT/ES) to override automatic detection. |
+| **Top K** | How many source chunks the retrieval pipeline should include (1–20, default 8). Higher values may improve recall on complex questions but increase LLM cost. |
+
+#### Reading the answer
+
+- **Answer text**: Grounded in your uploaded documents. Citation markers like `[Source 1]` appear inline.
+- **Citations panel**: Lists the exact page numbers and document names for each cited source. Click a citation to inspect the raw chunk text.
+- **Web sources** (if web research was enabled): Displayed below the answer with URLs and relevance snippets.
+- **Cache indicator**: A small badge shows whether this query result was served from cache (instant) or freshly computed.
+- **Retrieval metadata**: Expandable panel showing counts of vector/keyword/fused/reranked candidates and latency.
+
+If the system cannot find sufficient evidence in your documents to answer the question, it will say so rather than guessing. This is intentional — add more relevant documents or refine your query.
+
+---
 
 ### Downloading reports
 
-After a query completes, **Download DOCX** and **Download PDF** buttons appear on the turn. These generate a formatted report containing the query, answer, citations, and source chunk content.
+After any query completes, two report buttons appear on that query turn:
 
-### OpenAI BYOK (Bring Your Own Key)
+- **Download DOCX** — a formatted Word document containing the query, answer, citations, and raw chunk text.
+- **Download PDF** — the same content as a PDF.
 
-Users can store their own OpenAI API key in the encrypted vault. The key is used for their queries instead of the server-wide key. Keys are encrypted server-side and never stored in the browser.
+Reports are generated on-demand server-side and downloaded directly to your browser. They are useful for sharing results with colleagues who do not have access to the application.
+
+---
+
+### Using query history
+
+Previous queries are saved and accessible from the **Query History** panel:
+
+1. Open the history panel.
+2. Click any past query to reload it into the current turn view.
+3. Report buttons are available for historical queries as well.
+
+---
+
+### Bring Your Own OpenAI Key (BYOK)
+
+If you have your own OpenAI API key, you can store it in the encrypted vault so your queries use your key rather than the shared server key:
+
+1. Open the **OpenAI Key** panel on the workbench.
+2. Paste your key (starts with `sk-`).
+3. Click **Save**.
+4. A status indicator confirms whether the key is valid.
+5. To remove it, click **Delete**.
+
+Your key is encrypted server-side before storage and is never accessible from the browser after saving.
+
+---
+
+### Admin — managing users
+
+If your account has the `admin` role, an **Admin** link appears in the navigation.
+
+The admin panel shows a table of all registered users with their current roles. Available actions per user:
+
+| Current role | What you can do |
+|---|---|
+| pending | **Approve** → promotes to reader |
+| reader | **Promote to Admin** or **Suspend** |
+| admin | **Demote to Reader** (not available for your own account) |
+| suspended | **Reactivate** → restores reader access |
+
+Changes take effect immediately. The affected user will see the updated role on their next page load or **Check Status** action.
 
 ---
 
@@ -353,6 +664,8 @@ See `.env.example` for the full list. Key variables:
 | `RAG_WEB_SEARCH_API_KEY` | No | Tavily API key (required if web search enabled) |
 | `ADMIN_EMAIL` | No | Email auto-promoted to admin on first sign-up |
 | `AUTH_DEV_INSECURE_BYPASS` | No | Skip auth in development (default: false) |
+| `OPENAI_BYOK_VAULT_KEY` | Prod | Base64-encoded 32-byte key for BYOK encryption |
+| `CRON_SECRET` | Prod* | Required if `INGESTION_RUNTIME_MODE=vercel` |
 
 ---
 
