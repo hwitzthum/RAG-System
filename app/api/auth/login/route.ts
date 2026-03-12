@@ -103,17 +103,20 @@ export async function POST(request: NextRequest) {
     return response;
   }
 
-  if (role === "suspended") {
+  if (role === "suspended" || role === "rejected") {
     logAuditEvent({
       action: "auth.login",
       actorId: tokenData.user.id,
-      actorRole: "suspended",
+      actorRole: role,
       outcome: "failure",
       resource: "auth",
       ipAddress,
-      metadata: { reason: "account_suspended" },
+      metadata: { reason: role === "suspended" ? "account_suspended" : "account_rejected" },
     });
-    return NextResponse.json({ error: "Your account has been suspended. Contact an administrator." }, { status: 403 });
+    const message = role === "suspended"
+      ? "Your account has been suspended. Contact an administrator."
+      : "Your account request has been declined. Contact an administrator.";
+    return NextResponse.json({ error: message }, { status: 403 });
   }
 
   // Successful login with active role

@@ -19,7 +19,8 @@ export function resolveRoleFromClaims(payload: ClaimsLike): Role | null {
     roleCandidate === "admin" ||
     roleCandidate === "reader" ||
     roleCandidate === "pending" ||
-    roleCandidate === "suspended"
+    roleCandidate === "suspended" ||
+    roleCandidate === "rejected"
   ) {
     return roleCandidate;
   }

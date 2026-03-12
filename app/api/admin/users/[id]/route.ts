@@ -3,17 +3,28 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 const updateRoleSchema = z.object({
-  role: z.enum(["reader", "admin", "suspended"]),
+  role: z.enum(["reader", "admin", "suspended", "rejected"]),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const authResult = await requireAuthWithCsrf(request, ["admin"]);
   const ipAddress = getClientIp(request);
+
+  // Rate limit: 30 requests per 15 minutes per IP
+  const rl = await consumeSharedRateLimit(`admin:users:update:${ipAddress}`, 30, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
+  const authResult = await requireAuthWithCsrf(request, ["admin"]);
   const { id: targetUserId } = await params;
 
   if (!authResult.ok) {
@@ -52,8 +63,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
 
+    // Zero-admin guard: prevent demoting the last admin
+    if (previousRole === "admin" && newRole !== "admin") {
+      const { data: allUsers, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      if (listError) throw listError;
+      const adminCount = allUsers.users.filter((u) => u.app_metadata?.role === "admin").length;
+      if (adminCount <= 1) {
+        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
+      }
+    }
+
+    // Spread existing app_metadata to avoid destructive overwrite
     const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(targetUserId, {
-      app_metadata: { role: newRole },
+      app_metadata: { ...currentUser.user.app_metadata, role: newRole },
     });
 
     if (updateError) {

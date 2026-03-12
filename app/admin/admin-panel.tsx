@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import type { Role } from "@/lib/auth/types";
 
 type AdminUser = {
   id: string;
   email: string | null;
-  role: string;
+  role: Role;
   created_at: string;
   last_sign_in_at: string | null;
 };
@@ -55,11 +56,13 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
         },
         body: JSON.stringify({ role }),
       });
+      const data = await response.json();
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error ?? "Failed to update role");
+        throw new Error((data as { error?: string }).error ?? "Failed to update role");
       }
-      await fetchUsers();
+      // Update local state from response instead of re-fetching entire list
+      const updated = data as AdminUser;
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -71,11 +74,12 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
     setConfirmAction({ userId, role, label });
   }
 
-  const roleBadgeColor: Record<string, string> = {
+  const roleBadgeColor: Record<Role, string> = {
     admin: "bg-purple-100 text-purple-800 border-purple-300",
     reader: "bg-emerald-100 text-emerald-800 border-emerald-300",
     pending: "bg-amber-100 text-amber-800 border-amber-300",
     suspended: "bg-rose-100 text-rose-800 border-rose-300",
+    rejected: "bg-gray-100 text-gray-800 border-gray-300",
   };
 
   return (
@@ -157,14 +161,24 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                       ) : (
                         <>
                           {u.role === "pending" && (
-                            <button
-                              onClick={() => updateRole(u.id, "reader")}
-                              disabled={actionLoading === u.id}
-                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                              data-testid={`approve-${u.id}`}
-                            >
-                              Approve
-                            </button>
+                            <>
+                              <button
+                                onClick={() => updateRole(u.id, "reader")}
+                                disabled={actionLoading === u.id}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                data-testid={`approve-${u.id}`}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => requestConfirm(u.id, "rejected", `decline ${u.email ?? u.id}`)}
+                                disabled={actionLoading === u.id}
+                                className="rounded-lg bg-gray-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
+                                data-testid={`decline-${u.id}`}
+                              >
+                                Decline
+                              </button>
+                            </>
                           )}
                           {u.role === "reader" && (
                             <>
@@ -195,11 +209,20 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                           )}
                           {u.role === "suspended" && (
                             <button
-                              onClick={() => updateRole(u.id, "reader")}
+                              onClick={() => requestConfirm(u.id, "reader", `reactivate ${u.email ?? u.id}`)}
                               disabled={actionLoading === u.id}
                               className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
                               Reactivate
+                            </button>
+                          )}
+                          {u.role === "rejected" && (
+                            <button
+                              onClick={() => requestConfirm(u.id, "reader", `approve previously rejected ${u.email ?? u.id}`)}
+                              disabled={actionLoading === u.id}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Approve
                             </button>
                           )}
                         </>

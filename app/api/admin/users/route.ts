@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/request-auth";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -10,8 +11,18 @@ const DEFAULT_PER_PAGE = 50;
 const MAX_PER_PAGE = 200;
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth(request, ["admin"]);
   const ipAddress = getClientIp(request);
+
+  // Rate limit: 60 requests per 15 minutes per IP
+  const rl = await consumeSharedRateLimit(`admin:users:list:${ipAddress}`, 60, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
+  const authResult = await requireAuth(request, ["admin"]);
 
   if (!authResult.ok) {
     logAuditEvent({
@@ -59,7 +70,9 @@ export async function GET(request: NextRequest) {
       metadata: { userCount: users.length, page, perPage },
     });
 
-    return NextResponse.json({ users, page, perPage });
+    return NextResponse.json({ users, page, perPage }, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     logAuditEvent({

@@ -80,6 +80,11 @@ function LoginFormInner() {
           Your account has been suspended. Contact an administrator.
         </p>
       )}
+      {urlError === "rejected" && (
+        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+          Your account request has been declined. Contact an administrator if you believe this is an error.
+        </p>
+      )}
       {urlError === "confirmation_failed" && (
         <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
           Email confirmation failed or the link has expired. Please try signing up again.

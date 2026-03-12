@@ -79,11 +79,11 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const role = user.app_metadata?.role as string | undefined;
 
-    // Suspended users: clear session and redirect to login
-    if (role === "suspended") {
+    // Suspended/rejected users: clear session and redirect to login
+    if (role === "suspended" || role === "rejected") {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
-      loginUrl.searchParams.set("error", "suspended");
+      loginUrl.searchParams.set("error", role);
       const response = NextResponse.redirect(loginUrl);
       // Clear Supabase auth cookies
       for (const cookie of request.cookies.getAll()) {
