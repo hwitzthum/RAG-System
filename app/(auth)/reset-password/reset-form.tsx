@@ -16,45 +16,29 @@ export default function ResetForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Detect recovery session in URL
+  // Detect recovery code in URL (forwarded by /auth/callback)
   useEffect(() => {
     const code = searchParams?.get("code");
-    const verified = searchParams?.get("verified"); // set by /auth/callback after code exchange
 
-    // Session already established by /auth/callback (server-side exchange)
-    if (verified === "true") {
-      setMode("set-password");
-      return;
-    }
-
-    // Direct PKCE code (e.g. from browser-initiated reset)
     async function handleCode() {
       if (!code) return;
       const supabase = getSupabaseBrowserClient();
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
       if (exchangeError) {
         setError("Invalid or expired reset link. Please request a new one.");
-      } else {
-        setMode("set-password");
+        return;
       }
+      // Verify the session is actually present before showing the form
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setError("Session could not be established. Please request a new reset link.");
+        return;
+      }
+      setMode("set-password");
     }
 
     if (code) {
       void handleCode();
-      return;
-    }
-
-    // Implicit flow: access_token in URL hash (e.g. #access_token=...&type=recovery)
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash;
-      if (hash.includes("type=recovery") || hash.includes("access_token=")) {
-        const supabase = getSupabaseBrowserClient();
-        supabase.auth.getSession().then(({ data }) => {
-          if (data.session) {
-            setMode("set-password");
-          }
-        });
-      }
     }
   }, [searchParams]);
 
@@ -66,7 +50,7 @@ export default function ResetForm() {
     try {
       const supabase = getSupabaseBrowserClient();
       const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password%3Fverified%3Dtrue`,
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
       });
       if (authError) {
         setError(authError.message);
@@ -98,8 +82,10 @@ export default function ResetForm() {
         setError(updateError.message);
         return;
       }
+      // Sign out the recovery session so the user does a clean login
+      await supabase.auth.signOut();
       setMode("success-set");
-      setTimeout(() => router.push("/"), 2000);
+      setTimeout(() => router.push("/login"), 2000);
     } finally {
       setLoading(false);
     }

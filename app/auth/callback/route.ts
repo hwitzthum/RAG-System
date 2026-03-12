@@ -5,13 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
- * Supabase auth callback — exchanges a PKCE `code` for a session.
+ * Supabase auth callback.
  *
- * Used as the redirect target for:
- *  - Email confirmation after signup  → redirects to /login?confirmed=true
- *  - Password recovery link           → redirects to /reset-password?verified=true
- *
- * The `next` query parameter overrides the default redirect target.
+ * - Email confirmation: exchanges PKCE code server-side → /login?confirmed=true
+ * - Password recovery: forwards code to browser client → /reset-password?code=...
+ *   (browser must exchange it so updateUser() has a valid session)
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -24,6 +22,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
+  // For password recovery, forward the code to the browser client so it can
+  // exchange it directly. This ensures the browser Supabase client has a valid
+  // session for updateUser(). Exchanging server-side would put the session in
+  // HTTP-only cookies invisible to the browser client, AND the middleware would
+  // redirect the now-authenticated user away from /reset-password.
+  const isRecovery = type === "recovery" || (next && next.includes("reset-password"));
+  if (isRecovery) {
+    return NextResponse.redirect(`${origin}/reset-password?code=${code}`);
+  }
+
+  // All other flows (email confirmation, etc.) — exchange server-side.
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,11 +61,6 @@ export async function GET(request: NextRequest) {
   // Determine where to send the user after exchange
   if (next && next.startsWith("/") && !next.startsWith("//")) {
     return NextResponse.redirect(`${origin}${next}`);
-  }
-
-  if (type === "recovery") {
-    // Password reset: send to reset-password page (session is now active, no code needed)
-    return NextResponse.redirect(`${origin}/reset-password?verified=true`);
   }
 
   // Signup confirmation: send to login with a success message
