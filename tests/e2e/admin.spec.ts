@@ -42,6 +42,38 @@ async function resetPendingUserRole(): Promise<void> {
   await setUserRole(PENDING_USER_ID, "pending");
 }
 
+/** Re-create the pending test user if it was deleted by a test */
+async function ensurePendingUserExists(): Promise<void> {
+  // Check if user exists
+  const checkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${PENDING_USER_ID}`, {
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+  });
+  if (checkRes.ok) {
+    // User exists, just reset role
+    await resetPendingUserRole();
+    return;
+  }
+  // User was deleted — re-create with the same ID
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      id: PENDING_USER_ID,
+      email: PENDING_EMAIL,
+      password: PENDING_PASSWORD,
+      email_confirm: true,
+      app_metadata: { role: "pending" },
+    }),
+  });
+}
+
 test.describe("Admin API", () => {
   let adminToken: string;
 
@@ -80,8 +112,7 @@ test.describe("Admin API", () => {
   });
 
   test("PATCH /api/admin/users/:id can approve a pending user", async ({ request }) => {
-    // Reset pending user first
-    await resetPendingUserRole();
+    await ensurePendingUserExists();
 
     const response = await request.patch(`/api/admin/users/${PENDING_USER_ID}`, {
       headers: {
@@ -95,12 +126,11 @@ test.describe("Admin API", () => {
     const json = (await response.json()) as { role: string };
     expect(json.role).toBe("reader");
 
-    // Reset back to pending for other tests
     await resetPendingUserRole();
   });
 
   test("PATCH /api/admin/users/:id can decline a pending user", async ({ request }) => {
-    await resetPendingUserRole();
+    await ensurePendingUserExists();
 
     const response = await request.patch(`/api/admin/users/${PENDING_USER_ID}`, {
       headers: {
@@ -114,12 +144,10 @@ test.describe("Admin API", () => {
     const json = (await response.json()) as { role: string };
     expect(json.role).toBe("rejected");
 
-    // Reset back to pending for other tests
     await resetPendingUserRole();
   });
 
-  test("PATCH /api/admin/users/:id prevents self-demotion", async ({ request }) => {
-    // Get admin user's ID from the list
+  test("PATCH /api/admin/users/:id prevents self-action", async ({ request }) => {
     const listResponse = await request.get("/api/admin/users", {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
@@ -141,7 +169,6 @@ test.describe("Admin API", () => {
   });
 
   test("PATCH /api/admin/users/:id can suspend a user", async ({ request }) => {
-    // Reset pending user to reader first
     await setUserRole(PENDING_USER_ID, "reader");
 
     const response = await request.patch(`/api/admin/users/${PENDING_USER_ID}`, {
@@ -156,12 +183,10 @@ test.describe("Admin API", () => {
     const json = (await response.json()) as { role: string };
     expect(json.role).toBe("suspended");
 
-    // Reset back to pending
     await resetPendingUserRole();
   });
 
   test("PATCH /api/admin/users/:id can reactivate a suspended user", async ({ request }) => {
-    // Set user to suspended first
     await setUserRole(PENDING_USER_ID, "suspended");
 
     const response = await request.patch(`/api/admin/users/${PENDING_USER_ID}`, {
@@ -176,37 +201,82 @@ test.describe("Admin API", () => {
     const json = (await response.json()) as { role: string };
     expect(json.role).toBe("reader");
 
-    // Reset back to pending
     await resetPendingUserRole();
   });
 
-  test("demoting an admin succeeds when multiple admins exist", async ({ request }) => {
-    // Promote pending user to admin (now 2 admins)
-    await setUserRole(PENDING_USER_ID, "admin");
+  test("PATCH /api/admin/users/:id rejects 'admin' as target role", async ({ request }) => {
+    await ensurePendingUserExists();
 
-    // Original admin demotes pending admin → should succeed (2→1 admins)
     const response = await request.patch(`/api/admin/users/${PENDING_USER_ID}`, {
       headers: {
         Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
       },
-      data: { role: "reader" },
+      data: { role: "admin" },
     });
+
+    expect(response.status()).toBe(400);
+    const json = (await response.json()) as { error: string };
+    expect(json.error).toContain("Invalid");
+  });
+
+  test("DELETE /api/admin/users/:id deletes a user", async ({ request }) => {
+    // Create a temporary user to delete
+    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+      },
+      body: JSON.stringify({
+        email: "e2e-delete-target@ragsystem.test",
+        password: "DeleteMe123!",
+        email_confirm: true,
+        app_metadata: { role: "pending" },
+      }),
+    });
+    const created = (await createRes.json()) as { id: string };
+    const tempUserId = created.id;
+
+    const response = await request.delete(`/api/admin/users/${tempUserId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
     expect(response.ok()).toBe(true);
-    const json = (await response.json()) as { role: string };
-    expect(json.role).toBe("reader");
+    const json = (await response.json()) as { deleted: boolean; id: string };
+    expect(json.deleted).toBe(true);
+    expect(json.id).toBe(tempUserId);
 
-    // Note: The zero-admin guard (count <= 1) is defense-in-depth for race conditions.
-    // In normal flow, self-demotion check prevents the only triggerable case.
+    // Verify user is gone
+    const listRes = await request.get("/api/admin/users", {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const listJson = (await listRes.json()) as { users: Array<{ id: string }> };
+    expect(listJson.users.find((u) => u.id === tempUserId)).toBeUndefined();
+  });
 
-    // Cleanup
-    await resetPendingUserRole();
+  test("DELETE /api/admin/users/:id prevents self-deletion", async ({ request }) => {
+    const listResponse = await request.get("/api/admin/users", {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const listJson = (await listResponse.json()) as { users: Array<{ id: string; email: string }> };
+    const adminUser = listJson.users.find((u) => u.email === ADMIN_EMAIL);
+    expect(adminUser).toBeDefined();
+
+    const response = await request.delete(`/api/admin/users/${adminUser!.id}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(response.status()).toBe(400);
+    const json = (await response.json()) as { error: string };
+    expect(json.error).toContain("own account");
   });
 });
 
 test.describe("Pending approval flow", () => {
   test.beforeEach(async () => {
-    await resetPendingUserRole();
+    await ensurePendingUserExists();
   });
 
   test("pending user gets 403 on query API", async ({ request }) => {
@@ -219,7 +289,6 @@ test.describe("Pending approval flow", () => {
       data: { query: "test question", topK: 3 },
     });
 
-    // Query route allows ["reader", "admin"] — pending should be 403
     expect(response.status()).toBe(403);
   });
 
@@ -242,20 +311,17 @@ test.describe("Pending approval flow", () => {
 
 test.describe("Rejected user flow", () => {
   test.afterEach(async () => {
-    await resetPendingUserRole();
+    await ensurePendingUserExists();
   });
 
   test("rejected user sees error on login attempt", async ({ page }) => {
-    // Set user to rejected
     await setUserRole(PENDING_USER_ID, "rejected");
 
-    // Try to login as the rejected user
     await page.goto("/login");
     await page.fill('input[type="email"]', PENDING_EMAIL);
     await page.fill('input[type="password"]', PENDING_PASSWORD);
     await page.click('button[type="submit"]');
 
-    // The server-side login route returns 403 for rejected users, shown as error on login page
     await expect(page.locator("text=declined")).toBeVisible({ timeout: 10_000 });
   });
 
@@ -277,7 +343,6 @@ test.describe("Rejected user flow", () => {
 
 test.describe("Auth rate limiting", () => {
   test("login rate limit returns 429 after too many attempts", async ({ request }) => {
-    // Make 22 login attempts with wrong password (rate limit: 20 per 5 min per IP+email)
     const responses: number[] = [];
     for (let i = 0; i < 22; i++) {
       const response = await request.post("/api/auth/login", {
@@ -286,7 +351,6 @@ test.describe("Auth rate limiting", () => {
       responses.push(response.status());
     }
 
-    // At least one should be 429
     expect(responses).toContain(429);
   });
 });
@@ -299,20 +363,17 @@ test.describe("Admin page UI", () => {
     await page.click('button[type="submit"]');
     await page.waitForURL("/", { timeout: 15_000 });
 
-    // Navigate to admin page
     await page.goto("/admin");
     await expect(page.locator("h1")).toHaveText("User Management", { timeout: 10_000 });
 
-    // Check table is visible
     const table = page.locator('[data-testid="admin-users-table"]');
     await expect(table).toBeVisible({ timeout: 10_000 });
 
-    // Should show at least the admin user
     await expect(page.locator(`text=${ADMIN_EMAIL}`)).toBeVisible();
   });
 
-  test("admin sees Decline button for pending users", async ({ page }) => {
-    await resetPendingUserRole();
+  test("admin sees correct buttons for pending users (Approve, Decline, Delete)", async ({ page }) => {
+    await ensurePendingUserExists();
 
     await page.goto("/login");
     await page.fill('input[type="email"]', ADMIN_EMAIL);
@@ -323,11 +384,19 @@ test.describe("Admin page UI", () => {
     await page.goto("/admin");
     await expect(page.locator('[data-testid="admin-users-table"]')).toBeVisible({ timeout: 10_000 });
 
-    // Should see both Approve and Decline buttons for the pending user
+    // Pending user should have Approve, Decline, and Delete buttons
     const approveBtn = page.locator(`[data-testid="approve-${PENDING_USER_ID}"]`);
     const declineBtn = page.locator(`[data-testid="decline-${PENDING_USER_ID}"]`);
+    const deleteBtn = page.locator(`[data-testid="delete-${PENDING_USER_ID}"]`);
     await expect(approveBtn).toBeVisible();
     await expect(declineBtn).toBeVisible();
+    await expect(deleteBtn).toBeVisible();
+
+    // Should NOT have Suspend or Reactivate buttons
+    const suspendBtn = page.locator(`[data-testid="suspend-${PENDING_USER_ID}"]`);
+    const reactivateBtn = page.locator(`[data-testid="reactivate-${PENDING_USER_ID}"]`);
+    await expect(suspendBtn).not.toBeVisible();
+    await expect(reactivateBtn).not.toBeVisible();
   });
 
   test("reader is redirected away from /admin", async ({ page }) => {
@@ -337,9 +406,7 @@ test.describe("Admin page UI", () => {
     await page.click('button[type="submit"]');
     await page.waitForURL("/", { timeout: 15_000 });
 
-    // Try to access admin page
     await page.goto("/admin");
-    // Should be redirected to home
     await page.waitForURL("/", { timeout: 10_000 });
   });
 
@@ -350,7 +417,6 @@ test.describe("Admin page UI", () => {
     await page.click('button[type="submit"]');
     await page.waitForURL("/", { timeout: 20_000 });
 
-    // The server component may not have the latest session on first load — reload to sync
     await page.reload({ waitUntil: "networkidle" });
 
     const adminLink = page.locator('[data-testid="admin-link"]');
@@ -371,7 +437,7 @@ test.describe("Admin page UI", () => {
 
 test.describe("Pending approval page UI", () => {
   test.beforeEach(async () => {
-    await resetPendingUserRole();
+    await ensurePendingUserExists();
   });
 
   test("pending user is redirected to /pending-approval", async ({ page }) => {
@@ -380,7 +446,6 @@ test.describe("Pending approval page UI", () => {
     await page.fill('input[type="password"]', PENDING_PASSWORD);
     await page.click('button[type="submit"]');
 
-    // Should redirect to pending-approval
     await page.waitForURL("/pending-approval", { timeout: 15_000 });
     await expect(page.locator("h1")).toHaveText("Pending Approval", { timeout: 10_000 });
   });

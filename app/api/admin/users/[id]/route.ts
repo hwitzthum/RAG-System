@@ -9,7 +9,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 
 const updateRoleSchema = z.object({
-  role: z.enum(["reader", "admin", "suspended", "rejected"]),
+  role: z.enum(["reader", "suspended", "rejected"]),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -63,16 +63,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
 
-    // Zero-admin guard: prevent demoting the last admin
-    if (previousRole === "admin" && newRole !== "admin") {
-      const { data: allUsers, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-      if (listError) throw listError;
-      const adminCount = allUsers.users.filter((u) => u.app_metadata?.role === "admin").length;
-      if (adminCount <= 1) {
-        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
-      }
-    }
-
     // Spread existing app_metadata to avoid destructive overwrite
     const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(targetUserId, {
       app_metadata: { ...currentUser.user.app_metadata, role: newRole },
@@ -116,5 +106,82 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       metadata: { reason: "update_failed", targetUserId, message },
     });
     return NextResponse.json({ error: "Failed to update user role" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const ipAddress = getClientIp(request);
+
+  // Rate limit: reuse admin update bucket
+  const rl = await consumeSharedRateLimit(`admin:users:update:${ipAddress}`, 30, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
+  const authResult = await requireAuthWithCsrf(request, ["admin"]);
+  const { id: targetUserId } = await params;
+
+  if (!authResult.ok) {
+    logAuditEvent({
+      action: "admin.user.delete",
+      actorId: null,
+      actorRole: "anonymous",
+      outcome: "failure",
+      resource: "admin",
+      ipAddress,
+      metadata: { reason: "unauthorized", targetUserId },
+    });
+    return authResult.response;
+  }
+
+  // Prevent self-deletion
+  if (targetUserId === authResult.user.id) {
+    return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    // Get user info for audit log before deletion
+    const { data: targetUser, error: getUserError } = await supabase.auth.admin.getUserById(targetUserId);
+    if (getUserError || !targetUser.user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(targetUserId);
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    logAuditEvent({
+      action: "admin.user.delete",
+      actorId: authResult.user.id,
+      actorRole: "admin",
+      outcome: "success",
+      resource: "admin",
+      ipAddress,
+      metadata: {
+        targetUserId,
+        targetEmail: targetUser.user.email,
+        targetRole: targetUser.user.app_metadata?.role ?? "pending",
+      },
+    });
+
+    return NextResponse.json({ deleted: true, id: targetUserId, email: targetUser.user.email ?? null });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_error";
+    logAuditEvent({
+      action: "admin.user.delete",
+      actorId: authResult.user.id,
+      actorRole: "admin",
+      outcome: "failure",
+      resource: "admin",
+      ipAddress,
+      metadata: { reason: "delete_failed", targetUserId, message },
+    });
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
   }
 }

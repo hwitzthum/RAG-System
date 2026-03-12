@@ -12,6 +12,10 @@ type AdminUser = {
   last_sign_in_at: string | null;
 };
 
+type ConfirmAction =
+  | { userId: string; action: "role"; role: string; label: string }
+  | { userId: string; action: "delete"; label: string };
+
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|;\s*)(?:csrf_token|__Host-csrf)=([^;]*)/);
@@ -23,7 +27,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ userId: string; role: string; label: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -60,7 +64,6 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
       if (!response.ok) {
         throw new Error((data as { error?: string }).error ?? "Failed to update role");
       }
-      // Update local state from response instead of re-fetching entire list
       const updated = data as AdminUser;
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
     } catch (err) {
@@ -70,8 +73,37 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
     }
   }
 
-  function requestConfirm(userId: string, role: string, label: string) {
-    setConfirmAction({ userId, role, label });
+  async function deleteUser(userId: string) {
+    setActionLoading(userId);
+    setConfirmAction(null);
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { "X-CSRF-Token": getCsrfToken() },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error ?? "Failed to delete user");
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function requestConfirm(ca: ConfirmAction) {
+    setConfirmAction(ca);
+  }
+
+  function handleConfirm() {
+    if (!confirmAction) return;
+    if (confirmAction.action === "delete") {
+      deleteUser(confirmAction.userId);
+    } else {
+      updateRole(confirmAction.userId, confirmAction.role);
+    }
   }
 
   const roleBadgeColor: Record<Role, string> = {
@@ -110,10 +142,15 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
       {confirmAction && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Are you sure you want to <strong>{confirmAction.label}</strong>?
+          {confirmAction.action === "delete" && (
+            <span className="ml-1 font-semibold text-rose-700">This action cannot be undone.</span>
+          )}
           <div className="mt-2 flex gap-2">
             <button
-              onClick={() => updateRole(confirmAction.userId, confirmAction.role)}
-              className="rounded-lg bg-amber-700 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-800"
+              onClick={handleConfirm}
+              className={`rounded-lg px-3 py-1 text-xs font-semibold text-white ${
+                confirmAction.action === "delete" ? "bg-rose-700 hover:bg-rose-800" : "bg-amber-700 hover:bg-amber-800"
+              }`}
             >
               Confirm
             </button>
@@ -160,6 +197,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                         <span className="text-xs text-slate-400">You</span>
                       ) : (
                         <>
+                          {/* Pending: Approve, Decline, Delete */}
                           {u.role === "pending" && (
                             <>
                               <button
@@ -171,7 +209,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                                 Approve
                               </button>
                               <button
-                                onClick={() => requestConfirm(u.id, "rejected", `decline ${u.email ?? u.id}`)}
+                                onClick={() => requestConfirm({ userId: u.id, action: "role", role: "rejected", label: `decline ${u.email ?? u.id}` })}
                                 disabled={actionLoading === u.id}
                                 className="rounded-lg bg-gray-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
                                 data-testid={`decline-${u.id}`}
@@ -180,51 +218,49 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                               </button>
                             </>
                           )}
+                          {/* Reader: Suspend, Delete */}
                           {u.role === "reader" && (
-                            <>
-                              <button
-                                onClick={() => requestConfirm(u.id, "admin", `promote ${u.email ?? u.id} to admin`)}
-                                disabled={actionLoading === u.id}
-                                className="rounded-lg bg-purple-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
-                              >
-                                Promote
-                              </button>
-                              <button
-                                onClick={() => requestConfirm(u.id, "suspended", `suspend ${u.email ?? u.id}`)}
-                                disabled={actionLoading === u.id}
-                                className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
-                              >
-                                Suspend
-                              </button>
-                            </>
-                          )}
-                          {u.role === "admin" && (
                             <button
-                              onClick={() => requestConfirm(u.id, "reader", `demote ${u.email ?? u.id} to reader`)}
+                              onClick={() => requestConfirm({ userId: u.id, action: "role", role: "suspended", label: `suspend ${u.email ?? u.id}` })}
                               disabled={actionLoading === u.id}
-                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                              data-testid={`suspend-${u.id}`}
                             >
-                              Demote
+                              Suspend
                             </button>
                           )}
+                          {/* Admin (not self): Suspend, Delete */}
+                          {u.role === "admin" && (
+                            <button
+                              onClick={() => requestConfirm({ userId: u.id, action: "role", role: "suspended", label: `suspend ${u.email ?? u.id}` })}
+                              disabled={actionLoading === u.id}
+                              className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                              data-testid={`suspend-${u.id}`}
+                            >
+                              Suspend
+                            </button>
+                          )}
+                          {/* Suspended: Reactivate, Delete */}
                           {u.role === "suspended" && (
                             <button
-                              onClick={() => requestConfirm(u.id, "reader", `reactivate ${u.email ?? u.id}`)}
+                              onClick={() => requestConfirm({ userId: u.id, action: "role", role: "reader", label: `reactivate ${u.email ?? u.id}` })}
                               disabled={actionLoading === u.id}
                               className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              data-testid={`reactivate-${u.id}`}
                             >
                               Reactivate
                             </button>
                           )}
-                          {u.role === "rejected" && (
-                            <button
-                              onClick={() => requestConfirm(u.id, "reader", `approve previously rejected ${u.email ?? u.id}`)}
-                              disabled={actionLoading === u.id}
-                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                          )}
+                          {/* Rejected: Delete only (no extra button) */}
+                          {/* Delete button for all non-self users */}
+                          <button
+                            onClick={() => requestConfirm({ userId: u.id, action: "delete", label: `permanently delete ${u.email ?? u.id}` })}
+                            disabled={actionLoading === u.id}
+                            className="rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                            data-testid={`delete-${u.id}`}
+                          >
+                            Delete
+                          </button>
                         </>
                       )}
                     </div>
