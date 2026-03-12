@@ -69,5 +69,10 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5"
+  },
+  "overrides": {
+    "pdfkit": {
+      "jpeg-exif": "1.1.4"
+    }
   }
 }
