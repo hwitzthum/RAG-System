@@ -12,7 +12,7 @@ import type {
   QuerySseMetaEvent,
   QuerySseTokenEvent,
 } from "@/lib/contracts/api";
-import { getCsrfToken, csrfHeaders } from "@/lib/security/csrf-client";
+import { csrfHeaders } from "@/lib/security/csrf-client";
 
 import { AppNav } from "@/components/layout/app-nav";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -164,6 +164,18 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     else setDocuments([]);
   }, [user]);
 
+  const clearSession = useCallback(async (): Promise<void> => {
+    await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
+    await getSupabaseBrowserClient().auth.signOut().catch(() => null);
+    setUser(null);
+    setOpenAiByokInput("");
+    setOpenAiByokStatus(null);
+    setTurns([]);
+    setQueryHistory([]);
+    setQueryDocumentScopeId(null);
+    router.push("/login");
+  }, [router]);
+
   // Inactivity logout
   useEffect(() => {
     if (!user) return;
@@ -180,7 +192,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [user]);
+  }, [user, clearSession]);
 
   const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
     if (!user) { setOpenAiByokStatus(null); return; }
@@ -220,18 +232,6 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
     setUser(payload.user);
     setWorkspaceMessage(`Session created for role=${payload.user.role}.`);
-  }
-
-  async function clearSession(): Promise<void> {
-    await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
-    await getSupabaseBrowserClient().auth.signOut().catch(() => null);
-    setUser(null);
-    setOpenAiByokInput("");
-    setOpenAiByokStatus(null);
-    setTurns([]);
-    setQueryHistory([]);
-    setQueryDocumentScopeId(null);
-    router.push("/login");
   }
 
   async function saveOpenAiByokKey(): Promise<void> {

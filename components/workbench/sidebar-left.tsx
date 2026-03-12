@@ -1,4 +1,3 @@
-import type { QueryHistoryItem } from "@/lib/contracts/api";
 import type { SidebarLeftProps } from "./types";
 import { getDocumentDisplayName, formatTime } from "./types";
 import { Skeleton } from "@/components/ui/skeleton";
