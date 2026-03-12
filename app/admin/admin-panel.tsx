@@ -13,7 +13,7 @@ type AdminUser = {
 };
 
 type ConfirmAction =
-  | { userId: string; action: "role"; role: string; label: string }
+  | { userId: string; action: "role"; role: Role; label: string }
   | { userId: string; action: "delete"; label: string };
 
 function getCsrfToken(): string {
@@ -48,7 +48,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
     fetchUsers();
   }, [fetchUsers]);
 
-  async function updateRole(userId: string, role: string) {
+  async function updateRole(userId: string, role: Role) {
     setActionLoading(userId);
     setConfirmAction(null);
     try {
@@ -60,11 +60,11 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
         },
         body: JSON.stringify({ role }),
       });
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error((data as { error?: string }).error ?? "Failed to update role");
+        const msg = await response.json().then((d) => (d as { error?: string }).error).catch(() => null);
+        throw new Error(msg ?? "Failed to update role");
       }
-      const updated = data as AdminUser;
+      const updated = (await response.json()) as AdminUser;
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -81,9 +81,9 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
         method: "DELETE",
         headers: { "X-CSRF-Token": getCsrfToken() },
       });
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error((data as { error?: string }).error ?? "Failed to delete user");
+        const msg = await response.json().then((d) => (d as { error?: string }).error).catch(() => null);
+        throw new Error(msg ?? "Failed to delete user");
       }
       setUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (err) {
@@ -218,19 +218,8 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
                               </button>
                             </>
                           )}
-                          {/* Reader: Suspend, Delete */}
-                          {u.role === "reader" && (
-                            <button
-                              onClick={() => requestConfirm({ userId: u.id, action: "role", role: "suspended", label: `suspend ${u.email ?? u.id}` })}
-                              disabled={actionLoading === u.id}
-                              className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
-                              data-testid={`suspend-${u.id}`}
-                            >
-                              Suspend
-                            </button>
-                          )}
-                          {/* Admin (not self): Suspend, Delete */}
-                          {u.role === "admin" && (
+                          {/* Reader or Admin (not self): Suspend, Delete */}
+                          {(u.role === "reader" || u.role === "admin") && (
                             <button
                               onClick={() => requestConfirm({ userId: u.id, action: "role", role: "suspended", label: `suspend ${u.email ?? u.id}` })}
                               disabled={actionLoading === u.id}
