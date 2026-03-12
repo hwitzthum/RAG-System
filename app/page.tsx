@@ -7,8 +7,7 @@ export default async function HomePage() {
   const user = await getServerSessionUser();
 
   return (
-    <main>
-      <h1>Hello</h1>
+    <main className="min-h-screen bg-zinc-50">
       <RagWorkbench initialUser={user} />
     </main>
   );

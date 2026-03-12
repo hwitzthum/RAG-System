@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getCsrfToken } from "@/lib/security/csrf-client";
 
 export default function PendingApprovalForm() {
   const router = useRouter();
@@ -30,7 +31,10 @@ export default function PendingApprovalForm() {
         if (data.session?.access_token) {
           await fetch("/api/auth/session", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": getCsrfToken(),
+            },
             body: JSON.stringify({ accessToken: data.session.access_token }),
           });
         }
@@ -58,8 +62,7 @@ export default function PendingApprovalForm() {
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Account Status</p>
-      <h1 className="mt-1 text-3xl font-bold text-slate-900">Pending Approval</h1>
+      <h1 className="text-3xl font-bold text-slate-900">Pending Approval</h1>
       <p className="mt-4 text-sm leading-relaxed text-slate-700">
         Your account is pending approval by an administrator. You&apos;ll be able to access the workspace once your account is approved.
       </p>
@@ -74,14 +77,14 @@ export default function PendingApprovalForm() {
         <button
           onClick={handleCheckStatus}
           disabled={checking}
-          className="w-full rounded-xl border border-teal-800 bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {checking ? "Checking..." : "Check Status"}
         </button>
 
         <button
           onClick={handleSignOut}
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
         >
           Sign Out
         </button>

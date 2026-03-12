@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 function LoginFormInner() {
@@ -54,7 +55,8 @@ function LoginFormInner() {
       }
 
       const next = searchParams?.get("next") || serverData.redirect || "/";
-      router.push(next);
+      const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      router.push(safeNext);
       router.refresh();
     } finally {
       setLoading(false);
@@ -66,67 +68,68 @@ function LoginFormInner() {
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
-      <h1 className="mt-1 text-3xl font-bold text-slate-900">Sign In</h1>
+      <h1 className="text-3xl font-bold text-slate-900">Sign In</h1>
       <p className="mt-2 text-sm text-slate-600">Enter your credentials to access the workspace.</p>
 
       {confirmed && (
-        <p className="mt-4 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-800">
+        <p className="mt-4 rounded-lg bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-800">
           Email confirmed — you can now sign in.
         </p>
       )}
       {urlError === "suspended" && (
-        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+        <p className="mt-4 rounded-lg bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
           Your account has been suspended. Contact an administrator.
         </p>
       )}
       {urlError === "rejected" && (
-        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+        <p className="mt-4 rounded-lg bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
           Your account request has been declined. Contact an administrator if you believe this is an error.
         </p>
       )}
       {urlError === "confirmation_failed" && (
-        <p className="mt-4 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+        <p className="mt-4 rounded-lg bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
           Email confirmation failed or the link has expired. Please try signing up again.
         </p>
       )}
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <label htmlFor="email" className="block text-xs font-medium text-zinc-500">
             Email
           </label>
           <input
             id="email"
             type="email"
             required
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <label htmlFor="password" className="block text-xs font-medium text-zinc-500">
             Password
           </label>
           <input
             id="password"
             type="password"
             required
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
             placeholder="Enter your password"
           />
         </div>
 
-        {error && <p className="text-sm text-rose-700">{error}</p>}
+        {error && <p className="text-sm text-rose-700" role="alert" aria-live="assertive">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg border border-slate-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
@@ -135,14 +138,14 @@ function LoginFormInner() {
       <div className="mt-6 space-y-2 text-center text-sm text-slate-600">
         <p>
           Don&apos;t have an account?{" "}
-          <a href="/signup" className="font-semibold text-teal-800 hover:underline">
+          <Link href="/signup" className="font-semibold text-teal-600 hover:text-teal-700 hover:underline">
             Sign up
-          </a>
+          </Link>
         </p>
         <p>
-          <a href="/reset-password" className="text-teal-800 hover:underline">
+          <Link href="/reset-password" className="text-teal-600 hover:text-teal-700 hover:underline">
             Forgot your password?
-          </a>
+          </Link>
         </p>
       </div>
     </>

@@ -2,11 +2,17 @@
 
 :root {
   color-scheme: light;
-  --bg-1: #f6f0e5;
-  --bg-2: #efe4d3;
-  --ink: #1f2937;
-  --muted: #5b6473;
-  --ring: rgba(13, 148, 136, 0.28);
+  --bg-page: #fafafa;
+  --bg-surface: #ffffff;
+  --bg-recessed: #f4f4f5;
+  --border: #e4e4e7;
+  --border-hover: #d4d4d8;
+  --text-primary: #09090b;
+  --text-secondary: #3f3f46;
+  --text-muted: #71717a;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --ring: rgba(13, 148, 136, 0.35);
 }
 
 * {
@@ -20,50 +26,14 @@ body {
 }
 
 body {
-  position: relative;
-  color: var(--ink);
-  font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(1100px 620px at 8% -16%, rgba(45, 212, 191, 0.2) 0%, transparent 64%),
-    radial-gradient(840px 520px at 98% 2%, rgba(251, 146, 60, 0.16) 0%, transparent 62%),
-    radial-gradient(760px 420px at 45% 110%, rgba(56, 189, 248, 0.12) 0%, transparent 62%),
-    linear-gradient(180deg, var(--bg-1), var(--bg-2));
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.24;
-  mix-blend-mode: multiply;
-  background-image: linear-gradient(
-      90deg,
-      transparent 0%,
-      transparent calc(100% - 1px),
-      rgba(148, 163, 184, 0.2) calc(100% - 1px)
-    ),
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent calc(100% - 1px),
-      rgba(148, 163, 184, 0.15) calc(100% - 1px)
-    );
-  background-size: 32px 32px;
-}
-
-.font-display,
-h1,
-h2,
-h3 {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  font-family: var(--font-sans, "Inter", "Segoe UI", sans-serif);
+  background: var(--bg-page);
 }
 
 ::selection {
-  background-color: rgba(13, 148, 136, 0.22);
-  color: #0f172a;
+  background-color: rgba(13, 148, 136, 0.18);
+  color: #09090b;
 }
 
 a {
@@ -80,7 +50,7 @@ select {
 input,
 textarea,
 select {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 button:focus-visible,
@@ -92,17 +62,15 @@ select:focus-visible {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  main > header,
-  main > section,
-  main > div {
-    animation: rise-in 0.45s ease both;
+  .animate-rise {
+    animation: rise-in 0.35s ease both;
   }
 }
 
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 6px, 0);
   }
   to {
     opacity: 1;

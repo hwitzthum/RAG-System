@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function SignUpForm() {
   const [email, setEmail] = useState("");
@@ -38,47 +39,46 @@ export default function SignUpForm() {
   if (success) {
     return (
       <>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-900">Account Created</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Account Created</h1>
         <p className="mt-4 text-sm leading-relaxed text-slate-700">
           Your account has been created. An administrator will review your request and approve your access.
         </p>
         <p className="mt-2 text-sm leading-relaxed text-slate-700">
           You&apos;ll be able to sign in once your account is approved.
         </p>
-        <a
+        <Link
           href="/login"
-          className="mt-6 block w-full rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-slate-700"
+          className="mt-6 block w-full rounded-lg border border-slate-900 bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98]"
         >
           Go to Sign In
-        </a>
+        </Link>
       </>
     );
   }
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-900/85">Authentication</p>
-      <h1 className="mt-1 text-3xl font-bold text-slate-900">Create Account</h1>
+      <h1 className="text-3xl font-bold text-slate-900">Create Account</h1>
       <p className="mt-2 text-sm text-slate-600">Sign up to request access to the retrieval workspace.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <label htmlFor="email" className="block text-xs font-medium text-zinc-500">
             Email
           </label>
           <input
             id="email"
             type="email"
             required
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+          <label htmlFor="password" className="block text-xs font-medium text-zinc-500">
             Password
           </label>
           <input
@@ -86,19 +86,20 @@ export default function SignUpForm() {
             type="password"
             required
             minLength={6}
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[#cdbca8] bg-white/95 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
             placeholder="At least 6 characters"
           />
         </div>
 
-        {error && <p className="text-sm text-rose-700">{error}</p>}
+        {error && <p className="text-sm text-rose-700" role="alert" aria-live="assertive">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg border border-slate-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Creating account..." : "Sign Up"}
         </button>
@@ -106,9 +107,9 @@ export default function SignUpForm() {
 
       <p className="mt-6 text-center text-sm text-slate-600">
         Already have an account?{" "}
-        <a href="/login" className="font-semibold text-teal-800 hover:underline">
+        <Link href="/login" className="font-semibold text-teal-600 hover:text-teal-700 hover:underline">
           Sign in
-        </a>
+        </Link>
       </p>
     </>
   );

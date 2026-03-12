@@ -12,7 +12,7 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(135deg,#fefdfb,#f7f0e7)] p-4 md:p-8">
+    <main className="min-h-screen bg-zinc-50 p-4 md:p-8">
       <AdminPanel currentUserId={user.id} />
     </main>
   );

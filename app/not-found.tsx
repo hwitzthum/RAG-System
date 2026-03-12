@@ -1,14 +1,16 @@
+import Link from "next/link";
+
 export const dynamic = "force-dynamic";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-slate-900">404</h1>
-        <p className="mt-2 text-slate-600">This page could not be found.</p>
-        <a href="/login" className="mt-4 inline-block text-teal-800 hover:underline">
-          Go to login
-        </a>
+        <h1 className="text-4xl font-bold text-zinc-900">404</h1>
+        <p className="mt-2 text-zinc-500">This page could not be found.</p>
+        <Link href="/" className="mt-4 inline-block text-teal-600 hover:text-teal-700 hover:underline">
+          Go to workspace
+        </Link>
       </div>
     </div>
   );

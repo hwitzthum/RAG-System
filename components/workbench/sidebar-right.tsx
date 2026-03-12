@@ -1,0 +1,173 @@
+import type { SidebarRightProps } from "./types";
+import { getDocumentDisplayName, getMessageToneClass } from "./types";
+
+export function SidebarRight({
+  activeTurn,
+  uploadFileInputRef,
+  handleUploadFileChange,
+  uploadTitle,
+  setUploadTitle,
+  uploadLanguageHint,
+  setUploadLanguageHint,
+  handleUploadButtonClick,
+  uploading,
+  uploadFile,
+  canUpload,
+  userRole,
+  effectiveQueryScopeId,
+  batchFileInputRef,
+  handleBatchUpload,
+  batchFiles,
+  uploadStatus,
+  onDeleteDocument,
+  workspaceMessage,
+}: SidebarRightProps) {
+  const workspaceToneClass = getMessageToneClass(workspaceMessage);
+
+  return (
+    <aside className="flex w-[320px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-zinc-200 bg-white p-4">
+      {/* Evidence Navigator */}
+      <section>
+        <h3 className="text-xs font-medium text-zinc-500">Evidence Navigator</h3>
+        <p className="mt-0.5 text-[10px] text-zinc-400">Citations for the selected answer.</p>
+        <div className="mt-2 space-y-1.5">
+          {activeTurn?.citations.length ? (
+            activeTurn.citations.map((citation) => (
+              <a
+                key={`${citation.documentId}:${citation.pageNumber}:${citation.chunkId}`}
+                className="block rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 transition hover:bg-zinc-100"
+                href={`/api/upload/${citation.documentId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <p><span className="font-medium text-zinc-700">Doc:</span> {citation.documentId.slice(0, 8)}</p>
+                <p><span className="font-medium text-zinc-700">Page:</span> {citation.pageNumber}</p>
+                <p><span className="font-medium text-zinc-700">Chunk:</span> {citation.chunkId.slice(0, 12)}</p>
+              </a>
+            ))
+          ) : (
+            <p className="rounded-lg border border-dashed border-zinc-200 px-3 py-4 text-xs text-zinc-400">
+              No citations for this turn yet.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Ingestion Desk */}
+      <section>
+        <h3 className="text-xs font-medium text-zinc-500">Ingestion Desk</h3>
+        <div className="mt-2 space-y-2">
+          <input
+            ref={uploadFileInputRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            className="block w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border file:border-zinc-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-50"
+            onChange={handleUploadFileChange}
+          />
+          <input
+            value={uploadTitle}
+            onChange={(e) => setUploadTitle(e.target.value)}
+            placeholder="Optional title"
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400"
+          />
+          <select
+            value={uploadLanguageHint}
+            onChange={(e) => setUploadLanguageHint(e.target.value)}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+          >
+            <option value="">Language hint (optional)</option>
+            <option value="EN">EN</option>
+            <option value="DE">DE</option>
+            <option value="FR">FR</option>
+            <option value="IT">IT</option>
+            <option value="ES">ES</option>
+          </select>
+          <button
+            type="button"
+            onClick={handleUploadButtonClick}
+            disabled={uploading}
+            className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+          >
+            {uploading ? "Uploading..." : uploadFile ? "Upload PDF" : "Select PDF"}
+          </button>
+          {!canUpload ? (
+            <p className="text-xs text-zinc-400">Create a session first. Current role: {userRole ?? "none"}.</p>
+          ) : !uploadFile ? (
+            <p className="text-xs text-zinc-400">Select a PDF file to enable upload.</p>
+          ) : (
+            <p className="text-xs text-zinc-500">Selected: {uploadFile.name}</p>
+          )}
+          {effectiveQueryScopeId ? (
+            <p className="text-xs text-zinc-400">
+              Scope: {effectiveQueryScopeId.slice(0, 8)}...
+            </p>
+          ) : null}
+        </div>
+
+        {/* Batch Upload */}
+        <div className="mt-3 space-y-2">
+          <p className="text-[11px] font-medium text-zinc-500">Batch Upload</p>
+          <input
+            ref={batchFileInputRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            multiple
+            className="block w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border file:border-zinc-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-50"
+            onChange={handleBatchUpload}
+            data-testid="batch-upload-input"
+          />
+          {batchFiles.length > 0 ? (
+            <div className="space-y-1">
+              {batchFiles.map((entry, index) => (
+                <div key={index} className="flex items-center gap-2 text-xs">
+                  <span className="truncate text-zinc-600">{entry.file.name}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      entry.status === "failed"
+                        ? "border border-rose-200 bg-rose-50 text-rose-700"
+                        : entry.status === "queued"
+                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : entry.status === "uploading"
+                            ? "border border-amber-200 bg-amber-50 text-amber-700"
+                            : "border border-zinc-200 bg-zinc-50 text-zinc-500"
+                    }`}
+                  >
+                    {entry.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Upload Status */}
+        {uploadStatus ? (
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+            <p><span className="font-medium">Document:</span> {getDocumentDisplayName(uploadStatus.document)}</p>
+            <p><span className="font-medium">Status:</span> {uploadStatus.document.status}</p>
+            <p><span className="font-medium">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}</p>
+            {uploadStatus.latestIngestionJob?.last_error ? (
+              <p><span className="font-medium">Error:</span> {uploadStatus.latestIngestionJob.last_error}</p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onDeleteDocument(uploadStatus.document.id)}
+              className="mt-2 w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 active:scale-[0.98]"
+              data-testid="delete-document-button"
+            >
+              Delete Document
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      {/* Operations Log */}
+      <section>
+        <h3 className="text-xs font-medium text-zinc-500">Status</h3>
+        <p aria-live="polite" className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`}>
+          {workspaceMessage}
+        </p>
+      </section>
+    </aside>
+  );
+}

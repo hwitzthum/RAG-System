@@ -4,9 +4,12 @@ import PendingApprovalForm from "./pending-form";
 
 export default function PendingApprovalPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#fefdfb,#f7f0e7)] p-4">
-      <div className="w-full max-w-md rounded-3xl border border-[#d9c9b4] bg-white/95 p-8 shadow-[0_24px_64px_-36px_rgba(15,23,42,0.68)]">
-        <PendingApprovalForm />
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+      <div className="w-full max-w-md">
+        <p className="mb-6 text-center text-sm font-semibold text-zinc-900">RAG Workspace</p>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-lg">
+          <PendingApprovalForm />
+        </div>
       </div>
     </main>
   );
