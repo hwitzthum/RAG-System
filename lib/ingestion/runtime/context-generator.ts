@@ -93,7 +93,10 @@ export class ContextGenerator {
   }
 
   private async claudeContext(chunk: ChunkCandidate): Promise<string> {
-    const client = new Anthropic({ apiKey: this.anthropicApiKey! });
+    const client = new Anthropic({
+      apiKey: this.anthropicApiKey!,
+      timeout: this.settings.openAiTimeoutSeconds * 1000,
+    });
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 140,
