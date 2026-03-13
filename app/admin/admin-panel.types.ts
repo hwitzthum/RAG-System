@@ -17,5 +17,5 @@ export const roleBadgeColor: Record<Role, string> = {
   reader: "bg-emerald-100 text-emerald-800 border-emerald-300",
   pending: "bg-amber-100 text-amber-800 border-amber-300",
   suspended: "bg-rose-100 text-rose-800 border-rose-300",
-  rejected: "bg-gray-100 text-gray-800 border-gray-300",
+  rejected: "bg-zinc-100 text-zinc-800 border-zinc-300",
 };

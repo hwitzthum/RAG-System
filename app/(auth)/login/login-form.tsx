@@ -68,11 +68,11 @@ function LoginFormInner() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-slate-900">Sign In</h1>
-      <p className="mt-2 text-sm text-slate-600">Enter your credentials to access the workspace.</p>
+      <h1 className="text-3xl font-bold text-zinc-900">Sign In</h1>
+      <p className="mt-2 text-sm text-zinc-600">Enter your credentials to access the workspace.</p>
 
       {confirmed && (
-        <p className="mt-4 rounded-lg bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-800">
+        <p className="mt-4 rounded-lg bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-800">
           Email confirmed — you can now sign in.
         </p>
       )}
@@ -104,7 +104,7 @@ function LoginFormInner() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400"
             placeholder="you@example.com"
           />
         </div>
@@ -119,7 +119,7 @@ function LoginFormInner() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400"
             placeholder="Enter your password"
           />
         </div>
@@ -129,21 +129,21 @@ function LoginFormInner() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg border border-slate-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
 
-      <div className="mt-6 space-y-2 text-center text-sm text-slate-600">
+      <div className="mt-6 space-y-2 text-center text-sm text-zinc-600">
         <p>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold text-teal-600 hover:text-teal-700 hover:underline">
+          <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
             Sign up
           </Link>
         </p>
         <p>
-          <Link href="/reset-password" className="text-teal-600 hover:text-teal-700 hover:underline">
+          <Link href="/reset-password" className="text-indigo-600 hover:text-indigo-700 hover:underline">
             Forgot your password?
           </Link>
         </p>
@@ -154,7 +154,7 @@ function LoginFormInner() {
 
 export default function LoginForm() {
   return (
-    <Suspense fallback={<div className="p-4 text-center text-sm text-slate-500">Loading...</div>}>
+    <Suspense fallback={<div className="p-4 text-center text-sm text-zinc-500">Loading...</div>}>
       <LoginFormInner />
     </Suspense>
   );

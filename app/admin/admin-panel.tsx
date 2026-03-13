@@ -120,11 +120,11 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
+          <h1 className="text-3xl font-bold text-zinc-900">User Management</h1>
         </div>
         <Link
           href="/"
-          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
         >
           Back to Workbench
         </Link>
@@ -174,7 +174,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
             void fetchRuntimeStatus();
           }}
           disabled={loading || runtimeLoading}
-          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50"
         >
           Refresh All
         </button>

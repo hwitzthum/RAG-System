@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   color-scheme: light;
@@ -10,9 +11,17 @@
   --text-primary: #09090b;
   --text-secondary: #3f3f46;
   --text-muted: #71717a;
-  --accent: #0d9488;
-  --accent-hover: #0f766e;
-  --ring: rgba(13, 148, 136, 0.35);
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-subtle: #eef2ff;
+  --accent-border: #c7d2fe;
+  --ring: rgba(79, 70, 229, 0.35);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 * {
@@ -32,7 +41,7 @@ body {
 }
 
 ::selection {
-  background-color: rgba(13, 148, 136, 0.18);
+  background-color: rgba(79, 70, 229, 0.15);
   color: #09090b;
 }
 
@@ -65,6 +74,12 @@ select:focus-visible {
   .animate-rise {
     animation: rise-in 0.35s ease both;
   }
+  .animate-fade-in {
+    animation: fade-in 0.4s ease both;
+  }
+  .animate-slide-up {
+    animation: slide-up 0.3s ease both;
+  }
 }
 
 @keyframes rise-in {
@@ -75,5 +90,34 @@ select:focus-visible {
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
   }
 }

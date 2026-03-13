@@ -76,6 +76,16 @@ async function cleanupSmokeDocument(documentId: string): Promise<void> {
   }
 }
 
+/** Click the Upload tab in the right sidebar to reveal upload controls */
+async function clickUploadTab(page: Page): Promise<void> {
+  await page.locator("aside >> text=Upload").last().click();
+}
+
+/** Click the Status tab in the right sidebar */
+async function clickStatusTab(page: Page): Promise<void> {
+  await page.locator("aside >> text=Status").last().click();
+}
+
 async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> {
   const pdfBuffer = await createPdfBuffer(
     `The uploaded document contains the phrase ${uniqueToken}. This line is used for end-to-end retrieval verification.`,
@@ -84,6 +94,9 @@ async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> 
   const uploadResponsePromise = page.waitForResponse((response) => {
     return response.url().endsWith("/api/upload") && response.request().method() === "POST";
   });
+
+  // Click Upload tab to reveal the single-upload-input
+  await clickUploadTab(page);
 
   await page.getByTestId("single-upload-input").setInputFiles({
     name: "rag-smoke.pdf",
@@ -244,7 +257,11 @@ test.describe("Authenticated Workbench UI", () => {
     await page.goto("/");
     await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=Grounded Answer Operations")).toBeVisible();
+
+    // Click Upload tab to see Ingestion Desk
+    await clickUploadTab(page);
     await expect(page.locator("text=Ingestion Desk")).toBeVisible();
+
     await expect(page.locator("text=Evidence Navigator")).toBeVisible();
     await expect(page.locator("text=Query Timeline")).toBeVisible();
   });
@@ -265,6 +282,9 @@ test.describe("Authenticated Workbench UI", () => {
   test("workbench has batch upload input", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
+
+    // Click Upload tab to see batch upload input
+    await clickUploadTab(page);
 
     const batchInput = page.locator('[data-testid="batch-upload-input"]');
     await expect(batchInput).toBeVisible({ timeout: 10_000 });
@@ -295,12 +315,19 @@ test.describe("Authenticated Workbench UI", () => {
       documentId = await uploadSmokePdf(page, uniqueToken);
       await waitForDocumentReady(request, accessToken, documentId);
 
+      // Click Status tab to check workspace status
+      await clickStatusTab(page);
       await expect(page.getByTestId("workspace-status-message")).toContainText("ready", { timeout: 30_000 });
+
+      // Click Upload tab to check upload status panel
+      await clickUploadTab(page);
       await expect(page.getByTestId("upload-status-panel")).toContainText("Status: ready", { timeout: 30_000 });
 
       await page.getByTestId("chat-query-input").fill("What exact smoke phrase appears in the uploaded document?");
       await page.getByTestId("chat-send-button").click();
 
+      // Click Status tab to check query completion
+      await clickStatusTab(page);
       await expect(page.getByTestId("workspace-status-message")).toContainText("Query complete.", { timeout: 60_000 });
       await expect(page.getByTestId("chat-turn").last()).toContainText("What exact smoke phrase appears in the uploaded document?");
       await expect(page.getByTestId("chat-turn").last()).not.toContainText("Query failed.");

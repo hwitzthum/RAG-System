@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef, useCallback } from "react";
 import type { ChatInputProps } from "./types";
 
 export function ChatInput({
@@ -9,14 +12,25 @@ export function ChatInput({
   setEnableWebResearch,
   canQuery,
   effectiveQueryScopeId,
+  scopeDocumentTitle,
   onClearScope,
 }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleInput = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, []);
+
   return (
     <div className="border-t border-zinc-200 bg-white p-4">
       <div className="flex gap-2">
         <textarea
+          ref={textareaRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); handleInput(); }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -24,15 +38,15 @@ export function ChatInput({
             }
           }}
           placeholder="Ask about indexed documents..."
-          rows={2}
-          className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-teal-400"
+          rows={1}
+          className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-indigo-400"
           data-testid="chat-query-input"
         />
         <button
           type="button"
           disabled={!canQuery || isStreaming || query.trim().length === 0}
           onClick={executeQuery}
-          className="self-end rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+          className="self-end rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
           data-testid="chat-send-button"
         >
           {isStreaming ? "Streaming..." : "Send"}
@@ -44,7 +58,7 @@ export function ChatInput({
             type="checkbox"
             checked={enableWebResearch}
             onChange={(e) => setEnableWebResearch(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-zinc-300 text-teal-600"
+            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
             data-testid="web-research-toggle"
           />
           Web Research
@@ -53,13 +67,13 @@ export function ChatInput({
           <button
             type="button"
             onClick={onClearScope}
-            className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100"
+            className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
           >
-            Scope: {effectiveQueryScopeId.slice(0, 8)}... (clear)
+            Scope: {scopeDocumentTitle ?? effectiveQueryScopeId.slice(0, 8)}... (clear)
           </button>
         ) : null}
         {!canQuery ? (
-          <span className="text-[11px] text-zinc-400">
+          <span className="text-xs text-zinc-400">
             Requires reader/admin role
           </span>
         ) : null}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Toaster, toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthUser } from "@/lib/auth/types";
 import type {
@@ -20,8 +21,8 @@ import { ChatView } from "@/components/workbench/chat-view";
 import { ChatInput } from "@/components/workbench/chat-input";
 import { SidebarLeft } from "@/components/workbench/sidebar-left";
 import { SidebarRight } from "@/components/workbench/sidebar-right";
-import { OpenAiKeyVault } from "@/components/workbench/openai-key-vault";
 import { DevSessionControls } from "@/components/workbench/dev-session-controls";
+import { getDocumentDisplayName } from "@/components/workbench/types";
 import type { Turn, UploadStatusSnapshot, DocumentListItem } from "@/components/workbench/types";
 
 type RagWorkbenchProps = {
@@ -89,6 +90,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [workspaceMessage, setWorkspaceMessage] = useState("Ready.");
   const [enableWebResearch, setEnableWebResearch] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"none" | "left" | "right">("none");
 
   const [batchFiles, setBatchFiles] = useState<Array<{ file: File; status: string; error?: string; documentId?: string }>>([]);
   const batchFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -115,6 +117,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }, [activeTurnId, turns]);
 
   const effectiveQueryScopeId = queryDocumentScopeId;
+
+  const scopeDocumentTitle = useMemo(() => {
+    if (!effectiveQueryScopeId) return null;
+    const doc = documents.find((d) => d.id === effectiveQueryScopeId);
+    return doc ? getDocumentDisplayName(doc) : null;
+  }, [effectiveQueryScopeId, documents]);
 
   // --- Data loading ---
 
@@ -229,10 +237,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     const payload = (await response.json()) as { user?: AuthUser; error?: string };
     if (!response.ok || !payload.user) {
       setWorkspaceMessage(payload.error ?? "Session creation failed.");
+      toast.error(payload.error ?? "Session creation failed.");
       return;
     }
     setUser(payload.user);
     setWorkspaceMessage(`Session created for role=${payload.user.role}.`);
+    toast.success(`Session created for role=${payload.user.role}.`);
   }
 
   async function saveOpenAiByokKey(): Promise<void> {
@@ -246,10 +256,15 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         body: JSON.stringify({ apiKey: openAiByokInput }),
       });
       const payload = (await response.json()) as OpenAiByokStatusResponse & { error?: string };
-      if (!response.ok) { setWorkspaceMessage(payload.error ?? "Failed to save OpenAI API key."); return; }
+      if (!response.ok) {
+        setWorkspaceMessage(payload.error ?? "Failed to save OpenAI API key.");
+        toast.error(payload.error ?? "Failed to save OpenAI API key.");
+        return;
+      }
       setOpenAiByokStatus(payload);
       setOpenAiByokInput("");
       setWorkspaceMessage("OpenAI BYOK key stored in encrypted vault.");
+      toast.success("OpenAI BYOK key stored in encrypted vault.");
     } finally {
       setOpenAiByokLoading(false);
     }
@@ -261,9 +276,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/byok/openai", { method: "DELETE", headers: csrfHeaders() });
       const payload = (await response.json()) as OpenAiByokStatusResponse & { error?: string };
-      if (!response.ok) { setWorkspaceMessage(payload.error ?? "Failed to remove OpenAI API key."); return; }
+      if (!response.ok) {
+        setWorkspaceMessage(payload.error ?? "Failed to remove OpenAI API key.");
+        toast.error(payload.error ?? "Failed to remove OpenAI API key.");
+        return;
+      }
       setOpenAiByokStatus(payload);
       setWorkspaceMessage("OpenAI BYOK key removed from vault.");
+      toast.success("OpenAI BYOK key removed from vault.");
     } finally {
       setOpenAiByokLoading(false);
     }
@@ -286,15 +306,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       const jobStatus = snapshot.latestIngestionJob?.status ?? "unknown";
       if (documentStatus === "ready") {
         setWorkspaceMessage(`Upload indexed and ready. documentId=${documentId}`);
+        toast.success("Document indexed and ready.");
         void fetchDocuments();
         return;
       }
       if (documentStatus === "failed" || jobStatus === "dead_letter" || jobStatus === "failed") {
-        setWorkspaceMessage(
-          snapshot.latestIngestionJob?.last_error
-            ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
-            : `Upload failed. document status=${documentStatus}, job status=${jobStatus}`,
-        );
+        const errorMsg = snapshot.latestIngestionJob?.last_error
+          ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
+          : `Upload failed. document status=${documentStatus}, job status=${jobStatus}`;
+        setWorkspaceMessage(errorMsg);
+        toast.error("Upload failed.");
         void fetchDocuments();
         return;
       }
@@ -324,8 +345,13 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     try {
       const response = await fetch("/api/upload", { method: "POST", headers: csrfHeaders(), body: formData });
       const payload = (await response.json()) as { documentId?: string; error?: string };
-      if (!response.ok || !payload.documentId) { setWorkspaceMessage(payload.error ?? "Upload failed."); return; }
+      if (!response.ok || !payload.documentId) {
+        setWorkspaceMessage(payload.error ?? "Upload failed.");
+        toast.error(payload.error ?? "Upload failed.");
+        return;
+      }
       setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
+      toast.success("Upload accepted. Indexing started...");
       setQueryDocumentScopeId(payload.documentId);
       await waitForUploadTerminalStatus(payload.documentId);
       setUploadFile(null);
@@ -373,6 +399,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       }
     }
     setWorkspaceMessage(`Batch upload complete: ${entries.length} files processed.`);
+    toast.success(`Batch upload complete: ${entries.length} files processed.`);
     await fetchDocuments();
   }
 
@@ -386,8 +413,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       }
       await fetchDocuments();
       setWorkspaceMessage("Document deleted.");
+      toast.success("Document deleted.");
     } else {
       setWorkspaceMessage("Failed to delete document.");
+      toast.error("Failed to delete document.");
     }
   }
 
@@ -402,6 +431,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         setWorkspaceMessage(payload.error ?? "Report generation failed.");
+        toast.error(payload.error ?? "Report generation failed.");
         return;
       }
       const blob = await response.blob();
@@ -412,8 +442,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       anchor.click();
       URL.revokeObjectURL(url);
       setWorkspaceMessage(`${format.toUpperCase()} report downloaded.`);
+      toast.success(`${format.toUpperCase()} report downloaded.`);
     } catch {
       setWorkspaceMessage("Report download failed.");
+      toast.error("Report download failed.");
     }
   }, []);
 
@@ -507,7 +539,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         failed: true,
         answer: "Query failed. Please retry.",
       }));
-      setWorkspaceMessage(error instanceof Error ? error.message : "Query failed.");
+      const msg = error instanceof Error ? error.message : "Query failed.";
+      setWorkspaceMessage(msg);
+      toast.error(msg);
     } finally {
       setIsStreaming(false);
     }
@@ -520,14 +554,52 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setQueryDocumentScopeId(scopedDocumentId);
   }
 
+  function handleNewConversation(): void {
+    setConversationId(newUuid());
+    setTurns([]);
+    setActiveTurnId(null);
+    setQuery("");
+  }
+
   return (
     <ErrorBoundary>
-      <AppNav user={user} onSignOut={() => void clearSession()} />
+      <Toaster position="bottom-right" richColors />
+      <AppNav
+        user={user}
+        onSignOut={() => void clearSession()}
+        onToggleLeftPanel={() => setMobilePanel((p) => p === "left" ? "none" : "left")}
+        onToggleRightPanel={() => setMobilePanel((p) => p === "right" ? "none" : "right")}
+      />
 
       <h1 className="sr-only">Response Workspace</h1>
       <h2 className="sr-only">Grounded Answer Operations</h2>
 
+      {/* Mobile overlay backdrop */}
+      {mobilePanel !== "none" && (
+        <div
+          className="fixed inset-0 z-30 bg-black/20 lg:hidden"
+          onClick={() => setMobilePanel("none")}
+        />
+      )}
+
       <div className="flex h-[calc(100vh-3.5rem)]">
+        {/* Left sidebar - mobile overlay */}
+        {mobilePanel === "left" && (
+          <div className="fixed inset-y-14 left-0 z-40 w-[280px] border-r border-zinc-200 bg-white lg:hidden">
+            <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+              <button
+                type="button"
+                onClick={handleNewConversation}
+                className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.98]"
+              >
+                + New Chat
+              </button>
+              {/* Simplified mobile sidebar content */}
+              <p className="text-xs text-zinc-400">Use desktop view for full sidebar.</p>
+            </div>
+          </div>
+        )}
+
         <SidebarLeft
           documents={documents}
           documentsLoading={documentsLoading}
@@ -539,6 +611,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           historyLoading={historyLoading}
           onRefreshHistory={() => void loadHistory()}
           onRestoreHistory={handleRestoreHistory}
+          onNewConversation={handleNewConversation}
         />
 
         <div className="flex flex-1 flex-col overflow-hidden">
@@ -557,20 +630,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             setEnableWebResearch={setEnableWebResearch}
             canQuery={canQuery}
             effectiveQueryScopeId={effectiveQueryScopeId}
+            scopeDocumentTitle={scopeDocumentTitle}
             onClearScope={() => setQueryDocumentScopeId(null)}
           />
-          {user && (
-            <OpenAiKeyVault
-              user={user}
-              openAiByokInput={openAiByokInput}
-              setOpenAiByokInput={setOpenAiByokInput}
-              openAiByokStatus={openAiByokStatus}
-              openAiByokLoading={openAiByokLoading}
-              saveOpenAiByokKey={() => void saveOpenAiByokKey()}
-              deleteOpenAiByokKey={() => void deleteOpenAiByokKey()}
-              loadOpenAiByokStatus={() => void loadOpenAiByokStatus()}
-            />
-          )}
           {process.env.NODE_ENV === "development" && (
             <DevSessionControls
               token={token}
@@ -605,6 +667,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           documentsLoading={documentsLoading}
           queryDocumentScopeId={queryDocumentScopeId}
           setQueryDocumentScopeId={setQueryDocumentScopeId}
+          user={user}
+          openAiByokInput={openAiByokInput}
+          setOpenAiByokInput={setOpenAiByokInput}
+          openAiByokStatus={openAiByokStatus}
+          openAiByokLoading={openAiByokLoading}
+          saveOpenAiByokKey={() => void saveOpenAiByokKey()}
+          deleteOpenAiByokKey={() => void deleteOpenAiByokKey()}
+          loadOpenAiByokStatus={() => void loadOpenAiByokStatus()}
         />
       </div>
     </ErrorBoundary>

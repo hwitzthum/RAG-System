@@ -8,7 +8,7 @@ export default function NotFound() {
       <div className="text-center">
         <h1 className="text-4xl font-bold text-zinc-900">404</h1>
         <p className="mt-2 text-zinc-500">This page could not be found.</p>
-        <Link href="/" className="mt-4 inline-block text-teal-600 hover:text-teal-700 hover:underline">
+        <Link href="/" className="mt-4 inline-block text-indigo-600 hover:text-indigo-700 hover:underline">
           Go to workspace
         </Link>
       </div>

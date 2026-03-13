@@ -62,8 +62,8 @@ export default function PendingApprovalForm() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-slate-900">Pending Approval</h1>
-      <p className="mt-4 text-sm leading-relaxed text-slate-700">
+      <h1 className="text-3xl font-bold text-zinc-900">Pending Approval</h1>
+      <p className="mt-4 text-sm leading-relaxed text-zinc-700">
         Your account is pending approval by an administrator. You&apos;ll be able to access the workspace once your account is approved.
       </p>
 
@@ -84,7 +84,7 @@ export default function PendingApprovalForm() {
 
         <button
           onClick={handleSignOut}
-          className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
+          className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-all duration-150 hover:bg-zinc-50 active:scale-[0.98]"
         >
           Sign Out
         </button>

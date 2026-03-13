@@ -14,7 +14,7 @@ export function AdminUsersTable(props: {
   if (props.loading) {
     return (
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <div className="p-8 text-center text-sm text-slate-500">Loading users...</div>
+        <div className="p-8 text-center text-sm text-zinc-500">Loading users...</div>
       </div>
     );
   }
@@ -34,20 +34,20 @@ export function AdminUsersTable(props: {
         <tbody>
           {props.users.map((user) => (
             <tr key={user.id} className="border-b border-zinc-100 last:border-0">
-              <td className="px-4 py-3 font-medium text-slate-800">{user.email ?? user.id.slice(0, 8)}</td>
+              <td className="px-4 py-3 font-medium text-zinc-800">{user.email ?? user.id.slice(0, 8)}</td>
               <td className="px-4 py-3">
-                <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${roleBadgeColor[user.role] ?? "bg-slate-100 text-slate-600 border-slate-300"}`}>
+                <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${roleBadgeColor[user.role] ?? "bg-zinc-100 text-zinc-600 border-zinc-300"}`}>
                   {user.role}
                 </span>
               </td>
-              <td className="px-4 py-3 text-slate-500">{new Date(user.created_at).toLocaleDateString()}</td>
-              <td className="px-4 py-3 text-slate-500">
+              <td className="px-4 py-3 text-zinc-500">{new Date(user.created_at).toLocaleDateString()}</td>
+              <td className="px-4 py-3 text-zinc-500">
                 {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : "Never"}
               </td>
               <td className="px-4 py-3">
                 <div className="flex gap-1.5">
                   {user.id === props.currentUserId ? (
-                    <span className="text-xs text-slate-400">You</span>
+                    <span className="text-xs text-zinc-400">You</span>
                   ) : (
                     <AdminUserActions
                       user={user}
@@ -96,7 +96,7 @@ function AdminUserActions(props: {
               })
             }
             disabled={loading}
-            className="active:scale-[0.98] transition-all duration-150 rounded-lg bg-gray-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
+            className="active:scale-[0.98] transition-all duration-150 rounded-lg bg-zinc-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-50"
             data-testid={`decline-${props.user.id}`}
           >
             Decline

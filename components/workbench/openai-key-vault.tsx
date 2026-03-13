@@ -18,7 +18,7 @@ export function OpenAiKeyVault({
     : "Vault disabled";
 
   return (
-    <div className="border-t border-zinc-200 bg-zinc-50 p-4">
+    <div className="border-t border-zinc-200 bg-zinc-50 p-3">
       <details className="group">
         <summary className="cursor-pointer text-xs font-medium text-zinc-500 group-open:mb-3">
           OpenAI API Key
@@ -32,7 +32,7 @@ export function OpenAiKeyVault({
                 type="button"
                 onClick={loadOpenAiByokStatus}
                 disabled={!user || openAiByokLoading}
-                className="rounded px-2 py-1 text-[10px] font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:opacity-40"
+                className="rounded px-2 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:opacity-40"
               >
                 Refresh
               </button>
@@ -40,7 +40,7 @@ export function OpenAiKeyVault({
                 type="button"
                 onClick={deleteOpenAiByokKey}
                 disabled={!openAiByokStatus?.configured || openAiByokLoading}
-                className="rounded px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
+                className="rounded px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
               >
                 Delete Key
               </button>
@@ -72,7 +72,7 @@ export function OpenAiKeyVault({
               Clear Input
             </button>
           </div>
-          <p className="text-[10px] text-zinc-400">
+          <p className="text-xs text-zinc-400">
             {vaultStatusText}
             {openAiByokStatus?.updatedAt ? ` | Updated ${formatTime(openAiByokStatus.updatedAt)}` : ""}
           </p>

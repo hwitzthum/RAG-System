@@ -65,6 +65,7 @@ export type ChatInputProps = {
   setEnableWebResearch: (v: boolean) => void;
   canQuery: boolean;
   effectiveQueryScopeId: string | null;
+  scopeDocumentTitle: string | null;
   onClearScope: () => void;
 };
 
@@ -79,6 +80,7 @@ export type SidebarLeftProps = {
   historyLoading: boolean;
   onRefreshHistory: () => void;
   onRestoreHistory: (item: QueryHistoryItem) => void;
+  onNewConversation: () => void;
 };
 
 export type SidebarRightProps = {
@@ -105,6 +107,15 @@ export type SidebarRightProps = {
   documentsLoading: boolean;
   queryDocumentScopeId: string | null;
   setQueryDocumentScopeId: (id: string | null) => void;
+  // BYOK props
+  user: AuthUser | null;
+  openAiByokInput: string;
+  setOpenAiByokInput: (v: string) => void;
+  openAiByokStatus: OpenAiByokStatusResponse | null;
+  openAiByokLoading: boolean;
+  saveOpenAiByokKey: () => void;
+  deleteOpenAiByokKey: () => void;
+  loadOpenAiByokStatus: () => void;
 };
 
 export type OpenAiKeyVaultProps = {
@@ -130,6 +141,10 @@ export function formatTime(iso: string): string {
   return date.toLocaleString();
 }
 
+export function formatLatency(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
 export function getDocumentDisplayName(doc: { title: string | null; id: string }): string {
   return doc.title ?? doc.id.slice(0, 8);
 }
@@ -137,6 +152,6 @@ export function getDocumentDisplayName(doc: { title: string | null; id: string }
 export function getMessageToneClass(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("failed")) return "text-rose-600";
-  if (lower.includes("ready") || lower.includes("complete")) return "text-teal-600";
+  if (lower.includes("ready") || lower.includes("complete")) return "text-indigo-600";
   return "text-zinc-500";
 }

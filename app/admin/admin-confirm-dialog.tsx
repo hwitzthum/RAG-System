@@ -43,7 +43,7 @@ export function AdminConfirmDialog(props: {
             </button>
             <button
               onClick={props.onCancel}
-              className="active:scale-[0.98] transition-all duration-150 rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="active:scale-[0.98] transition-all duration-150 rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
               Cancel
             </button>

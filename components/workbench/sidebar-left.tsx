@@ -1,5 +1,6 @@
+import { Trash2 } from "lucide-react";
 import type { SidebarLeftProps } from "./types";
-import { getDocumentDisplayName, formatTime } from "./types";
+import { getDocumentDisplayName, formatTime, formatLatency } from "./types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function SidebarLeft({
@@ -13,9 +14,19 @@ export function SidebarLeft({
   historyLoading,
   onRefreshHistory,
   onRestoreHistory,
+  onNewConversation,
 }: SidebarLeftProps) {
   return (
-    <aside className="flex w-[280px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-white p-4">
+    <aside className="hidden w-[280px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-white p-4 lg:flex">
+      {/* New Conversation */}
+      <button
+        type="button"
+        onClick={onNewConversation}
+        className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.98]"
+      >
+        + New Chat
+      </button>
+
       {/* Query Timeline */}
       <section>
         <div className="flex items-center justify-between">
@@ -23,7 +34,7 @@ export function SidebarLeft({
           <button
             type="button"
             onClick={onRefreshHistory}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+            className="rounded px-1.5 py-0.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
           >
             Refresh
           </button>
@@ -45,8 +56,8 @@ export function SidebarLeft({
                 className="w-full rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-left transition hover:border-zinc-200 hover:bg-white"
               >
                 <p className="truncate text-xs font-medium text-zinc-700">{item.query}</p>
-                <p className="mt-0.5 text-[10px] text-zinc-400">
-                  {formatTime(item.createdAt)} | {item.latencyMs}ms
+                <p className="mt-0.5 text-xs text-zinc-400">
+                  {formatTime(item.createdAt)} | {formatLatency(item.latencyMs)}
                 </p>
               </button>
             ))
@@ -61,7 +72,7 @@ export function SidebarLeft({
           <button
             type="button"
             onClick={onRefreshDocuments}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+            className="rounded px-1.5 py-0.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
           >
             Refresh
           </button>
@@ -92,7 +103,7 @@ export function SidebarLeft({
                       <p className="truncate font-medium text-zinc-700" title={displayName}>
                         {displayName}
                       </p>
-                      <span className={`text-[10px] font-medium ${statusColor[doc.status] ?? "text-zinc-400"}`}>
+                      <span className={`text-xs font-medium ${statusColor[doc.status] ?? "text-zinc-400"}`}>
                         {doc.status}
                       </span>
                     </div>
@@ -100,9 +111,9 @@ export function SidebarLeft({
                       <button
                         type="button"
                         onClick={() => setQueryDocumentScopeId(isScoped ? null : doc.id)}
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition ${
+                        className={`rounded px-1.5 py-0.5 text-xs font-medium transition ${
                           isScoped
-                            ? "bg-teal-100 text-teal-700 hover:bg-teal-200"
+                            ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
                             : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                         }`}
                         title={isScoped ? "Remove scope" : "Scope queries to this document"}
@@ -112,10 +123,10 @@ export function SidebarLeft({
                       <button
                         type="button"
                         onClick={() => onDeleteDocument(doc.id)}
-                        className="rounded px-1.5 py-0.5 text-[10px] font-medium text-rose-500 transition hover:bg-rose-50"
+                        className="rounded p-1 text-rose-500 transition hover:bg-rose-50"
                         title="Delete document"
                       >
-                        Del
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </li>
