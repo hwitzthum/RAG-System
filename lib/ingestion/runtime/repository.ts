@@ -95,17 +95,57 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
   }
 
   async claimIngestionJobs(input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
-    const { data, error } = await this.supabase.rpc("claim_ingestion_jobs", {
+    // Try RPC first (atomic claim with row locking), fall back to direct query
+    const { data, error: rpcError } = await this.supabase.rpc("claim_ingestion_jobs", {
       worker_name: input.workerName,
       batch_size: Math.max(1, input.batchSize),
       lock_timeout_seconds: Math.max(1, input.lockTimeoutSeconds),
     });
 
-    if (error) {
-      throw new Error(`Failed to claim ingestion jobs: ${error.message}`);
+    if (!rpcError) {
+      return (data ?? []).map(toIngestionJob);
     }
 
-    return (data ?? []).map(toIngestionJob);
+    // RPC missing — fall back to direct query + update
+    if (!rpcError.message.includes("Could not find the function")) {
+      this.logger.warn("claim_ingestion_jobs_rpc_error_fallback", { error: rpcError.message });
+    }
+
+    const { data: jobs, error: queryError } = await this.supabase
+      .from("ingestion_jobs")
+      .select("id,document_id,status,attempt")
+      .in("status", ["queued", "failed"])
+      .is("locked_at", null)
+      .order("created_at", { ascending: true })
+      .limit(Math.max(1, input.batchSize));
+
+    if (queryError) {
+      throw new Error(`Failed to claim ingestion jobs: ${queryError.message}`);
+    }
+
+    if (!jobs || jobs.length === 0) {
+      return [];
+    }
+
+    const now = new Date().toISOString();
+    for (const job of jobs) {
+      await this.supabase
+        .from("ingestion_jobs")
+        .update({
+          status: "processing" as const,
+          attempt: job.attempt + 1,
+          locked_at: now,
+          locked_by: input.workerName,
+        })
+        .eq("id", job.id);
+    }
+
+    return jobs.map((row) => ({
+      id: row.id,
+      documentId: row.document_id,
+      status: "processing" as const,
+      attempt: row.attempt + 1,
+    }));
   }
 
   async getDocument(documentId: string): Promise<DocumentRecord> {
@@ -180,37 +220,73 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
   }
 
   async markJobCompleted(jobId: string): Promise<void> {
-    const { data, error } = await this.supabase.rpc("complete_ingestion_job", {
+    // Try RPC first (atomic job+document update), fall back to direct table update
+    const { error: rpcError } = await this.supabase.rpc("complete_ingestion_job", {
       job_id: jobId,
     });
 
-    if (error) {
-      throw new Error(`Failed to mark ingestion job completed: ${error.message}`);
+    if (!rpcError) {
+      return;
     }
 
-    if (!data || data.length === 0) {
-      this.logger.warn("ingestion_job_complete_noop", { jobId });
+    // RPC missing or failed — fall back to direct update
+    if (!rpcError.message.includes("Could not find the function")) {
+      this.logger.warn("complete_ingestion_job_rpc_error_fallback", { jobId, error: rpcError.message });
+    }
+
+    const { error: updateError } = await this.supabase
+      .from("ingestion_jobs")
+      .update({
+        status: "completed" as const,
+        last_error: null,
+        locked_at: null,
+        locked_by: null,
+      })
+      .eq("id", jobId);
+
+    if (updateError) {
+      throw new Error(`Failed to mark ingestion job completed: ${updateError.message}`);
     }
   }
 
   async markJobFailed(job: IngestionJob, errorMessage: string): Promise<boolean> {
-    const { data, error } = await this.supabase.rpc("fail_ingestion_job", {
+    // Try RPC first (atomic job+document update), fall back to direct table update
+    const { data, error: rpcError } = await this.supabase.rpc("fail_ingestion_job", {
       job_id: job.id,
       error_text: errorMessage,
       max_retries: this.settings.maxRetries,
     });
 
-    if (error) {
-      throw new Error(`Failed to mark ingestion job failed: ${error.message}`);
+    if (!rpcError) {
+      const row = data?.[0];
+      if (!row) {
+        this.logger.warn("ingestion_job_fail_noop", { jobId: job.id });
+        return false;
+      }
+      return row.dead_letter;
     }
 
-    const row = data?.[0];
-    if (!row) {
-      this.logger.warn("ingestion_job_fail_noop", { jobId: job.id });
-      return false;
+    // RPC missing or failed — fall back to direct update
+    if (!rpcError.message.includes("Could not find the function")) {
+      this.logger.warn("fail_ingestion_job_rpc_error_fallback", { jobId: job.id, error: rpcError.message });
     }
 
-    return row.dead_letter;
+    const isDeadLetter = job.attempt >= this.settings.maxRetries;
+    const { error: updateError } = await this.supabase
+      .from("ingestion_jobs")
+      .update({
+        status: isDeadLetter ? ("dead_letter" as const) : ("failed" as const),
+        last_error: errorMessage.slice(0, 4000),
+        locked_at: null,
+        locked_by: null,
+      })
+      .eq("id", job.id);
+
+    if (updateError) {
+      throw new Error(`Failed to mark ingestion job failed: ${updateError.message}`);
+    }
+
+    return isDeadLetter;
   }
 
   async invalidateRetrievalCache(): Promise<void> {
