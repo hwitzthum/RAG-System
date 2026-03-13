@@ -49,6 +49,7 @@ export class EmbeddingProvider {
       const batch = texts.slice(index, index + batchSize);
       const response = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
+        signal: AbortSignal.timeout(this.settings.openAiTimeoutSeconds * 1000),
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,

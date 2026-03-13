@@ -100,11 +100,10 @@ function decryptApiKey(row: Pick<UserOpenAiKeyRow, "encrypted_key" | "iv" | "aut
   );
   decipher.setAuthTag(Buffer.from(row.auth_tag, "base64"));
 
-  const decrypted = Buffer.concat([
+  return Buffer.concat([
     decipher.update(Buffer.from(row.encrypted_key, "base64")),
     decipher.final(),
   ]).toString("utf8");
-  return sanitizeOpenAiApiKey(decrypted);
 }
 
 export function isOpenAiByokVaultEnabled(): boolean {
@@ -217,7 +216,7 @@ export async function resolveUserOpenAiApiKey(userId: string): Promise<string | 
 
   if (error) {
     if (isMissingVaultTableError(error.message)) {
-      return null;
+      throw new Error("OpenAI BYOK vault table is missing. Apply database migrations.");
     }
     throw new Error(`Failed to resolve OpenAI BYOK key: ${error.message}`);
   }

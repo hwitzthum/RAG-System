@@ -48,6 +48,7 @@ export class ContextGenerator {
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
+      signal: AbortSignal.timeout(this.settings.openAiTimeoutSeconds * 1000),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,

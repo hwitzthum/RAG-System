@@ -278,13 +278,15 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   async function waitForUploadTerminalStatus(documentId: string): Promise<void> {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    const MAX_POLLS = 60; // 60 × 3s = 3 minutes
+    for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
       const snapshot = await refreshUploadStatus(documentId);
       if (!snapshot) return;
       const documentStatus = snapshot.document.status;
       const jobStatus = snapshot.latestIngestionJob?.status ?? "unknown";
       if (documentStatus === "ready") {
         setWorkspaceMessage(`Upload indexed and ready. documentId=${documentId}`);
+        void fetchDocuments();
         return;
       }
       if (documentStatus === "failed" || jobStatus === "dead_letter" || jobStatus === "failed") {
@@ -293,11 +295,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
             : `Upload failed. document status=${documentStatus}, job status=${jobStatus}`,
         );
+        void fetchDocuments();
         return;
+      }
+      if (attempt > 0 && attempt % 10 === 0) {
+        setWorkspaceMessage(`Still processing PDF... (${attempt * 3}s elapsed)`);
       }
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
-    setWorkspaceMessage("Upload queued/processing. Keep refreshing status until ready.");
+    setWorkspaceMessage("Processing is taking longer than expected. Check back shortly.");
+    void fetchDocuments();
   }
 
   async function uploadPdf(selectedFile?: File): Promise<void> {
@@ -320,7 +327,6 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       if (!response.ok || !payload.documentId) { setWorkspaceMessage(payload.error ?? "Upload failed."); return; }
       setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
       setQueryDocumentScopeId(payload.documentId);
-      void fetchDocuments();
       await waitForUploadTerminalStatus(payload.documentId);
       setUploadFile(null);
       if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";

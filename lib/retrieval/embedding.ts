@@ -13,6 +13,9 @@ type EmbeddingApiResponse = {
 export async function createQueryEmbedding(normalizedQuery: string): Promise<number[]> {
   const runtimeOpenAiApiKey = getRuntimeSecrets().openAiApiKey;
   const apiKey = runtimeOpenAiApiKey ?? env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("No OpenAI API key available. Configure OPENAI_API_KEY or store a key in the BYOK vault.");
+  }
 
   const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",

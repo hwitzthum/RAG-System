@@ -290,6 +290,8 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
   }
 }
 
+const INLINE_PIPELINE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function processIngestionJobInline(
   documentId: string,
   ingestionJobId: string,
@@ -318,10 +320,16 @@ export async function processIngestionJobInline(
   };
 
   try {
-    await pipeline.processJob(job);
+    const pipelinePromise = pipeline.processJob(job);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Inline pipeline timeout exceeded")), INLINE_PIPELINE_TIMEOUT_MS);
+    });
+
+    await Promise.race([pipelinePromise, timeoutPromise]);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
+    console.error(`processIngestionJobInline failed [doc=${documentId}]:`, message);
     await repository.setDocumentStatus(documentId, "failed").catch(() => null);
     await repository.markJobFailed(job, message).catch(() => null);
     return { success: false, error: message };

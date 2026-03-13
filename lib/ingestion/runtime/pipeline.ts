@@ -138,11 +138,18 @@ export class IngestionPipeline {
   }
 
   async processJob(job: IngestionJob): Promise<void> {
+    const pipelineStart = Date.now();
+    const elapsed = () => `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;
+
     const document = await this.repository.getDocument(job.documentId);
     await this.repository.setDocumentStatus(document.id, "processing");
+    this.logger.info("pipeline_step", { step: "document_loaded", elapsed: elapsed(), jobId: job.id, documentId: document.id });
 
     const pdfBytes = await this.repository.downloadDocument(document.storagePath);
+    this.logger.info("pipeline_step", { step: "pdf_downloaded", elapsed: elapsed(), bytes: pdfBytes.length });
+
     const pages = await this.extractPagesFn(pdfBytes, this.settings.ocrFallbackEnabled, this.logger);
+    this.logger.info("pipeline_step", { step: "pages_extracted", elapsed: elapsed(), pageCount: pages.length });
 
     const sections = [];
     for (const page of pages) {
@@ -184,9 +191,14 @@ export class IngestionPipeline {
       });
     }
 
+    this.logger.info("pipeline_step", { step: "chunks_created", elapsed: elapsed(), chunkCount: chunkCandidates.length, sectionCount: sections.length });
+
     const chunksWithContext = await this.contextGenerator.enrich(chunkCandidates);
+    this.logger.info("pipeline_step", { step: "context_enriched", elapsed: elapsed(), chunkCount: chunksWithContext.length });
+
     const embeddingInputs = chunksWithContext.map((item) => `${item.context}\n\n${item.content}`);
     const embeddings = await this.embeddingProvider.embedTexts(embeddingInputs);
+    this.logger.info("pipeline_step", { step: "embeddings_generated", elapsed: elapsed(), embeddingCount: embeddings.length });
 
     if (embeddings.length !== chunksWithContext.length) {
       throw new Error("Embedding response size mismatch");
@@ -213,6 +225,7 @@ export class IngestionPipeline {
     });
 
     await this.repository.replaceDocumentChunks(document.id, preparedChunks);
+    this.logger.info("pipeline_step", { step: "chunks_stored", elapsed: elapsed(), chunkCount: preparedChunks.length });
 
     const selectedLanguage = determineDocumentLanguage(
       chunksWithContext.map((item) => item.language),
@@ -236,6 +249,7 @@ export class IngestionPipeline {
       documentId: document.id,
       chunks: preparedChunks.length,
       language: selectedLanguage,
+      totalSeconds: ((Date.now() - pipelineStart) / 1000).toFixed(1),
     });
   }
 }

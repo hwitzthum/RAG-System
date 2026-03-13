@@ -115,12 +115,18 @@ export async function POST(request: NextRequest) {
       languageHint: parsedMetadata.data.languageHint,
     });
 
-    // Process ingestion inline (cron is fallback for retries)
+    // Fire-and-forget: process ingestion in the background.
+    // The client polls /api/upload-status for terminal state.
     if (!persisted.deduplicated || persisted.documentStatus !== "ready") {
-      const result = await processIngestionJobInline(persisted.documentId, persisted.ingestionJobId);
-      if (!result.success) {
-        console.error("Inline ingestion failed, cron will retry:", result.error);
-      }
+      processIngestionJobInline(persisted.documentId, persisted.ingestionJobId)
+        .then((result) => {
+          if (!result.success) {
+            console.error("Inline ingestion failed, cron will retry:", result.error);
+          }
+        })
+        .catch((error) => {
+          console.error("Inline ingestion unexpected error:", error);
+        });
     }
 
     logAuditEvent({
