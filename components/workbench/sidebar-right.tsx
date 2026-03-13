@@ -14,7 +14,6 @@ export function SidebarRight({
   uploadFile,
   canUpload,
   userRole,
-  effectiveQueryScopeId,
   batchFileInputRef,
   handleBatchUpload,
   batchFiles,
