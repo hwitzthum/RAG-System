@@ -323,8 +323,7 @@ export async function processIngestionJobInline(
     const deadline = Date.now() + INLINE_PIPELINE_TIMEOUT_MS;
 
     // Loop until all chunks are processed (incremental pipeline)
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    for (;;) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         throw new Error("Inline pipeline timeout exceeded");

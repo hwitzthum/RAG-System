@@ -6,13 +6,12 @@ import type { IngestionRuntimeSettings, ProcessJobResult, RuntimeLogger } from "
 export type IngestionRunMetrics = {
   claimed: number;
   completed: number;
-  partial: number;
   failed: number;
   deadLettered: number;
   durationMs: number;
   jobs: Array<{
     id: string;
-    outcome: "completed" | "partial" | "failed" | "dead_letter";
+    outcome: "completed" | "failed" | "dead_letter";
     attempt: number;
     error?: string;
   }>;
@@ -51,7 +50,6 @@ export async function runIngestionBatch(input?: {
   const metrics: IngestionRunMetrics = {
     claimed: jobs.length,
     completed: 0,
-    partial: 0,
     failed: 0,
     deadLettered: 0,
     durationMs: 0,
@@ -60,30 +58,30 @@ export async function runIngestionBatch(input?: {
 
   for (const job of jobs) {
     try {
-      const result: ProcessJobResult = await pipeline.processJob(job);
+      // Loop through all batches for this job until complete.
+      // Progress is saved after each batch, so if Vercel kills the function
+      // mid-loop, the next invocation resumes from the last saved position.
+      let result: ProcessJobResult;
+      do {
+        result = await pipeline.processJob(job);
 
-      if (result.status === "completed") {
-        await repository.markJobCompleted(job.id);
-        metrics.completed += 1;
-        metrics.jobs.push({
-          id: job.id,
-          outcome: "completed",
-          attempt: job.attempt,
-        });
-      } else {
-        await repository.yieldJob(job.id);
-        metrics.partial += 1;
-        metrics.jobs.push({
-          id: job.id,
-          outcome: "partial",
-          attempt: job.attempt,
-        });
-        logger.info("ingestion_job_yielded", {
-          jobId: job.id,
-          chunksProcessed: result.chunksProcessed,
-          chunksTotal: result.chunksTotal,
-        });
-      }
+        if (result.status === "partial") {
+          logger.info("ingestion_job_batch_done", {
+            jobId: job.id,
+            chunksProcessed: result.chunksProcessed,
+            chunksTotal: result.chunksTotal,
+          });
+        }
+      } while (result.status === "partial");
+
+      // All chunks processed — finalize
+      await repository.markJobCompleted(job.id);
+      metrics.completed += 1;
+      metrics.jobs.push({
+        id: job.id,
+        outcome: "completed",
+        attempt: job.attempt,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error";
       const deadLettered = await repository.markJobFailed(job, message);

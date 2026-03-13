@@ -146,9 +146,9 @@ export function resolveIngestionRuntimeSettings(
     ocrFallbackEnabled: parseBooleanEnv(process.env.WORKER_OCR_FALLBACK_ENABLED, true),
     lockTimeoutSeconds: parseIntegerEnv(
       process.env.WORKER_LOCK_TIMEOUT_SECONDS,
-      parseIntegerEnv(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 900),
+      parseIntegerEnv(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 120),
     ),
-    chunksPerRun: parseIntegerEnv(process.env.WORKER_CHUNKS_PER_RUN, 15),
+    chunksPerRun: parseIntegerEnv(process.env.WORKER_CHUNKS_PER_RUN, 5),
     chunkInsertBatchSize: parseIntegerEnv(process.env.WORKER_CHUNK_INSERT_BATCH_SIZE, 100),
     ragStorageBucket: process.env.RAG_STORAGE_BUCKET?.trim() || "documents",
     ...overrides,

@@ -427,35 +427,40 @@ test("runIngestionBatch reports completed, partial, failed, and dead-letter outc
   );
 });
 
-test("runIngestionBatch yields partial jobs back to queue", async () => {
+test("runIngestionBatch loops through partial batches until completion", async () => {
   const repository = new FakeRepository();
   repository.claimedJobs = [
-    { id: "job-partial", documentId: "doc-1", status: "processing", attempt: 1 },
+    { id: "job-loop", documentId: "doc-1", status: "processing", attempt: 1 },
   ];
 
   const settings = resolveIngestionRuntimeSettings({
     ingestionBatchSize: 1,
   });
 
+  let callCount = 0;
   const metrics = await runIngestionBatch({
     settings,
     repository,
     logger: quietLogger,
     pipeline: {
       processJob: async (): Promise<ProcessJobResult> => {
-        return { status: "partial", chunksProcessed: 5, chunksTotal: 20 };
+        callCount += 1;
+        if (callCount < 3) {
+          return { status: "partial", chunksProcessed: callCount * 5, chunksTotal: 15 };
+        }
+        return { status: "completed", chunksProcessed: 15, chunksTotal: 15 };
       },
     },
   });
 
+  assert.equal(callCount, 3);
   assert.equal(metrics.claimed, 1);
-  assert.equal(metrics.completed, 0);
-  assert.equal(metrics.partial, 1);
+  assert.equal(metrics.completed, 1);
   assert.equal(metrics.failed, 0);
-  assert.equal(repository.yieldedJobs.length, 1);
-  assert.equal(repository.yieldedJobs[0], "job-partial");
+  assert.equal(repository.completedJobs.length, 1);
+  assert.equal(repository.completedJobs[0], "job-loop");
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
-    [["job-partial", "partial"]],
+    [["job-loop", "completed"]],
   );
 });
