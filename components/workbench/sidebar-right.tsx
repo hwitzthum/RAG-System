@@ -66,6 +66,7 @@ export function SidebarRight({
             accept=".pdf,application/pdf"
             className="block w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border file:border-zinc-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-50"
             onChange={handleUploadFileChange}
+            data-testid="single-upload-input"
           />
           <input
             value={uploadTitle}
@@ -160,7 +161,7 @@ export function SidebarRight({
 
         {/* Upload Status */}
         {uploadStatus ? (
-          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600" data-testid="upload-status-panel">
             <p><span className="font-medium">Document:</span> {getDocumentDisplayName(uploadStatus.document)}</p>
             <p><span className="font-medium">Status:</span> {uploadStatus.document.status}</p>
             <p><span className="font-medium">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}</p>
@@ -182,7 +183,7 @@ export function SidebarRight({
       {/* Operations Log */}
       <section>
         <h3 className="text-xs font-medium text-zinc-500">Status</h3>
-        <p aria-live="polite" className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`}>
+        <p aria-live="polite" className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`} data-testid="workspace-status-message">
           {workspaceMessage}
         </p>
       </section>

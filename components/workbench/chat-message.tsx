@@ -27,6 +27,7 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
           : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm"
       }`}
       onClick={onClick}
+      data-testid="chat-turn"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-zinc-400">{formatTime(turn.createdAt)}</p>

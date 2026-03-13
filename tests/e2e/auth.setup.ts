@@ -38,7 +38,7 @@ async function loginAndSaveState(
   await page.click('button[type="submit"]');
 
   await page.waitForURL("/", { timeout: 30_000 });
-  await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Response Workspace" })).toBeVisible({ timeout: 15_000 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.context().storageState({ path: storagePath });
 }

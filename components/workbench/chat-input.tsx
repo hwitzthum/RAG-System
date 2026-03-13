@@ -26,12 +26,14 @@ export function ChatInput({
           placeholder="Ask about indexed documents..."
           rows={2}
           className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-teal-400"
+          data-testid="chat-query-input"
         />
         <button
           type="button"
           disabled={!canQuery || isStreaming || query.trim().length === 0}
           onClick={executeQuery}
           className="self-end rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+          data-testid="chat-send-button"
         >
           {isStreaming ? "Streaming..." : "Send"}
         </button>

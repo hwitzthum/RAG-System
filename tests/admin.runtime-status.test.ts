@@ -51,3 +51,81 @@ test("summarizeEffectiveDocumentCounts tallies effective document statuses", () 
   });
   })();
 });
+
+test("getAdminRuntimeStatus maps the snapshot RPC into the admin response shape", () => {
+  return (async () => {
+    const { getAdminRuntimeStatus } = await loadRuntimeStatusModule();
+
+    const fakeSupabase = {
+      rpc(fn: string, args?: Record<string, unknown>) {
+        if (fn === "check_required_ingestion_rpcs") {
+          const requiredFunctions = (args?.required_functions as string[] | undefined) ?? [];
+          return Promise.resolve({
+            data: requiredFunctions.map((name) => ({ function_name: name, is_present: true })),
+            error: null,
+          });
+        }
+
+        if (fn === "get_admin_runtime_snapshot") {
+          return Promise.resolve({
+            data: [
+              {
+                queued_count: 2,
+                processing_count: 1,
+                recent_progress_count: 4,
+                stale_processing_count: 0,
+                lagging_processing_count: 1,
+                max_heartbeat_lag_seconds: 42,
+                processing_without_lock_count: 0,
+                non_processing_with_lock_count: 0,
+                inconsistent_document_count: 1,
+                ready_without_chunks_count: 0,
+                stage_counts: { embedding: 1 },
+                effective_document_counts: { queued: 2, processing: 1, ready: 3, failed: 0 },
+                total_cache_entries: 7,
+                current_version_cache_entries: 5,
+                stale_version_cache_entries: 2,
+                expired_cache_entries: 1,
+              },
+            ],
+            error: null,
+          });
+        }
+
+        throw new Error(`Unexpected RPC: ${fn}`);
+      },
+    };
+
+    const status = await getAdminRuntimeStatus(fakeSupabase as never, { nowMs: Date.parse("2026-03-13T12:00:00.000Z") });
+
+    assert.equal(status.generatedAt, "2026-03-13T12:00:00.000Z");
+    assert.equal(status.ingestionContract.passed, true);
+    assert.equal(status.retrievalCacheContract.passed, true);
+    assert.deepEqual(status.ingestionHealth, {
+      queuedCount: 2,
+      processingCount: 1,
+      recentProgressCount: 4,
+      staleProcessingCount: 0,
+      laggingProcessingCount: 1,
+      maxHeartbeatLagSeconds: 42,
+      processingWithoutLockCount: 0,
+      nonProcessingWithLockCount: 0,
+      inconsistentDocumentCount: 1,
+      readyWithoutChunksCount: 0,
+      stageCounts: { embedding: 1 },
+      effectiveDocumentCounts: {
+        queued: 2,
+        processing: 1,
+        ready: 3,
+        failed: 0,
+      },
+    });
+    assert.deepEqual(status.retrievalCache, {
+      currentRetrievalVersion: 1,
+      totalEntries: 7,
+      currentVersionEntries: 5,
+      staleVersionEntries: 2,
+      expiredEntries: 1,
+    });
+  })();
+});

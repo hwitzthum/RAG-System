@@ -319,6 +319,33 @@ export type Database = {
           is_present: boolean;
         }[];
       };
+      get_admin_runtime_snapshot: {
+        Args: {
+          target_now?: string;
+          target_no_progress_minutes?: number;
+          target_stale_processing_minutes?: number;
+          target_heartbeat_lag_minutes?: number;
+          target_current_retrieval_version?: number;
+        };
+        Returns: {
+          queued_count: number;
+          processing_count: number;
+          recent_progress_count: number;
+          stale_processing_count: number;
+          lagging_processing_count: number;
+          max_heartbeat_lag_seconds: number | null;
+          processing_without_lock_count: number;
+          non_processing_with_lock_count: number;
+          inconsistent_document_count: number;
+          ready_without_chunks_count: number;
+          stage_counts: Record<string, number>;
+          effective_document_counts: Record<DocumentStatus, number>;
+          total_cache_entries: number;
+          current_version_cache_entries: number;
+          stale_version_cache_entries: number;
+          expired_cache_entries: number;
+        }[];
+      };
       smoke_test_ingestion_runtime_contract: {
         Args: Record<PropertyKey, never>;
         Returns: {

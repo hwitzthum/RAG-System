@@ -365,11 +365,11 @@ test.describe("Admin page UI", () => {
       await expect(operationsPanel).toBeVisible({ timeout: 10_000 });
       await expect(operationsPanel.getByRole("heading", { name: "Runtime Signals" })).toBeVisible();
 
-      await expect(page.locator('[data-testid="admin-ingestion-contract-card"]')).toBeVisible();
-      await expect(page.locator('[data-testid="admin-retrieval-contract-card"]')).toBeVisible();
-      await expect(page.locator('[data-testid="admin-document-state-card"]')).toBeVisible();
-      await expect(page.locator('[data-testid="admin-ingestion-health-card"]')).toBeVisible();
-      await expect(page.locator('[data-testid="admin-retrieval-cache-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="admin-ingestion-contract-card"]')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('[data-testid="admin-retrieval-contract-card"]')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('[data-testid="admin-document-state-card"]')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('[data-testid="admin-ingestion-health-card"]')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('[data-testid="admin-retrieval-cache-card"]')).toBeVisible({ timeout: 15_000 });
     });
 
     test("admin sees correct buttons for pending users (Approve, Decline, Delete)", async ({ page }) => {

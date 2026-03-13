@@ -1,5 +1,102 @@
-import { test, expect } from "@playwright/test";
-import { READER_STATE_PATH, READER_TOKEN_PATH, loadToken } from "./auth-states";
+import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { READER_STATE_PATH, READER_TOKEN_PATH, getTestAdminClient, loadToken } from "./auth-states";
+
+async function createPdfBuffer(text: string): Promise<Buffer> {
+  const { default: PDFDocument } = await import("pdfkit");
+
+  return await new Promise<Buffer>((resolve) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer | Uint8Array | string) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    doc.on("end", () => {
+      resolve(Buffer.concat(chunks));
+    });
+    doc.fontSize(18).text("RAG smoke test document", { underline: true });
+    doc.moveDown();
+    doc.fontSize(12).text(text);
+    doc.end();
+  });
+}
+
+async function triggerIngestionPass(request: APIRequestContext): Promise<void> {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return;
+  }
+
+  const response = await request.post("/api/internal/ingestion/run", {
+    headers: { Authorization: `Bearer ${cronSecret}` },
+  });
+  expect(response.ok()).toBe(true);
+}
+
+async function waitForDocumentReady(request: APIRequestContext, accessToken: string, documentId: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await triggerIngestionPass(request);
+
+    const response = await request.get(`/api/upload/${documentId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    expect(response.ok()).toBe(true);
+    const payload = (await response.json()) as {
+      document: { status: string };
+      latestIngestionJob: { status: string; last_error: string | null } | null;
+    };
+
+    if (payload.document.status === "ready") {
+      return;
+    }
+
+    if (payload.document.status === "failed" || payload.latestIngestionJob?.status === "dead_letter") {
+      throw new Error(payload.latestIngestionJob?.last_error ?? `Document ${documentId} failed to ingest`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  throw new Error(`Document ${documentId} did not reach ready within the smoke timeout`);
+}
+
+async function cleanupSmokeDocument(documentId: string): Promise<void> {
+  const supabase = getTestAdminClient();
+  const { data: documentRow } = await supabase
+    .from("documents")
+    .select("storage_path")
+    .eq("id", documentId)
+    .maybeSingle<{ storage_path: string | null }>();
+
+  await supabase.rpc("delete_document_cascade", {
+    target_document_id: documentId,
+  });
+
+  if (documentRow?.storage_path) {
+    await supabase.storage.from("documents").remove([documentRow.storage_path]);
+  }
+}
+
+async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> {
+  const pdfBuffer = await createPdfBuffer(
+    `The uploaded document contains the phrase ${uniqueToken}. This line is used for end-to-end retrieval verification.`,
+  );
+
+  const uploadResponsePromise = page.waitForResponse((response) => {
+    return response.url().endsWith("/api/upload") && response.request().method() === "POST";
+  });
+
+  await page.getByTestId("single-upload-input").setInputFiles({
+    name: "rag-smoke.pdf",
+    mimeType: "application/pdf",
+    buffer: pdfBuffer,
+  });
+
+  const uploadResponse = await uploadResponsePromise;
+  expect(uploadResponse.ok()).toBe(true);
+  const uploadJson = (await uploadResponse.json()) as { documentId?: string };
+  expect(uploadJson.documentId).toBeTruthy();
+  return uploadJson.documentId!;
+}
 
 test.describe("Authenticated API flows", () => {
   let accessToken: string;
@@ -181,5 +278,37 @@ test.describe("Authenticated Workbench UI", () => {
     await page.goto("/");
     // Storage state includes the reload from setup, so session cookie is already synced
     await expect(page.locator("text=Signed in as reader")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("workbench can upload a PDF and answer a grounded query for it", async ({ page, request }) => {
+    test.skip(!process.env.CRON_SECRET, "CRON_SECRET is required for the upload-to-query smoke");
+    test.setTimeout(180_000);
+
+    const accessToken = loadToken(READER_TOKEN_PATH);
+    const uniqueToken = `SMOKE-${Date.now()}`;
+    let documentId: string | null = null;
+
+    try {
+      await page.goto("/");
+      await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 15_000 });
+
+      documentId = await uploadSmokePdf(page, uniqueToken);
+      await waitForDocumentReady(request, accessToken, documentId);
+
+      await expect(page.getByTestId("workspace-status-message")).toContainText("ready", { timeout: 30_000 });
+      await expect(page.getByTestId("upload-status-panel")).toContainText("Status: ready", { timeout: 30_000 });
+
+      await page.getByTestId("chat-query-input").fill("What exact smoke phrase appears in the uploaded document?");
+      await page.getByTestId("chat-send-button").click();
+
+      await expect(page.getByTestId("workspace-status-message")).toContainText("Query complete.", { timeout: 60_000 });
+      await expect(page.getByTestId("chat-turn").last()).toContainText("What exact smoke phrase appears in the uploaded document?");
+      await expect(page.getByTestId("chat-turn").last()).not.toContainText("Query failed.");
+      await expect(page.locator(`a[href="/api/upload/${documentId}"]`).first()).toBeVisible({ timeout: 30_000 });
+    } finally {
+      if (documentId) {
+        await cleanupSmokeDocument(documentId);
+      }
+    }
   });
 });
