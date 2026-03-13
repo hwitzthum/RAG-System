@@ -358,6 +358,20 @@ test.describe("Admin page UI", () => {
       await expect(page.locator(`text=${ADMIN_EMAIL}`)).toBeVisible();
     });
 
+    test("admin sees the runtime operations strip with contract and health cards", async ({ page }) => {
+      await page.goto("/admin");
+
+      const operationsPanel = page.locator('[data-testid="admin-operations-panel"]');
+      await expect(operationsPanel).toBeVisible({ timeout: 10_000 });
+      await expect(operationsPanel.getByRole("heading", { name: "Runtime Signals" })).toBeVisible();
+
+      await expect(page.locator('[data-testid="admin-ingestion-contract-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="admin-retrieval-contract-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="admin-document-state-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="admin-ingestion-health-card"]')).toBeVisible();
+      await expect(page.locator('[data-testid="admin-retrieval-cache-card"]')).toBeVisible();
+    });
+
     test("admin sees correct buttons for pending users (Approve, Decline, Delete)", async ({ page }) => {
       await ensurePendingUserExists();
 

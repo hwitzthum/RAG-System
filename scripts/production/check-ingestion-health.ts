@@ -3,6 +3,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import {
+  countProcessingDocumentMismatches,
+  countReadyDocumentsWithoutChunks,
+  summarizeProcessingHeartbeat,
+} from "@/lib/ingestion/runtime/health-view";
 
 type RunMode = "live" | "dry-run";
 
@@ -10,6 +15,7 @@ type ScriptArgs = {
   mode: RunMode;
   queueThreshold: number;
   staleProcessingMinutes: number;
+  heartbeatLagMinutes: number;
   noProgressMinutes: number;
   noFailOnGate: boolean;
 };
@@ -27,12 +33,20 @@ type IngestionHealthReport = {
   thresholds: {
     queueThreshold: number;
     staleProcessingMinutes: number;
+    heartbeatLagMinutes: number;
     noProgressMinutes: number;
   };
   observed: {
     queuedCount: number;
     staleProcessingCount: number;
+    laggingProcessingCount: number;
+    maxHeartbeatLagSeconds: number | null;
+    processingStageCounts: Record<string, number>;
     recentProgressCount: number;
+    inconsistentDocumentCount: number;
+    readyWithoutChunksCount: number;
+    processingWithoutLockCount: number;
+    nonProcessingWithLockCount: number;
   };
   checks: IngestionHealthCheck[];
 };
@@ -50,6 +64,7 @@ function parseArgs(argv: string[]): ScriptArgs {
     mode: "live",
     queueThreshold: 25,
     staleProcessingMinutes: 20,
+    heartbeatLagMinutes: 5,
     noProgressMinutes: 15,
     noFailOnGate: false,
   };
@@ -67,6 +82,9 @@ function parseArgs(argv: string[]): ScriptArgs {
       index += 1;
     } else if (token === "--stale-processing-minutes") {
       args.staleProcessingMinutes = parsePositiveInt(argv[index + 1], args.staleProcessingMinutes);
+      index += 1;
+    } else if (token === "--heartbeat-lag-minutes") {
+      args.heartbeatLagMinutes = parsePositiveInt(argv[index + 1], args.heartbeatLagMinutes);
       index += 1;
     } else if (token === "--no-progress-minutes") {
       args.noProgressMinutes = parsePositiveInt(argv[index + 1], args.noProgressMinutes);
@@ -119,12 +137,20 @@ function buildDryRunReport(args: ScriptArgs): IngestionHealthReport {
     thresholds: {
       queueThreshold: args.queueThreshold,
       staleProcessingMinutes: args.staleProcessingMinutes,
+      heartbeatLagMinutes: args.heartbeatLagMinutes,
       noProgressMinutes: args.noProgressMinutes,
     },
     observed: {
       queuedCount: 0,
       staleProcessingCount: 0,
+      laggingProcessingCount: 0,
+      maxHeartbeatLagSeconds: 0,
+      processingStageCounts: {},
       recentProgressCount: 1,
+      inconsistentDocumentCount: 0,
+      readyWithoutChunksCount: 0,
+      processingWithoutLockCount: 0,
+      nonProcessingWithLockCount: 0,
     },
     checks,
   };
@@ -145,7 +171,6 @@ async function buildLiveReport(args: ScriptArgs): Promise<IngestionHealthReport>
   });
 
   const now = Date.now();
-  const staleCutoffIso = new Date(now - args.staleProcessingMinutes * 60_000).toISOString();
   const progressCutoffIso = new Date(now - args.noProgressMinutes * 60_000).toISOString();
 
   const { count: queuedCountRaw, error: queuedError } = await supabase
@@ -157,15 +182,30 @@ async function buildLiveReport(args: ScriptArgs): Promise<IngestionHealthReport>
   }
   const queuedCount = queuedCountRaw ?? 0;
 
-  const { count: staleCountRaw, error: staleError } = await supabase
+  const { data: processingRows, error: processingError } = await supabase
     .from("ingestion_jobs")
-    .select("id", { head: true, count: "exact" })
-    .eq("status", "processing")
-    .lte("locked_at", staleCutoffIso);
-  if (staleError) {
-    throw new Error(staleError.message);
+    .select("locked_at,locked_by,updated_at,current_stage")
+    .eq("status", "processing");
+  if (processingError) {
+    throw new Error(processingError.message);
   }
-  const staleProcessingCount = staleCountRaw ?? 0;
+  const processingHeartbeatSummary = summarizeProcessingHeartbeat(
+    (processingRows ?? []) as Array<{
+      locked_at: string | null;
+      locked_by: string | null;
+      updated_at: string;
+      current_stage: string | null;
+    }>,
+    {
+      nowMs: now,
+      staleProcessingMinutes: args.staleProcessingMinutes,
+      heartbeatLagMinutes: args.heartbeatLagMinutes,
+    },
+  );
+  const staleProcessingCount = processingHeartbeatSummary.staleProcessingCount;
+  const laggingProcessingCount = processingHeartbeatSummary.laggingProcessingCount;
+  const maxHeartbeatLagSeconds = processingHeartbeatSummary.maxHeartbeatLagSeconds;
+  const processingStageCounts = processingHeartbeatSummary.stageCounts;
 
   const { count: recentProgressRaw, error: recentProgressError } = await supabase
     .from("ingestion_jobs")
@@ -176,6 +216,34 @@ async function buildLiveReport(args: ScriptArgs): Promise<IngestionHealthReport>
     throw new Error(recentProgressError.message);
   }
   const recentProgressCount = recentProgressRaw ?? 0;
+
+  const { data: effectiveDocuments, error: effectiveDocumentsError } = await supabase
+    .from("document_effective_statuses")
+    .select("raw_document_status,latest_job_status,chunk_count")
+    .in("raw_document_status", ["processing", "ready"]);
+  if (effectiveDocumentsError) {
+    throw new Error(effectiveDocumentsError.message);
+  }
+
+  const effectiveDocumentRows = (effectiveDocuments ?? []) as Array<{
+    raw_document_status: "queued" | "processing" | "ready" | "failed";
+    latest_job_status: "queued" | "processing" | "completed" | "failed" | "dead_letter" | null;
+    chunk_count: number;
+  }>;
+  const inconsistentDocumentCount = countProcessingDocumentMismatches(effectiveDocumentRows);
+  const readyWithoutChunksCount = countReadyDocumentsWithoutChunks(effectiveDocumentRows);
+
+  const processingWithoutLockCount = processingHeartbeatSummary.processingWithoutLockCount;
+
+  const { count: nonProcessingWithLockRaw, error: nonProcessingWithLockError } = await supabase
+    .from("ingestion_jobs")
+    .select("id", { head: true, count: "exact" })
+    .in("status", ["queued", "failed", "dead_letter", "completed"])
+    .not("locked_at", "is", null);
+  if (nonProcessingWithLockError) {
+    throw new Error(nonProcessingWithLockError.message);
+  }
+  const nonProcessingWithLockCount = nonProcessingWithLockRaw ?? 0;
 
   const checks: IngestionHealthCheck[] = [
     {
@@ -189,12 +257,40 @@ async function buildLiveReport(args: ScriptArgs): Promise<IngestionHealthReport>
       detail: `stale_processing=${staleProcessingCount}, stale_window_minutes=${args.staleProcessingMinutes}`,
     },
     {
+      name: "processing_jobs_heartbeating_recently",
+      passed: laggingProcessingCount === 0,
+      detail:
+        maxHeartbeatLagSeconds === null
+          ? `lagging_processing=${laggingProcessingCount}, heartbeat_lag_minutes=${args.heartbeatLagMinutes}, max_heartbeat_lag_seconds=null`
+          : `lagging_processing=${laggingProcessingCount}, heartbeat_lag_minutes=${args.heartbeatLagMinutes}, max_heartbeat_lag_seconds=${maxHeartbeatLagSeconds}`,
+    },
+    {
       name: "cron_progress_present_when_queue_exists",
       passed: queuedCount === 0 || recentProgressCount > 0,
       detail:
         queuedCount === 0
           ? "No queued jobs; cron progress requirement not applicable."
           : `queued=${queuedCount}, recent_progress=${recentProgressCount}, no_progress_minutes=${args.noProgressMinutes}`,
+    },
+    {
+      name: "processing_documents_match_active_jobs",
+      passed: inconsistentDocumentCount === 0,
+      detail: `inconsistent_documents=${inconsistentDocumentCount}`,
+    },
+    {
+      name: "ready_documents_have_chunks",
+      passed: readyWithoutChunksCount === 0,
+      detail: `ready_without_chunks=${readyWithoutChunksCount}`,
+    },
+    {
+      name: "processing_jobs_have_locks",
+      passed: processingWithoutLockCount === 0,
+      detail: `processing_without_lock=${processingWithoutLockCount}`,
+    },
+    {
+      name: "non_processing_jobs_are_unlocked",
+      passed: nonProcessingWithLockCount === 0,
+      detail: `non_processing_with_lock=${nonProcessingWithLockCount}`,
     },
   ];
 
@@ -205,12 +301,20 @@ async function buildLiveReport(args: ScriptArgs): Promise<IngestionHealthReport>
     thresholds: {
       queueThreshold: args.queueThreshold,
       staleProcessingMinutes: args.staleProcessingMinutes,
+      heartbeatLagMinutes: args.heartbeatLagMinutes,
       noProgressMinutes: args.noProgressMinutes,
     },
     observed: {
       queuedCount,
       staleProcessingCount,
+      laggingProcessingCount,
+      maxHeartbeatLagSeconds,
+      processingStageCounts,
       recentProgressCount,
+      inconsistentDocumentCount,
+      readyWithoutChunksCount,
+      processingWithoutLockCount,
+      nonProcessingWithLockCount,
     },
     checks,
   };

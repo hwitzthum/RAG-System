@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/config/env";
-import { buildIdempotencyKey, buildStoragePath } from "@/lib/ingestion/upload-helpers";
+import { buildStoragePath } from "@/lib/ingestion/upload-helpers";
+import { createDocumentWithInitialJob, createUploadCreateClient } from "@/lib/ingestion/upload-create";
+import {
+  createUploadExistingJobClient,
+  ensureDocumentQueuedIngestionJob,
+} from "@/lib/ingestion/upload-existing-job";
+import { shouldRequeueExistingDocument } from "@/lib/ingestion/upload-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, DocumentStatus, IngestionJobStatus, SupportedLanguage } from "@/lib/supabase/database.types";
-import type { IngestionJob } from "@/lib/ingestion/runtime/types";
 
 export type UploadPersistenceInput = {
   file: File;
@@ -36,22 +41,14 @@ type IngestionJobRecord = {
   status: IngestionJobStatus;
 };
 
-function isTerminalFailedStatus(documentStatus: DocumentStatus, latestJobStatus: IngestionJobStatus | null): boolean {
-  return (
-    documentStatus === "failed" ||
-    latestJobStatus === "failed" ||
-    latestJobStatus === "dead_letter"
-  );
-}
-
-function isSupabaseUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const candidate = error as { code?: string };
-  return candidate.code === "23505";
-}
+type RequeuedDocumentResult = {
+  documentId: string;
+  ingestionJobId: string;
+  documentStatus: DocumentStatus;
+  ingestionJobStatus: IngestionJobStatus;
+  storagePath: string;
+  checksumSha256: string;
+};
 
 function isStorageAlreadyExists(error: unknown): boolean {
   if (!error || typeof error !== "object") {
@@ -117,27 +114,35 @@ async function uploadFileToStorage(
   }
 }
 
-async function createIngestionJob(
+async function requeueDeadLetterDocument(
   supabase: SupabaseClient<Database>,
-  documentId: string,
-  idempotencyKey: string,
-): Promise<IngestionJobRecord> {
-  const { data, error } = await supabase
-    .from("ingestion_jobs")
-    .insert({
-      document_id: documentId,
-      status: "queued",
-      attempt: 0,
-      idempotency_key: idempotencyKey,
-    })
-    .select("id,status")
-    .single<IngestionJobRecord>();
+  documentRecord: DocumentRecord,
+): Promise<RequeuedDocumentResult | null> {
+  const { data, error } = await supabase.rpc("requeue_dead_letter_document", {
+    target_document_id: documentRecord.id,
+  });
 
-  if (error) {
+  if (!error) {
+    const row = data?.[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      documentId: row.document_id,
+      ingestionJobId: row.ingestion_job_id,
+      documentStatus: row.document_status,
+      ingestionJobStatus: row.job_status,
+      storagePath: row.storage_path,
+      checksumSha256: row.sha256,
+    };
+  }
+
+  if (!error.message.includes("Could not find the function")) {
     throw error;
   }
 
-  return data;
+  throw new Error(`Required ingestion RPC requeue_dead_letter_document is unavailable (${error.message})`);
 }
 
 async function returnExistingDocumentResult(
@@ -146,46 +151,15 @@ async function returnExistingDocumentResult(
 ): Promise<UploadPersistenceResult> {
   const latestJob = await getLatestIngestionJob(supabase, documentRecord.id);
 
-  if (isTerminalFailedStatus(documentRecord.status, latestJob?.status ?? null)) {
-    const { data: requeuedDocument, error: requeueError } = await supabase
-      .from("documents")
-      .update({
-        status: "queued",
-        ingestion_version: documentRecord.ingestion_version + 1,
-      })
-      .eq("id", documentRecord.id)
-      .select("id,status,ingestion_version,storage_path,sha256")
-      .single<DocumentRecord>();
-
-    if (requeueError) {
-      throw requeueError;
+  if (shouldRequeueExistingDocument(documentRecord.status, latestJob?.status ?? null)) {
+    const requeued = await requeueDeadLetterDocument(supabase, documentRecord);
+    if (requeued) {
+      return {
+        ...requeued,
+        status: requeued.ingestionJobStatus,
+        deduplicated: false,
+      };
     }
-
-    const idempotencyKey = buildIdempotencyKey(requeuedDocument.sha256, requeuedDocument.ingestion_version);
-    let requeuedJob: IngestionJobRecord;
-    try {
-      requeuedJob = await createIngestionJob(supabase, requeuedDocument.id, idempotencyKey);
-    } catch (error) {
-      if (!isSupabaseUniqueViolation(error)) {
-        throw error;
-      }
-      const racedJob = await getLatestIngestionJob(supabase, requeuedDocument.id);
-      if (!racedJob) {
-        throw error;
-      }
-      requeuedJob = racedJob;
-    }
-
-    return {
-      documentId: requeuedDocument.id,
-      ingestionJobId: requeuedJob.id,
-      documentStatus: requeuedDocument.status,
-      ingestionJobStatus: requeuedJob.status,
-      status: requeuedJob.status,
-      deduplicated: false,
-      storagePath: requeuedDocument.storage_path,
-      checksumSha256: requeuedDocument.sha256,
-    };
   }
 
   if (latestJob) {
@@ -201,18 +175,24 @@ async function returnExistingDocumentResult(
     };
   }
 
-  const idempotencyKey = buildIdempotencyKey(documentRecord.sha256, documentRecord.ingestion_version);
-  const createdJob = await createIngestionJob(supabase, documentRecord.id, idempotencyKey);
+  const ensuredJob = await ensureDocumentQueuedIngestionJob({
+    client: createUploadExistingJobClient(supabase),
+    documentId: documentRecord.id,
+  });
+
+  if (!ensuredJob) {
+    throw new Error(`Required ingestion RPC ensure_document_queued_ingestion_job returned no row for ${documentRecord.id}`);
+  }
 
   return {
     documentId: documentRecord.id,
-    ingestionJobId: createdJob.id,
-    documentStatus: documentRecord.status,
-    ingestionJobStatus: createdJob.status,
-    status: createdJob.status,
-    deduplicated: false,
-    storagePath: documentRecord.storage_path,
-    checksumSha256: documentRecord.sha256,
+    ingestionJobId: ensuredJob.ingestionJobId,
+    documentStatus: ensuredJob.documentStatus,
+    ingestionJobStatus: ensuredJob.ingestionJobStatus,
+    status: ensuredJob.ingestionJobStatus,
+    deduplicated: !ensuredJob.jobCreated,
+    storagePath: ensuredJob.storagePath,
+    checksumSha256: ensuredJob.checksumSha256,
   };
 }
 
@@ -229,130 +209,31 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
 
   await uploadFileToStorage(supabase, storagePath, fileBytes);
 
-  const { data: insertedDocument, error: insertDocumentError } = await supabase
-    .from("documents")
-    .insert({
-      storage_path: storagePath,
-      sha256: checksumSha256,
+  try {
+    const created = await createDocumentWithInitialJob({
+      client: createUploadCreateClient(supabase),
+      storagePath,
+      checksumSha256,
       title: input.title,
-      language: input.languageHint,
-      status: "queued",
-      ingestion_version: 1,
-    })
-    .select("id,status,ingestion_version,storage_path,sha256")
-    .single<DocumentRecord>();
+      languageHint: input.languageHint,
+    });
 
-  if (insertDocumentError) {
-    if (isSupabaseUniqueViolation(insertDocumentError)) {
+    if (!created) {
       const racedDocument = await getDocumentByChecksum(supabase, checksumSha256);
       if (racedDocument) {
         return returnExistingDocumentResult(supabase, racedDocument);
       }
+
+      throw new Error("Atomic upload persistence returned no row and no existing document was found");
     }
-
-    await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([storagePath]);
-    throw insertDocumentError;
-  }
-
-  const idempotencyKey = buildIdempotencyKey(checksumSha256, insertedDocument.ingestion_version);
-
-  try {
-    const createdJob = await createIngestionJob(supabase, insertedDocument.id, idempotencyKey);
 
     return {
-      documentId: insertedDocument.id,
-      ingestionJobId: createdJob.id,
-      documentStatus: insertedDocument.status,
-      ingestionJobStatus: createdJob.status,
-      status: createdJob.status,
+      ...created,
+      status: created.ingestionJobStatus,
       deduplicated: false,
-      storagePath,
-      checksumSha256,
     };
   } catch (error) {
-    if (isSupabaseUniqueViolation(error)) {
-      const latestJob = await getLatestIngestionJob(supabase, insertedDocument.id);
-      if (latestJob) {
-        return {
-          documentId: insertedDocument.id,
-          ingestionJobId: latestJob.id,
-          documentStatus: insertedDocument.status,
-          ingestionJobStatus: latestJob.status,
-          status: latestJob.status,
-          deduplicated: true,
-          storagePath,
-          checksumSha256,
-        };
-      }
-    }
-
+    await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([storagePath]);
     throw error;
-  }
-}
-
-const INLINE_PIPELINE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
-export async function processIngestionJobInline(
-  documentId: string,
-  ingestionJobId: string,
-): Promise<{ success: boolean; error?: string }> {
-  const [
-    { resolveIngestionRuntimeSettings },
-    { SupabaseIngestionRuntimeRepository },
-    { IngestionPipeline },
-  ] = await Promise.all([
-    import("@/lib/ingestion/runtime/types"),
-    import("@/lib/ingestion/runtime/repository"),
-    import("@/lib/ingestion/runtime/pipeline"),
-  ]);
-
-  const settings = resolveIngestionRuntimeSettings({
-    workerName: "inline-upload-processor",
-  });
-  const repository = new SupabaseIngestionRuntimeRepository({ settings, logger: console });
-  const pipeline = new IngestionPipeline({ settings, repository, logger: console });
-
-  const job: IngestionJob = {
-    id: ingestionJobId,
-    documentId,
-    status: "queued",
-    attempt: 0,
-  };
-
-  try {
-    const deadline = Date.now() + INLINE_PIPELINE_TIMEOUT_MS;
-
-    // Loop until all chunks are processed (incremental pipeline)
-    for (;;) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        throw new Error("Inline pipeline timeout exceeded");
-      }
-
-      const batchPromise = pipeline.processJob(job);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Inline pipeline timeout exceeded")), remaining);
-      });
-
-      const result = await Promise.race([batchPromise, timeoutPromise]);
-
-      if (result.status === "completed") {
-        await repository.markJobCompleted(job.id);
-        return { success: true };
-      }
-
-      // Partial — log progress and continue
-      console.info("inline_pipeline_partial", {
-        documentId,
-        chunksProcessed: result.chunksProcessed,
-        chunksTotal: result.chunksTotal,
-      });
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown_error";
-    console.error(`processIngestionJobInline failed [doc=${documentId}]:`, message);
-    await repository.setDocumentStatus(documentId, "failed").catch(() => null);
-    await repository.markJobFailed(job, message).catch(() => null);
-    return { success: false, error: message };
   }
 }

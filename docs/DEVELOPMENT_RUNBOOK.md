@@ -10,7 +10,6 @@ Local setup and validation runbook for Phase 1 to Phase 12 implementation.
 ## Prerequisites
 
 - Node.js 20+ and npm
-- Python 3.11+ (only if you use worker fallback)
 
 ## Web Service Setup
 
@@ -28,25 +27,20 @@ npm run test:security
 npm run infra:check-env:web
 ```
 
-## Worker Fallback Setup (Optional)
+## Worker Setup (Optional for local queue draining)
 
-Use this only for rollback/fallback scenarios. Production ingestion runtime is Vercel.
+Local ingestion now runs through the TypeScript worker so the web app and
+worker share the same pipeline implementation. Production ingestion runtime is Vercel.
 
 ```bash
-cd worker
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-cp .env.example .env
-python -m rag_worker.main
+npm run dev:worker
 ```
 
 ## Worker Fallback Validation (Optional, Phase 6 parity checks)
 
 ```bash
-python3 -m py_compile worker/src/rag_worker/*.py worker/tests/test_*.py
-npm run infra:check-env:worker
-npm run test:worker
+node --import tsx --test tests/ingestion.runtime.test.ts tests/ingestion.worker-loop.test.ts
+npm run ingestion:worker:once
 ```
 
 ## Infrastructure Validation (Phase 2)
@@ -237,5 +231,5 @@ Note:
 - load test runner produces artifact in `evaluation/performance/`
 - resilience runner produces artifact in `evaluation/performance/`
 - release readiness report is generated from benchmark + hardening artifacts
-- production readiness gates do not require `infra:check-env:worker`
+- production readiness gates rely on web/staging env validation only
 - rollback and launch runbook documented in `docs/RELEASE_RUNBOOK.md`

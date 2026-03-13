@@ -122,7 +122,8 @@ export async function retrieveRankedCandidates(
   // Best-effort cache hygiene for TTL expiry and retrieval version invalidation.
   try {
     await deps.pruneCache(retrievalVersion);
-  } catch {
+  } catch (error) {
+    console.warn("retrieval_cache_prune_failed", error instanceof Error ? error.message : String(error));
     // Continue retrieval flow even if cache prune fails.
   }
 
@@ -133,7 +134,8 @@ export async function retrieveRankedCandidates(
       retrievalVersion,
       topK,
     });
-  } catch {
+  } catch (error) {
+    console.warn("retrieval_cache_read_failed", error instanceof Error ? error.message : String(error));
     cached = null;
   }
 
@@ -289,7 +291,8 @@ export async function retrieveRankedCandidates(
       candidateCounts,
       ttlSeconds: env.RAG_CACHE_TTL_SECONDS,
     });
-  } catch {
+  } catch (error) {
+    console.warn("retrieval_cache_write_failed", error instanceof Error ? error.message : String(error));
     // Continue response path if cache write fails.
   }
 

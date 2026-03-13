@@ -125,3 +125,40 @@ export type OpenAiByokStatusResponse = {
 export type OpenAiByokUpsertRequest = {
   apiKey: string;
 };
+
+export type AdminRuntimeStatusResponse = {
+  generatedAt: string;
+  ingestionContract: {
+    passed: boolean;
+    requiredRpcCount: number;
+    presentRpcNames: string[];
+    missingRpcNames: string[];
+  };
+  retrievalCacheContract: {
+    passed: boolean;
+    requiredRpcCount: number;
+    presentRpcNames: string[];
+    missingRpcNames: string[];
+  };
+  ingestionHealth: {
+    queuedCount: number;
+    processingCount: number;
+    recentProgressCount: number;
+    staleProcessingCount: number;
+    laggingProcessingCount: number;
+    maxHeartbeatLagSeconds: number | null;
+    processingWithoutLockCount: number;
+    nonProcessingWithLockCount: number;
+    inconsistentDocumentCount: number;
+    readyWithoutChunksCount: number;
+    stageCounts: Record<string, number>;
+    effectiveDocumentCounts: Record<DocumentStatus, number>;
+  };
+  retrievalCache: {
+    currentRetrievalVersion: number;
+    totalEntries: number;
+    currentVersionEntries: number;
+    staleVersionEntries: number;
+    expiredEntries: number;
+  };
+};

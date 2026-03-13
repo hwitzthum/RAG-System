@@ -61,17 +61,10 @@ function loadEnvFile(filepath) {
 }
 
 function requiredKeysByTarget(target) {
-  const common = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RAG_STORAGE_BUCKET"];
-
-  if (target === "worker") {
-    return [...common, "WORKER_NAME", "WORKER_POLL_INTERVAL_SECONDS", "WORKER_MAX_RETRIES"];
-  }
-
   if (target === "staging") {
     return [
       "NODE_ENV",
       "NEXT_PUBLIC_APP_NAME",
-      "INGESTION_RUNTIME_MODE",
       "INGESTION_BATCH_SIZE",
       "INGESTION_LOCK_TIMEOUT_SECONDS",
       "SUPABASE_URL",
@@ -103,7 +96,6 @@ function requiredKeysByTarget(target) {
   return [
     "NODE_ENV",
     "NEXT_PUBLIC_APP_NAME",
-    "INGESTION_RUNTIME_MODE",
     "INGESTION_BATCH_SIZE",
     "INGESTION_LOCK_TIMEOUT_SECONDS",
     "SUPABASE_URL",
@@ -185,12 +177,8 @@ function run() {
     invalid.push("Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured");
   }
 
-  if (env.INGESTION_RUNTIME_MODE && !["worker", "vercel"].includes(env.INGESTION_RUNTIME_MODE)) {
-    invalid.push("INGESTION_RUNTIME_MODE must be one of worker|vercel");
-  }
-
-  if (target !== "worker" && env.INGESTION_RUNTIME_MODE === "vercel" && !env.CRON_SECRET) {
-    invalid.push("CRON_SECRET must be configured when INGESTION_RUNTIME_MODE=vercel");
+  if ((target === "staging" || process.env.VERCEL === "1" || process.env.VERCEL === "true") && !env.CRON_SECRET) {
+    invalid.push("CRON_SECRET must be configured for deployment environments that expose the ingestion trigger");
   }
 
   if (env.CRON_SECRET && env.CRON_SECRET.length < 16) {

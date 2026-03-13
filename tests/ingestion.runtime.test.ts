@@ -14,13 +14,32 @@ import type {
   ProcessJobResult,
 } from "../lib/ingestion/runtime/types";
 import type { ClaimIngestionJobsInput, IngestionRuntimeRepository } from "../lib/ingestion/runtime/repository";
-import type { DocumentStatus, SupportedLanguage } from "../lib/supabase/database.types";
+import type { SupportedLanguage } from "../lib/supabase/database.types";
 
 const quietLogger = {
   info: () => undefined,
   warn: () => undefined,
   error: () => undefined,
 };
+
+function createCapturingLogger() {
+  const entries: Array<{ level: "info" | "warn" | "error"; event: string; payload: Record<string, unknown> | undefined }> = [];
+
+  return {
+    entries,
+    logger: {
+      info: (event: string, payload?: Record<string, unknown>) => {
+        entries.push({ level: "info", event, payload });
+      },
+      warn: (event: string, payload?: Record<string, unknown>) => {
+        entries.push({ level: "warn", event, payload });
+      },
+      error: (event: string, payload?: Record<string, unknown>) => {
+        entries.push({ level: "error", event, payload });
+      },
+    },
+  };
+}
 
 test("splitIntoSections detects uppercase headings and preserves page metadata", () => {
   const sections = splitIntoSections({
@@ -84,9 +103,8 @@ class FakeRepository implements IngestionRuntimeRepository {
     ingestionVersion: 1,
   };
 
-  public readonly statusUpdates: Array<{ documentId: string; status: DocumentStatus; language?: SupportedLanguage | null }> = [];
   public readonly replacedChunksHistory: PreparedChunkRecord[][] = [];
-  public readonly completedJobs: string[] = [];
+  public readonly completedJobs: Array<{ jobId: string; language?: SupportedLanguage | null }> = [];
   public claimedJobs: IngestionJob[] = [];
   public readonly failedCalls: Array<{ jobId: string; message: string }> = [];
   public retrievalCacheInvalidationCalls = 0;
@@ -98,6 +116,7 @@ class FakeRepository implements IngestionRuntimeRepository {
   public currentChunksProcessed = 0;
   public yieldedJobs: string[] = [];
   public insertedChunkBatches: PreparedChunkRecord[][] = [];
+  public stageUpdates: string[] = [];
 
   async claimIngestionJobs(_input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
     void _input;
@@ -114,17 +133,13 @@ class FakeRepository implements IngestionRuntimeRepository {
     return new TextEncoder().encode("%PDF-1.7 synthetic");
   }
 
-  async setDocumentStatus(documentId: string, status: DocumentStatus, language?: SupportedLanguage | null): Promise<void> {
-    this.statusUpdates.push({ documentId, status, language });
-  }
-
   async replaceDocumentChunks(documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
     assert.equal(documentId, this.document.id);
     this.replacedChunksHistory.push(chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })));
   }
 
-  async markJobCompleted(jobId: string): Promise<void> {
-    this.completedJobs.push(jobId);
+  async markJobCompleted(jobId: string, language?: SupportedLanguage | null): Promise<void> {
+    this.completedJobs.push({ jobId, language });
   }
 
   async markJobFailed(_job: IngestionJob, _errorMessage: string): Promise<boolean> {
@@ -141,12 +156,17 @@ class FakeRepository implements IngestionRuntimeRepository {
     this.savedChunksTotal = total;
   }
 
-  async loadJobProgress(_jobId: string): Promise<JobProgress> {
+  async loadJobProgress(): Promise<JobProgress> {
     return {
       candidates: this.savedCandidates,
       chunksProcessed: this.currentChunksProcessed,
       chunksTotal: this.savedChunksTotal,
+      currentStage: this.stageUpdates.at(-1) ?? null,
     };
+  }
+
+  async updateJobStage(_jobId: string, stage: string): Promise<void> {
+    this.stageUpdates.push(stage);
   }
 
   async updateJobProgress(_jobId: string, chunksProcessed: number): Promise<void> {
@@ -244,6 +264,15 @@ test("IngestionPipeline extracts and processes all chunks in a single invocation
 
   assert.equal(result.status, "completed");
   assert.equal(result.chunksTotal, 2);
+  assert.deepEqual(repository.stageUpdates, [
+    "extracting",
+    "chunking",
+    "clearing_chunks",
+    "contextualizing",
+    "embedding",
+    "storing",
+    "finalizing",
+  ]);
   assert.equal(result.chunksProcessed, 2);
 
   // Chunks stored via insertChunkBatch (one batch)
@@ -256,10 +285,6 @@ test("IngestionPipeline extracts and processes all chunks in a single invocation
   // Existing chunks were cleared (replaceDocumentChunks called with empty array)
   assert.equal(repository.replacedChunksHistory.length, 1);
   assert.equal(repository.replacedChunksHistory[0]?.length, 0);
-
-  // Document set to "ready" with detected language
-  const readyUpdate = repository.statusUpdates.find((u) => u.status === "ready");
-  assert.ok(readyUpdate);
 
   assert.equal(repository.retrievalCacheInvalidationCalls, 1);
 });
@@ -325,9 +350,6 @@ test("IngestionPipeline processes chunks incrementally across multiple invocatio
   assert.equal(repository.insertedChunkBatches[1]?.length, 1);
   assert.equal(repository.insertedChunkBatches[1]?.[0]?.chunkIndex, 1);
 
-  // Document set to "ready" only on completion
-  const readyUpdate = repository.statusUpdates.find((u) => u.status === "ready");
-  assert.ok(readyUpdate);
   assert.equal(repository.retrievalCacheInvalidationCalls, 1);
 });
 
@@ -415,7 +437,7 @@ test("runIngestionBatch reports completed, partial, failed, and dead-letter outc
   assert.equal(metrics.deadLettered, 1);
   assert.equal(repository.failedCalls.length, 2);
   assert.equal(repository.completedJobs.length, 1);
-  assert.equal(repository.completedJobs[0], "job-1");
+  assert.deepEqual(repository.completedJobs[0], { jobId: "job-1", language: null });
   assert.equal(metrics.jobs.length, 3);
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
@@ -423,6 +445,53 @@ test("runIngestionBatch reports completed, partial, failed, and dead-letter outc
       ["job-1", "completed"],
       ["job-2", "failed"],
       ["job-3", "dead_letter"],
+    ],
+  );
+});
+
+test("runIngestionBatch emits explicit transition events for claim, completion, retry, and dead-letter", async () => {
+  const repository = new FakeRepository();
+  repository.claimedJobs = [
+    { id: "job-1", documentId: "doc-1", status: "processing", attempt: 1 },
+    { id: "job-2", documentId: "doc-2", status: "processing", attempt: 2 },
+    { id: "job-3", documentId: "doc-3", status: "processing", attempt: 3 },
+  ];
+  repository.deadLetterIds.add("job-3");
+
+  const { entries, logger } = createCapturingLogger();
+
+  await runIngestionBatch({
+    repository,
+    logger,
+    pipeline: {
+      processJob: async (job): Promise<ProcessJobResult> => {
+        if (job.id === "job-2") {
+          throw new Error("transient failure");
+        }
+        if (job.id === "job-3") {
+          throw new Error("terminal failure");
+        }
+        return {
+          status: "completed",
+          chunksProcessed: 2,
+          chunksTotal: 2,
+          documentLanguage: "EN",
+        };
+      },
+    },
+  });
+
+  assert.deepEqual(
+    entries.map((entry) => [entry.level, entry.event]),
+    [
+      ["info", "ingestion_job_claimed"],
+      ["info", "ingestion_job_claimed"],
+      ["info", "ingestion_job_claimed"],
+      ["info", "ingestion_job_completed"],
+      ["warn", "ingestion_job_retry_scheduled"],
+      ["warn", "ingestion_job_failed"],
+      ["warn", "ingestion_job_dead_lettered"],
+      ["warn", "ingestion_job_failed"],
     ],
   );
 });
@@ -458,9 +527,30 @@ test("runIngestionBatch loops through partial batches until completion", async (
   assert.equal(metrics.completed, 1);
   assert.equal(metrics.failed, 0);
   assert.equal(repository.completedJobs.length, 1);
-  assert.equal(repository.completedJobs[0], "job-loop");
+  assert.deepEqual(repository.completedJobs[0], { jobId: "job-loop", language: null });
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
     [["job-loop", "completed"]],
   );
+});
+
+test("runIngestionBatch passes completed document language to markJobCompleted", async () => {
+  const repository = new FakeRepository();
+  repository.claimedJobs = [{ id: "job-lang", documentId: "doc-1", status: "processing", attempt: 1 }];
+
+  const metrics = await runIngestionBatch({
+    repository,
+    logger: quietLogger,
+    pipeline: {
+      processJob: async (): Promise<ProcessJobResult> => ({
+        status: "completed",
+        chunksProcessed: 2,
+        chunksTotal: 2,
+        documentLanguage: "DE",
+      }),
+    },
+  });
+
+  assert.equal(metrics.completed, 1);
+  assert.deepEqual(repository.completedJobs, [{ jobId: "job-lang", language: "DE" }]);
 });

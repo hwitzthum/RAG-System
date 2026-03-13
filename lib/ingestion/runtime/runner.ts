@@ -47,6 +47,15 @@ export async function runIngestionBatch(input?: {
     maxRetries: settings.maxRetries,
   });
 
+  for (const job of jobs) {
+    logger.info("ingestion_job_claimed", {
+      jobId: job.id,
+      documentId: job.documentId,
+      attempt: job.attempt,
+      workerName: settings.workerName,
+    });
+  }
+
   const metrics: IngestionRunMetrics = {
     claimed: jobs.length,
     completed: 0,
@@ -75,7 +84,15 @@ export async function runIngestionBatch(input?: {
       } while (result.status === "partial");
 
       // All chunks processed — finalize
-      await repository.markJobCompleted(job.id);
+      await repository.markJobCompleted(job.id, result.documentLanguage ?? null);
+      logger.info("ingestion_job_completed", {
+        jobId: job.id,
+        documentId: job.documentId,
+        attempt: job.attempt,
+        chunksProcessed: result.chunksProcessed,
+        chunksTotal: result.chunksTotal,
+        documentLanguage: result.documentLanguage ?? null,
+      });
       metrics.completed += 1;
       metrics.jobs.push({
         id: job.id,
@@ -86,6 +103,12 @@ export async function runIngestionBatch(input?: {
       const message = error instanceof Error ? error.message : "unknown_error";
       const deadLettered = await repository.markJobFailed(job, message);
       if (deadLettered) {
+        logger.warn("ingestion_job_dead_lettered", {
+          jobId: job.id,
+          documentId: job.documentId,
+          attempt: job.attempt,
+          message,
+        });
         metrics.deadLettered += 1;
         metrics.jobs.push({
           id: job.id,
@@ -94,6 +117,12 @@ export async function runIngestionBatch(input?: {
           error: message,
         });
       } else {
+        logger.warn("ingestion_job_retry_scheduled", {
+          jobId: job.id,
+          documentId: job.documentId,
+          attempt: job.attempt,
+          message,
+        });
         metrics.failed += 1;
         metrics.jobs.push({
           id: job.id,
@@ -104,6 +133,7 @@ export async function runIngestionBatch(input?: {
       }
       logger.warn("ingestion_job_failed", {
         jobId: job.id,
+        documentId: job.documentId,
         attempt: job.attempt,
         deadLettered,
         message,

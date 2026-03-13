@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
-import { env } from "@/lib/config/env";
 import { normalizeLanguageHint } from "@/lib/ingestion/upload-helpers";
-import { persistUploadAndQueueJob, processIngestionJobInline } from "@/lib/ingestion/upload-service";
+import { queueSingleUpload } from "@/lib/ingestion/upload-queue";
+import { env } from "@/lib/config/env";
+import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 
@@ -109,56 +110,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const persisted = await persistUploadAndQueueJob({
+    const queued = await queueSingleUpload({
       file,
+      ipAddress,
       title: parsedMetadata.data.title ?? null,
       languageHint: parsedMetadata.data.languageHint,
-    });
-
-    // Fire-and-forget: process ingestion in the background.
-    // The client polls /api/upload-status for terminal state.
-    if (!persisted.deduplicated || persisted.documentStatus !== "ready") {
-      processIngestionJobInline(persisted.documentId, persisted.ingestionJobId)
-        .then((result) => {
-          if (!result.success) {
-            console.error("Inline ingestion failed, cron will retry:", result.error);
-          }
-        })
-        .catch((error) => {
-          console.error("Inline ingestion unexpected error:", error);
-        });
-    }
-
-    logAuditEvent({
-      action: "upload.create",
-      actorId: authResult.user.id,
-      actorRole: authResult.user.role,
-      outcome: "success",
-      resource: "upload",
-      ipAddress,
-      metadata: {
-        documentId: persisted.documentId,
-        ingestionJobId: persisted.ingestionJobId,
-        fileName: file.name,
-        fileSizeBytes: file.size,
-        deduplicated: persisted.deduplicated,
-        checksumSha256: persisted.checksumSha256,
+      user: authResult.user,
+      dependencies: {
+        persistUploadAndQueueJob,
+        logAuditEvent,
       },
     });
 
-    return NextResponse.json(
-      {
-        documentId: persisted.documentId,
-        ingestionJobId: persisted.ingestionJobId,
-        status: persisted.status,
-        documentStatus: persisted.documentStatus,
-        ingestionJobStatus: persisted.ingestionJobStatus,
-        deduplicated: persisted.deduplicated,
-        storagePath: persisted.storagePath,
-        checksumSha256: persisted.checksumSha256,
-      },
-      { status: persisted.deduplicated ? 200 : 201 },
-    );
+    return NextResponse.json(queued.body, { status: queued.statusCode });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
 

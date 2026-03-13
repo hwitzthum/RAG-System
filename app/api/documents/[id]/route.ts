@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
+import { createDeleteDocumentClient, deleteDocumentCascade } from "@/lib/documents/delete-document";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -26,52 +27,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
 
   const supabase = getSupabaseAdminClient();
+  let deletedDocument;
 
-  // Fetch document to get storage path
-  const { data: doc, error: fetchError } = await supabase
-    .from("documents")
-    .select("id, storage_path")
-    .eq("id", id)
-    .single();
-
-  if (fetchError || !doc) {
-    return NextResponse.json({ error: "Document not found" }, { status: 404 });
-  }
-
-  // Remove storage file + related records in parallel (all independent of each other)
-  const [storageResult, jobsResult, chunksResult] = await Promise.all([
-    doc.storage_path
-      ? supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([doc.storage_path])
-      : Promise.resolve({ error: null }),
-    supabase.from("ingestion_jobs").delete().eq("document_id", id),
-    supabase.from("document_chunks").delete().eq("document_id", id),
-  ]);
-
-  // Log partial failures but continue — the document record must still be deleted
-  // to avoid leaving a dangling reference that blocks re-upload.
-  const deleteSteps = [
-    { result: storageResult, resource: "storage", reason: "storage_delete_failed" },
-    { result: jobsResult, resource: "ingestion_jobs", reason: "jobs_delete_failed" },
-    { result: chunksResult, resource: "chunks", reason: "chunks_delete_failed" },
-  ] as const;
-  for (const step of deleteSteps) {
-    if (step.result.error) {
-      logAuditEvent({
-        action: "document.delete",
-        actorId: authResult.user.id,
-        actorRole: authResult.user.role,
-        outcome: "failure",
-        resource: `document:${id}:${step.resource}`,
-        ipAddress,
-        metadata: { reason: step.reason, message: step.result.error.message },
-      });
-    }
-  }
-
-  // Delete document record last (after foreign-key dependents are gone)
-  const { error: deleteError } = await supabase.from("documents").delete().eq("id", id);
-
-  if (deleteError) {
+  try {
+    deletedDocument = await deleteDocumentCascade({
+      client: createDeleteDocumentClient(supabase),
+      documentId: id,
+    });
+  } catch (error) {
     logAuditEvent({
       action: "document.delete",
       actorId: authResult.user.id,
@@ -79,9 +42,32 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       outcome: "failure",
       resource: `document:${id}`,
       ipAddress,
-      metadata: { reason: "delete_failed" },
+      metadata: {
+        reason: "delete_failed",
+        message: error instanceof Error ? error.message : String(error),
+      },
     });
     return NextResponse.json({ error: "Failed to delete document" }, { status: 500 });
+  }
+
+  if (!deletedDocument) {
+    return NextResponse.json({ error: "Document not found" }, { status: 404 });
+  }
+
+  const storageResult = deletedDocument.storagePath
+    ? await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([deletedDocument.storagePath])
+    : { error: null };
+
+  if (storageResult.error) {
+    logAuditEvent({
+      action: "document.delete",
+      actorId: authResult.user.id,
+      actorRole: authResult.user.role,
+      outcome: "failure",
+      resource: `document:${id}:storage`,
+      ipAddress,
+      metadata: { reason: "storage_delete_failed", message: storageResult.error.message },
+    });
   }
 
   logAuditEvent({
@@ -91,6 +77,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     outcome: "success",
     resource: `document:${id}`,
     ipAddress,
+    metadata: {
+      deletedJobCount: deletedDocument.deletedJobCount,
+      deletedChunkCount: deletedDocument.deletedChunkCount,
+    },
   });
 
   return NextResponse.json({ status: "ok" });

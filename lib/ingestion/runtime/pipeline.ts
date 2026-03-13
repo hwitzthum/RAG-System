@@ -142,15 +142,22 @@ export class IngestionPipeline {
   async processJob(job: IngestionJob): Promise<ProcessJobResult> {
     const pipelineStart = Date.now();
     const elapsed = () => `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;
+    const setStage = async (stage: string) => {
+      if (job.currentStage === stage) {
+        return;
+      }
+      await this.repository.updateJobStage(job.id, stage);
+      job.currentStage = stage;
+    };
 
     const document = await this.repository.getDocument(job.documentId);
-    await this.repository.setDocumentStatus(document.id, "processing");
 
     // Load incremental state
     let progress: JobProgress = await this.repository.loadJobProgress(job.id);
 
     // Phase 1: Extract (first invocation only — no candidates saved yet)
     if (!progress.candidates) {
+      await setStage("extracting");
       this.logger.info("pipeline_step", { step: "extraction_start", elapsed: elapsed(), jobId: job.id, documentId: document.id });
 
       const pdfBytes = await this.repository.downloadDocument(document.storagePath);
@@ -159,6 +166,7 @@ export class IngestionPipeline {
       const pages = await this.extractPagesFn(pdfBytes, this.settings.ocrFallbackEnabled, this.logger);
       this.logger.info("pipeline_step", { step: "pages_extracted", elapsed: elapsed(), pageCount: pages.length });
 
+      await setStage("chunking");
       const sections = [];
       for (const page of pages) {
         if (page.text.trim()) {
@@ -206,7 +214,9 @@ export class IngestionPipeline {
         candidates: chunkCandidates,
         chunksProcessed: 0,
         chunksTotal: chunkCandidates.length,
+        currentStage: "chunked",
       };
+      job.currentStage = "chunked";
     }
 
     // Phase 2: Process next batch of chunks
@@ -222,6 +232,7 @@ export class IngestionPipeline {
 
     // Delete existing chunks on first batch (fresh start or retry from 0)
     if (chunksProcessed === 0) {
+      await setStage("clearing_chunks");
       await this.repository.replaceDocumentChunks(document.id, []);
       this.logger.info("pipeline_step", { step: "existing_chunks_cleared", elapsed: elapsed(), documentId: document.id });
     }
@@ -233,10 +244,12 @@ export class IngestionPipeline {
     this.logger.info("pipeline_step", { step: "batch_start", elapsed: elapsed(), batchStart, batchEnd, total: chunksTotal });
 
     // Enrich batch with context
+    await setStage("contextualizing");
     const batchWithContext = await this.contextGenerator.enrich(batch);
     this.logger.info("pipeline_step", { step: "batch_context_enriched", elapsed: elapsed(), count: batchWithContext.length });
 
     // Generate embeddings for batch
+    await setStage("embedding");
     const embeddingInputs = batchWithContext.map((item) => `${item.context}\n\n${item.content}`);
     const embeddings = await this.embeddingProvider.embedTexts(embeddingInputs);
     this.logger.info("pipeline_step", { step: "batch_embeddings_generated", elapsed: elapsed(), count: embeddings.length });
@@ -266,6 +279,7 @@ export class IngestionPipeline {
     });
 
     // Insert batch (append)
+    await setStage("storing");
     await this.repository.insertChunkBatch(document.id, preparedChunks);
     this.logger.info("pipeline_step", { step: "batch_stored", elapsed: elapsed(), count: preparedChunks.length });
 
@@ -279,9 +293,9 @@ export class IngestionPipeline {
         candidates.map((item) => item.language),
         document.language,
       );
-      await this.repository.setDocumentStatus(document.id, "ready", selectedLanguage);
 
       try {
+        await setStage("finalizing");
         await this.repository.invalidateRetrievalCache();
       } catch (error) {
         this.logger.warn("retrieval_cache_invalidation_failed", {
@@ -299,7 +313,12 @@ export class IngestionPipeline {
         totalSeconds: ((Date.now() - pipelineStart) / 1000).toFixed(1),
       });
 
-      return { status: "completed", chunksProcessed: newChunksProcessed, chunksTotal };
+      return {
+        status: "completed",
+        chunksProcessed: newChunksProcessed,
+        chunksTotal,
+        documentLanguage: selectedLanguage,
+      };
     }
 
     this.logger.info("pipeline_step", {

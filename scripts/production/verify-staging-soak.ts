@@ -3,6 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { countEffectiveDocumentsByStatus } from "@/lib/ingestion/runtime/effective-documents";
+import { collectMeasuredProcessingDurations, computeP95 } from "@/lib/ingestion/runtime/soak-metrics";
 
 type RunMode = "live" | "dry-run";
 
@@ -140,16 +142,6 @@ function writeReport(report: SoakReport, writeLatest: boolean): string {
   return outputPath;
 }
 
-function computeP95(values: number[]): number | null {
-  if (values.length === 0) {
-    return null;
-  }
-
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * 0.95) - 1));
-  return sorted[index]!;
-}
-
 function buildDryRunReport(args: ScriptArgs): SoakReport {
   const checks: SoakCheck[] = [
     {
@@ -242,7 +234,7 @@ async function buildLiveReport(args: ScriptArgs): Promise<SoakReport> {
 
   const { data: completedRows, error: completedRowsError } = await supabase
     .from("ingestion_jobs")
-    .select("created_at,updated_at")
+    .select("processing_duration_ms")
     .eq("status", "completed")
     .gte("updated_at", cutoffIso)
     .limit(5000);
@@ -250,20 +242,15 @@ async function buildLiveReport(args: ScriptArgs): Promise<SoakReport> {
     throw new Error(completedRowsError.message);
   }
 
-  const completionDurationsMs = (completedRows ?? [])
-    .map((row) => Date.parse(row.updated_at) - Date.parse(row.created_at))
-    .filter((durationMs) => Number.isFinite(durationMs) && durationMs >= 0);
+  const completionDurationsMs = collectMeasuredProcessingDurations(
+    (completedRows ?? []) as Array<{ processing_duration_ms: number | null }>,
+  );
   const p95CompletionMs = computeP95(completionDurationsMs);
 
-  const { count: readyDocumentsRaw, error: readyDocumentsError } = await supabase
-    .from("documents")
-    .select("id", { head: true, count: "exact" })
-    .eq("status", "ready")
-    .gte("updated_at", cutoffIso);
-  if (readyDocumentsError) {
-    throw new Error(readyDocumentsError.message);
-  }
-  const readyDocumentsInWindow = readyDocumentsRaw ?? 0;
+  const readyDocumentsInWindow = await countEffectiveDocumentsByStatus(supabase, {
+    status: "ready",
+    updatedSince: cutoffIso,
+  });
 
   const { data: processingRows, error: processingError } = await supabase
     .from("ingestion_jobs")
@@ -346,7 +333,7 @@ async function buildLiveReport(args: ScriptArgs): Promise<SoakReport> {
       passed: p95CompletionMs !== null && p95CompletionMs <= args.maxP95CompletionMs,
       detail:
         p95CompletionMs === null
-          ? "No completed jobs found in window; p95 completion cannot be evaluated."
+          ? "No completed jobs with measured processing duration found in window; p95 completion cannot be evaluated."
           : `p95_completion_ms=${p95CompletionMs}, max_allowed_ms=${args.maxP95CompletionMs}`,
     },
     {

@@ -64,7 +64,7 @@ All ingestion, retrieval, and evaluation flows must support the same language se
 
 - `app/`: Next.js UI and API routes.
 - `lib/`: retrieval, cache, provider abstraction, shared app logic.
-- `worker/`: ingestion fallback runtime retained for rollback scenarios.
+- `scripts/ingestion/`: Node-based ingestion worker entrypoints.
 - `database/`: SQL migrations, indexes, RLS policies.
 - `evaluation/`: evaluation datasets, benchmark runners, reports.
 - `prompts/`: system prompts and templates.
@@ -73,7 +73,6 @@ All ingestion, retrieval, and evaluation flows must support the same language se
 ## Coding and Module Rules
 
 - TypeScript is required in the Next.js codebase.
-- Fallback worker may use Python for extraction robustness.
 - File size target: under 400 lines.
 - Single responsibility per module.
 - Runtime configuration must be validated at startup.

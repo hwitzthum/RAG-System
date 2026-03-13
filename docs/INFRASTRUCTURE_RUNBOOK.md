@@ -31,7 +31,7 @@ npm run infra:vercel:readiness
 npm run infra:preflight
 ```
 
-`infra:vercel:prepare-staging` enforces `INGESTION_RUNTIME_MODE=vercel` and generates `CRON_SECRET` if missing/placeholder.
+`infra:vercel:prepare-staging` ensures `CRON_SECRET` exists for the protected ingestion trigger.
 
 ## 2. Link/Create Vercel Project
 
@@ -42,18 +42,16 @@ npm run infra:vercel:sync-ids
 npm run infra:vercel:readiness:postlink
 ```
 
-Set ingestion runtime configuration for production path:
+Set ingestion trigger configuration for the production path:
 
-- `INGESTION_RUNTIME_MODE=vercel`
 - `INGESTION_BATCH_SIZE=1`
 - `INGESTION_LOCK_TIMEOUT_SECONDS=900`
 - `CRON_SECRET=<long-random-secret>` (required)
 
-Worker fallback remains available for rollback only:
+Local queue draining remains available through the TypeScript worker:
 
-- `INGESTION_RUNTIME_MODE=worker`
 - disable Vercel cron job for `/api/internal/ingestion/run`
-- operate `worker/` runtime externally
+- run `npm run ingestion:worker`
 
 ## 3. Link/Create Supabase Project
 
@@ -79,19 +77,12 @@ npm run infra:check-env:staging
 npm run infra:check-env:web
 ```
 
-Optional fallback-only validation:
-
-```bash
-npm run infra:check-env:worker
-```
-
 ## 6. Exit Criteria for Phase 2
 
 - Vercel project linked and accessible
 - Supabase project linked and accessible
 - `pgvector` extension enabled in remote DB
 - `documents` storage bucket exists with correct policies
-- Vercel ingestion runtime env is set to `INGESTION_RUNTIME_MODE=vercel`
 - `CRON_SECRET` configured for protected cron execution
 - staging env file passes validation checks
 

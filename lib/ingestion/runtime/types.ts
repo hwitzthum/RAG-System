@@ -7,6 +7,7 @@ export type IngestionJob = {
   documentId: string;
   status: IngestionJobStatus;
   attempt: number;
+  currentStage?: string | null;
 };
 
 export type DocumentRecord = {
@@ -51,12 +52,14 @@ export type ProcessJobResult = {
   status: "completed" | "partial";
   chunksProcessed: number;
   chunksTotal: number;
+  documentLanguage?: SupportedLanguage;
 };
 
 export type JobProgress = {
   candidates: ChunkCandidate[] | null;
   chunksProcessed: number;
   chunksTotal: number;
+  currentStage?: string | null;
 };
 
 export type PreparedChunkRecord = {
@@ -72,6 +75,7 @@ export type PreparedChunkRecord = {
 
 export type IngestionRuntimeSettings = {
   workerName: string;
+  workerPollIntervalSeconds: number;
   ingestionBatchSize: number;
   maxRetries: number;
   chunkTargetTokens: number;
@@ -127,6 +131,7 @@ export function resolveIngestionRuntimeSettings(
 ): IngestionRuntimeSettings {
   const resolved: IngestionRuntimeSettings = {
     workerName: process.env.WORKER_NAME?.trim() || "rag-ingestion-worker",
+    workerPollIntervalSeconds: parseIntegerEnv(process.env.WORKER_POLL_INTERVAL_SECONDS, 5),
     ingestionBatchSize: parseIntegerEnv(process.env.INGESTION_BATCH_SIZE, 1),
     maxRetries: parseIntegerEnv(process.env.WORKER_MAX_RETRIES, 3),
     chunkTargetTokens: parseIntegerEnv(process.env.WORKER_CHUNK_TARGET_TOKENS, 700),

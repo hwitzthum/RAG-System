@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { hasPdfSignature, looksLikePdfUpload } from "@/lib/ingestion/upload-helpers";
-import { persistUploadAndQueueJob, processIngestionJobInline } from "@/lib/ingestion/upload-service";
+import { queueBatchUploadEntry } from "@/lib/ingestion/upload-queue";
+import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 
@@ -78,39 +79,18 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const persisted = await persistUploadAndQueueJob({
+      const accepted = await queueBatchUploadEntry({
         file,
+        user: authResult.user,
+        ipAddress,
         title: file.name,
         languageHint: null,
-      });
-
-      // Process ingestion inline (cron is fallback for retries)
-      if (!persisted.deduplicated || persisted.documentStatus !== "ready") {
-        const inlineResult = await processIngestionJobInline(persisted.documentId, persisted.ingestionJobId);
-        if (!inlineResult.success) {
-          console.error(`Inline ingestion failed for ${file.name}, cron will retry:`, inlineResult.error);
-        }
-      }
-
-      results.push({
-        fileName: file.name,
-        documentId: persisted.documentId,
-        status: "accepted",
-      });
-
-      logAuditEvent({
-        action: "upload.batch.file",
-        actorId: authResult.user.id,
-        actorRole: authResult.user.role,
-        outcome: "success",
-        resource: "upload",
-        ipAddress,
-        metadata: {
-          documentId: persisted.documentId,
-          fileName: file.name,
-          deduplicated: persisted.deduplicated,
+        dependencies: {
+          persistUploadAndQueueJob,
+          logAuditEvent,
         },
       });
+      results.push(accepted);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error";
       results.push({ fileName: file.name, status: "rejected", error: message });

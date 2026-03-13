@@ -16,7 +16,7 @@ Phase 12 launch runbook with release checklist, rollback plan, and approval gate
 - observability config validated (`npm run obs:validate`)
 - ingestion cron/backlog health validated (`npm run obs:ingestion:check`)
 - staging soak verification validated (`npm run perf:soak:verify`)
-- staging/prod release config uses `INGESTION_RUNTIME_MODE=vercel`
+- staging/prod release config protects the ingestion trigger with `CRON_SECRET`
 - load and resilience checks executed with saved artifacts
 
 ## Release Checklist
@@ -29,7 +29,6 @@ npm run infra:check-env:staging
 
 Required values in `.env.staging`:
 
-- `INGESTION_RUNTIME_MODE=vercel`
 - `CRON_SECRET=<long-random-secret>`
 
 2. Run benchmark and quality gates:
@@ -73,9 +72,9 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 ## Rollback Plan
 
 1. Immediately stop rollout traffic shift (or redeploy prior Vercel deployment).
-2. Switch runtime mode to fallback worker in Vercel env (`INGESTION_RUNTIME_MODE=worker`) and redeploy.
-3. Disable cron for `/api/internal/ingestion/run` in Vercel cron management (or redeploy config without the cron entry).
-4. Start/verify external `worker/` runtime and confirm it can claim queued jobs.
+2. Disable cron for `/api/internal/ingestion/run` in Vercel cron management (or redeploy config without the cron entry).
+3. Start/verify `npm run ingestion:worker` in the application repo and confirm it can claim queued jobs.
+4. Rotate `CRON_SECRET` if you need to block manual trigger access immediately.
 5. Restore previous environment variable set if changed.
 6. If schema migration caused regression, apply pre-validated rollback migration path.
 7. Invalidate retrieval cache by incrementing retrieval version only if required by incident response.
@@ -84,7 +83,7 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 - `GET /api/health` healthy
 - query endpoint authorization and rate limiter intact
 - alert noise stabilized
-- queued ingestion jobs begin draining via fallback worker
+- queued ingestion jobs begin draining via the TypeScript worker
 
 ## Incident Triggers for Rollback
 
@@ -103,8 +102,7 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 
 ## Staging Rollback Drill (Mandatory Before Production)
 
-1. In staging, set `INGESTION_RUNTIME_MODE=worker` and redeploy.
-2. Disable staging cron for `/api/internal/ingestion/run`.
-3. Start fallback worker and process a small queued set (at least 3 jobs).
-4. Re-enable `INGESTION_RUNTIME_MODE=vercel`, restore cron, and confirm queue drains again.
-5. Save drill evidence (logs + artifact references) in release notes.
+1. In staging, disable cron for `/api/internal/ingestion/run`.
+2. Start the TypeScript worker and process a small queued set (at least 3 jobs).
+3. Re-enable cron and confirm queue drains again through the protected trigger.
+4. Save drill evidence (logs + artifact references) in release notes.

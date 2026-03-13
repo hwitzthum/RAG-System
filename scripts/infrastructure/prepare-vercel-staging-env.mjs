@@ -89,8 +89,6 @@ function main() {
   ensureEnvFileExists(envPath, templatePath);
   const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
 
-  upsertKey(lines, "INGESTION_RUNTIME_MODE", "vercel");
-
   const currentCron = extractValue(lines, "CRON_SECRET");
   const shouldRotate =
     args.rotateCronSecret || !currentCron || currentCron.length < 16 || isPlaceholder(currentCron);
@@ -102,7 +100,6 @@ function main() {
   fs.writeFileSync(envPath, normalized, "utf8");
 
   console.log(`Prepared staging env for Vercel at ${envPath}`);
-  console.log(`INGESTION_RUNTIME_MODE=vercel`);
   console.log(`CRON_SECRET ${shouldRotate ? "generated/rotated" : "kept existing value"}`);
 }
 

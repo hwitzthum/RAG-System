@@ -3,7 +3,6 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
-  INGESTION_RUNTIME_MODE: z.enum(["worker", "vercel"]).default("worker"),
   INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(900),
   CRON_SECRET: z.string().min(16).optional(),
@@ -65,7 +64,6 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV,
   NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
-  INGESTION_RUNTIME_MODE: process.env.INGESTION_RUNTIME_MODE,
   INGESTION_BATCH_SIZE: process.env.INGESTION_BATCH_SIZE,
   INGESTION_LOCK_TIMEOUT_SECONDS: process.env.INGESTION_LOCK_TIMEOUT_SECONDS,
   CRON_SECRET: process.env.CRON_SECRET,
@@ -135,8 +133,8 @@ if (config.NODE_ENV === "production" && !config.OPENAI_BYOK_VAULT_KEY) {
   throw new Error("OPENAI_BYOK_VAULT_KEY must be configured in production");
 }
 
-if (config.INGESTION_RUNTIME_MODE === "vercel" && !config.CRON_SECRET) {
-  throw new Error("CRON_SECRET must be configured when INGESTION_RUNTIME_MODE=vercel");
+if (process.env.VERCEL && !config.CRON_SECRET) {
+  throw new Error("CRON_SECRET must be configured for deployment environments that expose the ingestion trigger");
 }
 
 export const env = config;

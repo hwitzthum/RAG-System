@@ -9,10 +9,12 @@ import type {
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { Database, DocumentStatus, SupportedLanguage } from "@/lib/supabase/database.types";
+import type { Database, SupportedLanguage } from "@/lib/supabase/database.types";
 
 type ClaimedJobRow = Database["public"]["Functions"]["claim_ingestion_jobs"]["Returns"][number];
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
+type ReplaceDocumentChunksRow = Database["public"]["Functions"]["replace_document_chunks"]["Returns"][number];
+type AppendDocumentChunksRow = Database["public"]["Functions"]["append_document_chunks"]["Returns"][number];
 
 export type ClaimIngestionJobsInput = {
   workerName: string;
@@ -25,16 +27,25 @@ export interface IngestionRuntimeRepository {
   claimIngestionJobs(input: ClaimIngestionJobsInput): Promise<IngestionJob[]>;
   getDocument(documentId: string): Promise<DocumentRecord>;
   downloadDocument(storagePath: string): Promise<Uint8Array>;
-  setDocumentStatus(documentId: string, status: DocumentStatus, language?: SupportedLanguage | null): Promise<void>;
   replaceDocumentChunks(documentId: string, chunks: PreparedChunkRecord[]): Promise<void>;
-  markJobCompleted(jobId: string): Promise<void>;
+  markJobCompleted(jobId: string, language?: SupportedLanguage | null): Promise<void>;
   markJobFailed(job: IngestionJob, errorMessage: string): Promise<boolean>;
   invalidateRetrievalCache(): Promise<void>;
   saveChunkCandidates(jobId: string, chunks: ChunkCandidate[], total: number): Promise<void>;
   loadJobProgress(jobId: string): Promise<JobProgress>;
+  updateJobStage(jobId: string, stage: string): Promise<void>;
   updateJobProgress(jobId: string, chunksProcessed: number): Promise<void>;
   yieldJob(jobId: string): Promise<void>;
   insertChunkBatch(documentId: string, chunks: PreparedChunkRecord[]): Promise<void>;
+}
+
+function isMissingRpcFunction(errorMessage: string): boolean {
+  return errorMessage.includes("Could not find the function");
+}
+
+function buildMissingRpcError(functionName: string, details?: string): Error {
+  const suffix = details ? ` (${details})` : "";
+  return new Error(`Required ingestion RPC ${functionName} is unavailable${suffix}`);
 }
 
 function toIngestionJob(row: ClaimedJobRow): IngestionJob {
@@ -43,6 +54,7 @@ function toIngestionJob(row: ClaimedJobRow): IngestionJob {
     documentId: row.document_id,
     status: row.status,
     attempt: row.attempt,
+    currentStage: "claimed",
   };
 }
 
@@ -55,6 +67,18 @@ function toDocumentRecord(row: DocumentRow): DocumentRecord {
     language: row.language,
     status: row.status,
     ingestionVersion: row.ingestion_version,
+  };
+}
+
+function toReplaceDocumentChunkRpcChunk(chunk: PreparedChunkRecord): Record<string, unknown> {
+  return {
+    chunk_index: chunk.chunkIndex,
+    page_number: chunk.pageNumber,
+    section_title: chunk.sectionTitle,
+    content: chunk.content,
+    context: chunk.context,
+    language: chunk.language,
+    embedding: chunk.embedding,
   };
 }
 
@@ -103,7 +127,6 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
   }
 
   async claimIngestionJobs(input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
-    // Try RPC first (atomic claim with row locking), fall back to direct query
     const { data, error: rpcError } = await this.supabase.rpc("claim_ingestion_jobs", {
       worker_name: input.workerName,
       batch_size: Math.max(1, input.batchSize),
@@ -115,46 +138,11 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
       return (data ?? []).map(toIngestionJob);
     }
 
-    // RPC missing — fall back to direct query + update
-    if (!rpcError.message.includes("Could not find the function")) {
-      this.logger.warn("claim_ingestion_jobs_rpc_error_fallback", { error: rpcError.message });
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("claim_ingestion_jobs", rpcError.message);
     }
 
-    const { data: jobs, error: queryError } = await this.supabase
-      .from("ingestion_jobs")
-      .select("id,document_id,status,attempt")
-      .in("status", ["queued", "failed"])
-      .is("locked_at", null)
-      .order("created_at", { ascending: true })
-      .limit(Math.max(1, input.batchSize));
-
-    if (queryError) {
-      throw new Error(`Failed to claim ingestion jobs: ${queryError.message}`);
-    }
-
-    if (!jobs || jobs.length === 0) {
-      return [];
-    }
-
-    const now = new Date().toISOString();
-    for (const job of jobs) {
-      await this.supabase
-        .from("ingestion_jobs")
-        .update({
-          status: "processing" as const,
-          attempt: job.attempt + 1,
-          locked_at: now,
-          locked_by: input.workerName,
-        })
-        .eq("id", job.id);
-    }
-
-    return jobs.map((row) => ({
-      id: row.id,
-      documentId: row.document_id,
-      status: "processing" as const,
-      attempt: row.attempt + 1,
-    }));
+    throw new Error(`Failed to claim ingestion jobs via RPC: ${rpcError.message}`);
   }
 
   async getDocument(documentId: string): Promise<DocumentRecord> {
@@ -183,83 +171,45 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     return toUint8Array(data);
   }
 
-  async setDocumentStatus(documentId: string, status: DocumentStatus, language?: SupportedLanguage | null): Promise<void> {
-    const payload: Database["public"]["Tables"]["documents"]["Update"] = {
-      status,
-    };
-    if (language) {
-      payload.language = language;
-    }
-
-    const { error } = await this.supabase.from("documents").update(payload).eq("id", documentId);
-    if (error) {
-      throw new Error(`Failed to update document status: ${error.message}`);
-    }
-  }
-
   async replaceDocumentChunks(documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
-    const { error: deleteError } = await this.supabase.from("document_chunks").delete().eq("document_id", documentId);
-    if (deleteError) {
-      throw new Error(`Failed to clear document chunks: ${deleteError.message}`);
-    }
+    const { data, error: rpcError } = await this.supabase.rpc("replace_document_chunks", {
+      target_document_id: documentId,
+      target_chunks: chunks.map(toReplaceDocumentChunkRpcChunk),
+    });
 
-    if (chunks.length === 0) {
+    if (!rpcError) {
+      const row = data?.[0] as ReplaceDocumentChunksRow | undefined;
+      if (!row) {
+        throw new Error(`replace_document_chunks returned no row for ${documentId}`);
+      }
       return;
     }
 
-    const batchSize = Math.max(1, this.settings.chunkInsertBatchSize);
-    for (let index = 0; index < chunks.length; index += batchSize) {
-      const batch = chunks.slice(index, index + batchSize);
-      const rows = batch.map((chunk) => ({
-        document_id: chunk.documentId,
-        chunk_index: chunk.chunkIndex,
-        page_number: chunk.pageNumber,
-        section_title: chunk.sectionTitle,
-        content: chunk.content,
-        context: chunk.context,
-        language: chunk.language,
-        embedding: chunk.embedding,
-      }));
-
-      const { error: insertError } = await this.supabase.from("document_chunks").insert(rows);
-      if (insertError) {
-        throw new Error(`Failed to insert document chunks batch: ${insertError.message}`);
-      }
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("replace_document_chunks", rpcError.message);
     }
+
+    throw new Error(`Failed to replace document chunks via RPC: ${rpcError.message}`);
   }
 
-  async markJobCompleted(jobId: string): Promise<void> {
-    // Try RPC first (atomic job+document update), fall back to direct table update
+  async markJobCompleted(jobId: string, language?: SupportedLanguage | null): Promise<void> {
     const { error: rpcError } = await this.supabase.rpc("complete_ingestion_job", {
       job_id: jobId,
+      document_language: language ?? null,
     });
 
     if (!rpcError) {
       return;
     }
 
-    // RPC missing or failed — fall back to direct update
-    if (!rpcError.message.includes("Could not find the function")) {
-      this.logger.warn("complete_ingestion_job_rpc_error_fallback", { jobId, error: rpcError.message });
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("complete_ingestion_job", rpcError.message);
     }
 
-    const { error: updateError } = await this.supabase
-      .from("ingestion_jobs")
-      .update({
-        status: "completed" as const,
-        last_error: null,
-        locked_at: null,
-        locked_by: null,
-      })
-      .eq("id", jobId);
-
-    if (updateError) {
-      throw new Error(`Failed to mark ingestion job completed: ${updateError.message}`);
-    }
+    throw new Error(`Failed to complete ingestion job via RPC: ${rpcError.message}`);
   }
 
   async markJobFailed(job: IngestionJob, errorMessage: string): Promise<boolean> {
-    // Try RPC first (atomic job+document update), fall back to direct table update
     const { data, error: rpcError } = await this.supabase.rpc("fail_ingestion_job", {
       job_id: job.id,
       error_text: errorMessage,
@@ -275,55 +225,54 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
       return row.dead_letter;
     }
 
-    // RPC missing or failed — fall back to direct update
-    if (!rpcError.message.includes("Could not find the function")) {
-      this.logger.warn("fail_ingestion_job_rpc_error_fallback", { jobId: job.id, error: rpcError.message });
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("fail_ingestion_job", rpcError.message);
     }
 
-    const isDeadLetter = job.attempt >= this.settings.maxRetries;
-    const { error: updateError } = await this.supabase
-      .from("ingestion_jobs")
-      .update({
-        status: isDeadLetter ? ("dead_letter" as const) : ("failed" as const),
-        last_error: errorMessage.slice(0, 4000),
-        locked_at: null,
-        locked_by: null,
-      })
-      .eq("id", job.id);
-
-    if (updateError) {
-      throw new Error(`Failed to mark ingestion job failed: ${updateError.message}`);
-    }
-
-    return isDeadLetter;
+    throw new Error(`Failed to fail ingestion job via RPC: ${rpcError.message}`);
   }
 
   async invalidateRetrievalCache(): Promise<void> {
-    const { error } = await this.supabase.from("retrieval_cache").delete().gt("retrieval_version", 0);
-    if (error) {
-      throw new Error(`Failed to invalidate retrieval cache: ${error.message}`);
+    const { data, error: rpcError } = await this.supabase.rpc("invalidate_retrieval_cache");
+
+    if (!rpcError) {
+      if (!data?.[0]) {
+        throw new Error("invalidate_retrieval_cache returned no row");
+      }
+      return;
     }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("invalidate_retrieval_cache", rpcError.message);
+    }
+
+    throw new Error(`Failed to invalidate retrieval cache via RPC: ${rpcError.message}`);
   }
 
   async saveChunkCandidates(jobId: string, chunks: ChunkCandidate[], total: number): Promise<void> {
-    const { error } = await this.supabase
-      .from("ingestion_jobs")
-      .update({
-        chunk_candidates: chunks as unknown as Record<string, unknown>[],
-        chunks_total: total,
-        chunks_processed: 0,
-      })
-      .eq("id", jobId);
+    const { error: rpcError } = await this.supabase.rpc("checkpoint_ingestion_job", {
+      target_job_id: jobId,
+      target_chunk_candidates: chunks as unknown as Record<string, unknown>[],
+      target_chunks_total: total,
+      target_chunks_processed: 0,
+      target_stage: "chunked",
+    });
 
-    if (error) {
-      throw new Error(`Failed to save chunk candidates: ${error.message}`);
+    if (!rpcError) {
+      return;
     }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("checkpoint_ingestion_job", rpcError.message);
+    }
+
+    throw new Error(`Failed to save chunk candidates via RPC: ${rpcError.message}`);
   }
 
   async loadJobProgress(jobId: string): Promise<JobProgress> {
     const { data, error } = await this.supabase
       .from("ingestion_jobs")
-      .select("chunk_candidates,chunks_total,chunks_processed")
+      .select("chunk_candidates,chunks_total,chunks_processed,current_stage")
       .eq("id", jobId)
       .single();
 
@@ -339,34 +288,58 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
       candidates,
       chunksProcessed: data.chunks_processed,
       chunksTotal: data.chunks_total,
+      currentStage: data.current_stage,
     };
   }
 
-  async updateJobProgress(jobId: string, chunksProcessed: number): Promise<void> {
-    const { error } = await this.supabase
-      .from("ingestion_jobs")
-      .update({ chunks_processed: chunksProcessed })
-      .eq("id", jobId);
+  async updateJobStage(jobId: string, stage: string): Promise<void> {
+    const { error: rpcError } = await this.supabase.rpc("checkpoint_ingestion_job", {
+      target_job_id: jobId,
+      target_stage: stage,
+    });
 
-    if (error) {
-      throw new Error(`Failed to update job progress: ${error.message}`);
+    if (!rpcError) {
+      return;
     }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("checkpoint_ingestion_job", rpcError.message);
+    }
+
+    throw new Error(`Failed to update job stage via RPC: ${rpcError.message}`);
+  }
+
+  async updateJobProgress(jobId: string, chunksProcessed: number): Promise<void> {
+    const { error: rpcError } = await this.supabase.rpc("checkpoint_ingestion_job", {
+      target_job_id: jobId,
+      target_chunks_processed: chunksProcessed,
+    });
+
+    if (!rpcError) {
+      return;
+    }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("checkpoint_ingestion_job", rpcError.message);
+    }
+
+    throw new Error(`Failed to update job progress via RPC: ${rpcError.message}`);
   }
 
   async yieldJob(jobId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("ingestion_jobs")
-      .update({
-        status: "queued" as const,
-        locked_at: null,
-        locked_by: null,
-        attempt: 0,
-      })
-      .eq("id", jobId);
+    const { error: rpcError } = await this.supabase.rpc("yield_ingestion_job", {
+      target_job_id: jobId,
+    });
 
-    if (error) {
-      throw new Error(`Failed to yield job: ${error.message}`);
+    if (!rpcError) {
+      return;
     }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("yield_ingestion_job", rpcError.message);
+    }
+
+    throw new Error(`Failed to yield job via RPC: ${rpcError.message}`);
   }
 
   async insertChunkBatch(documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
@@ -374,24 +347,23 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
       return;
     }
 
-    const batchSize = Math.max(1, this.settings.chunkInsertBatchSize);
-    for (let index = 0; index < chunks.length; index += batchSize) {
-      const batch = chunks.slice(index, index + batchSize);
-      const rows = batch.map((chunk) => ({
-        document_id: chunk.documentId,
-        chunk_index: chunk.chunkIndex,
-        page_number: chunk.pageNumber,
-        section_title: chunk.sectionTitle,
-        content: chunk.content,
-        context: chunk.context,
-        language: chunk.language,
-        embedding: chunk.embedding,
-      }));
+    const { data, error: rpcError } = await this.supabase.rpc("append_document_chunks", {
+      target_document_id: documentId,
+      target_chunks: chunks.map(toReplaceDocumentChunkRpcChunk),
+    });
 
-      const { error: insertError } = await this.supabase.from("document_chunks").insert(rows);
-      if (insertError) {
-        throw new Error(`Failed to insert chunk batch: ${insertError.message}`);
+    if (!rpcError) {
+      const row = data?.[0] as AppendDocumentChunksRow | undefined;
+      if (!row) {
+        throw new Error(`append_document_chunks returned no row for ${documentId}`);
       }
+      return;
     }
+
+    if (isMissingRpcFunction(rpcError.message)) {
+      throw buildMissingRpcError("append_document_chunks", rpcError.message);
+    }
+
+    throw new Error(`Failed to append document chunks via RPC: ${rpcError.message}`);
   }
 }

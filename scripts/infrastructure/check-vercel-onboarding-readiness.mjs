@@ -159,7 +159,6 @@ function evaluate(args) {
     !isPlaceholder(envValues.VERCEL_ORG_ID) &&
     !isPlaceholder(envValues.VERCEL_PROJECT_ID);
 
-  const ingestModeValid = envValues.INGESTION_RUNTIME_MODE === "vercel";
   const hasCronSecret = Boolean(envValues.CRON_SECRET) && !isPlaceholder(envValues.CRON_SECRET) && envValues.CRON_SECRET.length >= 16;
 
   const coreRequiredKeys = [
@@ -208,7 +207,6 @@ function evaluate(args) {
       detail: `orgId=${projectIds.orgId || "missing"}, projectId=${projectIds.projectId || "missing"}`,
     },
     { name: "staging_env_vercel_ids_configured", passed: hasVercelIdsInEnv, detail: "VERCEL_ORG_ID and VERCEL_PROJECT_ID are non-placeholder" },
-    { name: "staging_env_ingestion_mode_vercel", passed: ingestModeValid, detail: `INGESTION_RUNTIME_MODE=${envValues.INGESTION_RUNTIME_MODE || "missing"}` },
     { name: "staging_env_cron_secret_valid", passed: hasCronSecret, detail: "CRON_SECRET exists and length >=16" },
   ];
 
@@ -229,7 +227,6 @@ function evaluate(args) {
     checkByName.vercel_project_ids_present.passed &&
     checkByName.staging_env_core_values_configured.passed &&
     checkByName.staging_env_vercel_ids_configured.passed &&
-    checkByName.staging_env_ingestion_mode_vercel.passed &&
     checkByName.staging_env_cron_secret_valid.passed;
 
   const targetPassed = args.target === "presignup" ? preSignupGate : postLinkGate;

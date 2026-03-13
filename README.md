@@ -665,7 +665,7 @@ See `.env.example` for the full list. Key variables:
 | `ADMIN_EMAIL` | No | Email auto-promoted to admin on first sign-up |
 | `AUTH_DEV_INSECURE_BYPASS` | No | Skip auth in development (default: false) |
 | `OPENAI_BYOK_VAULT_KEY` | Prod | Base64-encoded 32-byte key for BYOK encryption |
-| `CRON_SECRET` | Prod* | Required if `INGESTION_RUNTIME_MODE=vercel` |
+| `CRON_SECRET` | Prod* | Required for protected ingestion trigger endpoints |
 
 ---
 
@@ -704,7 +704,7 @@ npm start
 
 - `AUTH_DEV_INSECURE_BYPASS` must be `false`
 - `OPENAI_BYOK_VAULT_KEY` must be set (32-byte base64 encryption key)
-- `CRON_SECRET` must be set if using `INGESTION_RUNTIME_MODE=vercel`
+- `CRON_SECRET` must be set in deployment environments that expose `/api/internal/ingestion/run`
 
 ### Validation
 

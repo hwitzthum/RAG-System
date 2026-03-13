@@ -1,0 +1,65 @@
+{
+  "generatedAt": "2026-03-13T21:11:14.662Z",
+  "mode": "live",
+  "passed": true,
+  "thresholds": {
+    "queueThreshold": 25,
+    "staleProcessingMinutes": 20,
+    "heartbeatLagMinutes": 5,
+    "noProgressMinutes": 15
+  },
+  "observed": {
+    "queuedCount": 0,
+    "staleProcessingCount": 0,
+    "laggingProcessingCount": 0,
+    "maxHeartbeatLagSeconds": null,
+    "processingStageCounts": {},
+    "recentProgressCount": 0,
+    "inconsistentDocumentCount": 0,
+    "readyWithoutChunksCount": 0,
+    "processingWithoutLockCount": 0,
+    "nonProcessingWithLockCount": 0
+  },
+  "checks": [
+    {
+      "name": "queue_backlog_within_limit",
+      "passed": true,
+      "detail": "queued=0, threshold=25"
+    },
+    {
+      "name": "stale_processing_jobs_absent",
+      "passed": true,
+      "detail": "stale_processing=0, stale_window_minutes=20"
+    },
+    {
+      "name": "processing_jobs_heartbeating_recently",
+      "passed": true,
+      "detail": "lagging_processing=0, heartbeat_lag_minutes=5, max_heartbeat_lag_seconds=null"
+    },
+    {
+      "name": "cron_progress_present_when_queue_exists",
+      "passed": true,
+      "detail": "No queued jobs; cron progress requirement not applicable."
+    },
+    {
+      "name": "processing_documents_match_active_jobs",
+      "passed": true,
+      "detail": "inconsistent_documents=0"
+    },
+    {
+      "name": "ready_documents_have_chunks",
+      "passed": true,
+      "detail": "ready_without_chunks=0"
+    },
+    {
+      "name": "processing_jobs_have_locks",
+      "passed": true,
+      "detail": "processing_without_lock=0"
+    },
+    {
+      "name": "non_processing_jobs_are_unlocked",
+      "passed": true,
+      "detail": "non_processing_with_lock=0"
+    }
+  ]
+}

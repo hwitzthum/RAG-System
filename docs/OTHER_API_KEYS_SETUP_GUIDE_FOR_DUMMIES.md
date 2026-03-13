@@ -98,11 +98,11 @@ Set:
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 ```
 
-### 5.2 Local worker
+### 5.2 Local ingestion worker
 
 Edit:
 
-- `/Users/hwitzthum/rag-system/worker/.env`
+- `/Users/hwitzthum/rag-system/.env.local`
 
 Set:
 
@@ -132,9 +132,9 @@ In Vercel dashboard:
    - `Production`
    - `Preview`
 
-### 5.5 Worker hosting platform env
+### 5.5 Local worker process
 
-If worker is hosted externally (Cloud Run/Railway/Fly/etc.), add `OPENAI_API_KEY` there too.
+The local ingestion worker reads the same `.env.local` file as the app, so no separate worker env file is required.
 
 ---
 
@@ -163,7 +163,6 @@ Run:
 cd /Users/hwitzthum/rag-system
 npm run infra:check-env:web
 npm run infra:check-env:staging
-npm run infra:check-env:worker
 ```
 
 If these pass, key wiring is correct for local + staging contract checks.
@@ -216,4 +215,3 @@ Fix: add `OPENAI_API_KEY` in Vercel env for the correct environment (Preview/Pro
 - OpenAI Help: projects + project-level key management: [https://help.openai.com/en/articles/9186755-managing-your-work-in-the-api-platform-with-projects](https://help.openai.com/en/articles/9186755-managing-your-work-in-the-api-platform-with-projects)
 - OpenAI Help: prepaid billing setup: [https://help.openai.com/en/articles/8264644-how-can-i-set-up-prepaid-billing](https://help.openai.com/en/articles/8264644-how-can-i-set-up-prepaid-billing)
 - OpenAI API pricing: [https://openai.com/api/pricing](https://openai.com/api/pricing)
-

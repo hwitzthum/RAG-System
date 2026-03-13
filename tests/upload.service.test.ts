@@ -5,6 +5,7 @@ import {
   buildStoragePath,
   normalizeLanguageHint,
 } from "../lib/ingestion/upload-helpers";
+import { shouldRequeueExistingDocument } from "../lib/ingestion/upload-state";
 
 test("buildIdempotencyKey includes checksum and version", () => {
   const key = buildIdempotencyKey("abc123", 7);
@@ -21,4 +22,11 @@ test("normalizeLanguageHint accepts supported values and rejects invalid ones", 
   assert.equal(normalizeLanguageHint("ES"), "ES");
   assert.equal(normalizeLanguageHint("pt"), null);
   assert.equal(normalizeLanguageHint(null), null);
+});
+
+test("shouldRequeueExistingDocument only requeues terminal failed states", () => {
+  assert.equal(shouldRequeueExistingDocument("failed", null), true);
+  assert.equal(shouldRequeueExistingDocument("queued", "dead_letter"), true);
+  assert.equal(shouldRequeueExistingDocument("queued", "failed"), false);
+  assert.equal(shouldRequeueExistingDocument("ready", "completed"), false);
 });

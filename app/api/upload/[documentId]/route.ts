@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/request-auth";
+import { getEffectiveDocumentById } from "@/lib/ingestion/runtime/effective-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -30,13 +31,10 @@ export async function GET(
   const supabase = getSupabaseAdminClient();
   const { documentId } = parsedParams.data;
 
-  const { data: documentRecord, error: documentError } = await supabase
-    .from("documents")
-    .select("id,title,status,ingestion_version,created_at,updated_at")
-    .eq("id", documentId)
-    .maybeSingle();
-
-  if (documentError) {
+  let documentRecord;
+  try {
+    documentRecord = await getEffectiveDocumentById(supabase, documentId);
+  } catch {
     logAuditEvent({
       action: "upload.status.read",
       actorId: authResult.user.id,
@@ -54,28 +52,6 @@ export async function GET(
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
-  const { data: latestJob, error: jobError } = await supabase
-    .from("ingestion_jobs")
-    .select("id,status,attempt,last_error,locked_at,locked_by,created_at,updated_at")
-    .eq("document_id", documentId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (jobError) {
-    logAuditEvent({
-      action: "upload.status.read",
-      actorId: authResult.user.id,
-      actorRole: authResult.user.role,
-      outcome: "failure",
-      resource: "upload_status",
-      ipAddress,
-      metadata: { documentId, reason: "job_query_failed" },
-    });
-
-    return NextResponse.json({ error: "Failed to query ingestion job status" }, { status: 500 });
-  }
-
   logAuditEvent({
     action: "upload.status.read",
     actorId: authResult.user.id,
@@ -85,13 +61,36 @@ export async function GET(
     ipAddress,
     metadata: {
       documentId,
-      documentStatus: documentRecord.status,
-      ingestionJobStatus: latestJob?.status ?? null,
+      documentStatus: documentRecord.effective_status,
+      ingestionJobStatus: documentRecord.latest_job_status,
     },
   });
 
   return NextResponse.json({
-    document: documentRecord,
-    latestIngestionJob: latestJob,
+    document: {
+      id: documentRecord.document_id,
+      title: documentRecord.title,
+      status: documentRecord.effective_status,
+      ingestion_version: documentRecord.ingestion_version,
+      created_at: documentRecord.created_at,
+      updated_at: documentRecord.updated_at,
+    },
+    latestIngestionJob: documentRecord.latest_job_id
+      ? {
+          id: documentRecord.latest_job_id,
+          status: documentRecord.latest_job_status,
+          attempt: documentRecord.latest_job_attempt,
+          last_error: documentRecord.latest_job_last_error,
+          locked_at: documentRecord.latest_job_locked_at,
+          locked_by: documentRecord.latest_job_locked_by,
+          current_stage: documentRecord.latest_job_current_stage,
+          stage_updated_at: documentRecord.latest_job_stage_updated_at,
+          chunks_processed: documentRecord.latest_job_chunks_processed,
+          chunks_total: documentRecord.latest_job_chunks_total,
+          processing_duration_ms: documentRecord.latest_job_processing_duration_ms,
+          created_at: documentRecord.latest_job_created_at,
+          updated_at: documentRecord.latest_job_updated_at,
+        }
+      : null,
   });
 }

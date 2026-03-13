@@ -71,14 +71,12 @@ Copy templates:
 ```bash
 cp .env.example .env.local
 cp .env.staging.example .env.staging
-cp worker/.env.example worker/.env
 ```
 
 Now open and replace placeholders in:
 
 - `/Users/hwitzthum/rag-system/.env.local`
 - `/Users/hwitzthum/rag-system/.env.staging`
-- `/Users/hwitzthum/rag-system/worker/.env`
 
 Set at least:
 
@@ -92,7 +90,7 @@ Set at least:
 - `OPENAI_BYOK_VAULT_KEY=<base64-encoded-32-byte-key>` (app/staging env files)
 - `OPENAI_BYOK_VAULT_KEY_VERSION=1` (app/staging env files)
 
-Also set `OPENAI_API_KEY` in both app + worker env files.
+Also set `OPENAI_API_KEY` in the app env files.
 
 You can generate a vault key with:
 
@@ -162,7 +160,6 @@ What this sets up for you:
 
 ```bash
 npm run infra:check-env:web
-npm run infra:check-env:worker
 npm run infra:check-env:staging
 npm run db:validate:migrations
 ```
@@ -246,12 +243,8 @@ If you get `Token missing required claims`, sign in again after ensuring user ro
 ## Step 10: Start worker
 
 ```bash
-cd /Users/hwitzthum/rag-system/worker
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-cp .env.example .env  # skip if already filled
-python -m rag_worker.main
+cd /Users/hwitzthum/rag-system
+npm run dev:worker
 ```
 
 ---
@@ -268,7 +261,7 @@ Optional validations:
 ```bash
 npm run check
 npm run test:security
-npm run test:worker
+node --import tsx --test tests/ingestion.runtime.test.ts tests/ingestion.worker-loop.test.ts
 ```
 
 ---
@@ -327,7 +320,7 @@ Use **Pro** first, with:
 ## Troubleshooting (fast)
 
 1. `Missing SUPABASE_URL / ANON / SERVICE_ROLE`  
-Fix `.env.local`, `.env.staging`, `worker/.env`, then rerun env checks.
+Fix `.env.local` and `.env.staging`, then rerun env checks.
 
 2. `Invalid access token` in app session  
 Regenerate token using Step 9. Use the same project URL/keys as app env.

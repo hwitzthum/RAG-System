@@ -15,18 +15,18 @@ Current repository architecture is:
 1. Next.js app + API routes (`app/`)  
 2. Vercel ingestion runner route + cron (`/api/internal/ingestion/run`)  
 3. Supabase (DB/Auth/Storage)  
-4. Python worker (`worker/`) as rollback fallback only
+4. TypeScript ingestion worker (`scripts/ingestion/run-worker.ts`) for local fallback/drain operations
 
 What this means today:
 
-- Web app + ingestion run on Vercel in production mode (`INGESTION_RUNTIME_MODE=vercel`).
-- `worker/` is deprecated for production and retained as rollback fallback for one release cycle.
+- Web app runs on Vercel, and cron triggers the same TypeScript ingestion worker used locally.
+- The legacy Python worker has been removed from the repo.
 - Production checklist no longer requires external worker runtime.
 
 This guide gives you:
 
 1. Correct production Vercel deployment steps for the Vercel-first runtime.
-2. Explicit rollback instructions if you temporarily need worker fallback.
+2. Explicit rollback instructions if you temporarily need the local TypeScript worker.
 
 ---
 
@@ -40,7 +40,7 @@ Follow these steps in order. Do not skip.
 cd /Users/hwitzthum/rag-system
 ```
 
-### 2. Prepare local staging config for Vercel mode
+### 2. Prepare local staging config for the protected ingestion trigger
 
 ```bash
 npm run infra:vercel:prepare-staging
@@ -48,7 +48,6 @@ npm run infra:vercel:prepare-staging
 
 Expected result:
 
-- `INGESTION_RUNTIME_MODE=vercel`
 - `CRON_SECRET` exists and is 16+ characters
 
 ### 3. Run pre-signup readiness check
@@ -165,7 +164,7 @@ npm run infra:vercel:prepare-staging
 npm run infra:vercel:readiness
 ```
 
-`infra:vercel:prepare-staging` automatically sets `INGESTION_RUNTIME_MODE=vercel` and creates a safe `CRON_SECRET` if needed.
+`infra:vercel:prepare-staging` creates or rotates `CRON_SECRET` when needed.
 
 ---
 
@@ -206,7 +205,6 @@ Add to both **Production** and **Preview**.
 ### 3.1 Required for this app in production
 
 - `NEXT_PUBLIC_APP_NAME=RAG System`
-- `INGESTION_RUNTIME_MODE=vercel`
 - `INGESTION_BATCH_SIZE=1`
 - `INGESTION_LOCK_TIMEOUT_SECONDS=900`
 - `SUPABASE_URL=https://<project-ref>.supabase.co`
@@ -380,9 +378,9 @@ npm run infra:vercel:readiness:postlink
 1. Go to Deployments.
 2. Select last known-good deployment.
 3. Promote rollback to production.
-4. Set `INGESTION_RUNTIME_MODE=worker` in Vercel env, then redeploy.
-5. Disable cron for `/api/internal/ingestion/run` in Vercel cron management.
-6. Start fallback worker runtime (`worker/`) externally.
+4. Disable cron for `/api/internal/ingestion/run` in Vercel cron management.
+5. Rotate `CRON_SECRET` if you need to block manual trigger access immediately.
+6. Start fallback worker runtime with `npm run ingestion:worker`.
 7. Re-run smoke checks:
    - `/api/health`
    - auth session
@@ -411,7 +409,7 @@ From current Vercel docs:
 Target outcome:
 
 - ingestion is executed by Vercel-hosted routes/functions only
-- `worker/` is no longer required in production
+- a separate Python worker runtime is no longer part of the deployment
 - upload -> queued -> processing -> ready flow works end-to-end without external worker runtime
 
 Execution order below is designed to be implemented in sequence.
@@ -423,10 +421,9 @@ Goal: introduce feature-gated Vercel ingestion path while keeping current worker
 Tasks:
 
 1. Add new env variables in web runtime config:
-   - `INGESTION_RUNTIME_MODE=worker|vercel` (default `worker`)
    - `INGESTION_BATCH_SIZE` (default 1-5)
    - `INGESTION_LOCK_TIMEOUT_SECONDS` (default aligns to current worker lock timeout)
-   - `CRON_SECRET` (required when `INGESTION_RUNTIME_MODE=vercel`)
+   - `CRON_SECRET` (required for deployments that expose `/api/internal/ingestion/run`)
 2. Update:
    - `.env.example`
    - `.env.staging.example`
@@ -436,8 +433,8 @@ Tasks:
 
 Acceptance checks:
 
-1. `npm run infra:check-env:web` passes in both modes.
-2. Existing upload/query features continue to work with `INGESTION_RUNTIME_MODE=worker`.
+1. `npm run infra:check-env:web` passes.
+2. Existing upload/query features continue to work when queue draining is handled by the TypeScript worker.
 
 ### 12.2 Move job claiming to atomic SQL functions (required for concurrent cron invocations)
 
@@ -480,7 +477,7 @@ Tasks:
    - `context-generator.ts`
    - `embedding-provider.ts`
    - `pipeline.ts`
-2. Preserve current behavior parity from `worker/src/rag_worker/*`:
+2. Preserve current behavior parity from the former Python worker implementation:
    - section-aware chunking (700/120)
    - language detection fallback
    - contextual summary generation
@@ -549,11 +546,11 @@ Tasks:
    - `docs/INFRASTRUCTURE_RUNBOOK.md`
    - `docs/RELEASE_RUNBOOK.md`
    - this file
-2. Mark `worker/` as deprecated for production (retain only as fallback until one release cycle passes).
-3. Remove `infra:check-env:worker` from required production gates.
+2. Remove the legacy Python worker runtime from the repository once TypeScript parity is verified.
+3. Keep production gates focused on web/staging env validation only.
 4. Add migration note and rollback path:
-   - rollback toggles `INGESTION_RUNTIME_MODE=worker`
-   - disable cron
+   - rollback disables cron
+   - drain the queue with `npm run ingestion:worker`
 
 Acceptance checks:
 
@@ -593,13 +590,13 @@ Cutover criteria:
 
 ### 12.8 Implementation checklist (copy/paste for execution tracking)
 
-1. Add env + validation updates (`INGESTION_*`, `CRON_SECRET`).
+1. Add env + validation updates (`INGESTION_BATCH_SIZE`, `INGESTION_LOCK_TIMEOUT_SECONDS`, `CRON_SECRET`).
 2. Ship SQL migration with atomic claim/finalize/fail RPCs.
 3. Port Python ingestion pipeline to `lib/ingestion/runtime/*`.
 4. Add internal ingestion API route + auth + bounded execution.
 5. Add `vercel.json` cron schedule + configure `CRON_SECRET`.
 6. Run staging soak + quality/security/release gates.
-7. Switch `INGESTION_RUNTIME_MODE=vercel` in production.
+7. Configure `CRON_SECRET` in production.
 8. Remove external worker from production checklist and runbooks after successful cutover window.
 
 ---
