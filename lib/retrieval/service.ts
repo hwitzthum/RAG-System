@@ -119,13 +119,10 @@ export async function retrieveRankedCandidates(
     scopeKey,
   });
 
-  // Best-effort cache hygiene for TTL expiry and retrieval version invalidation.
-  try {
-    await deps.pruneCache(retrievalVersion);
-  } catch (error) {
+  // Best-effort, fire-and-forget cache hygiene — avoids blocking the query path.
+  void deps.pruneCache(retrievalVersion).catch((error) => {
     console.warn("retrieval_cache_prune_failed", error instanceof Error ? error.message : String(error));
-    // Continue retrieval flow even if cache prune fails.
-  }
+  });
 
   let cached: { chunks: RetrievedChunk[]; candidateCounts: RetrievalTrace["candidateCounts"] } | null = null;
   try {

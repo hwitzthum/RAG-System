@@ -7,9 +7,12 @@ import { verifyAccessToken } from "@/lib/auth/verify";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { generateCsrfToken, getCsrfCookieName } from "@/lib/security/csrf";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
+
+const ACTIVE_ROLES = new Set<string>(["admin", "reader"]);
 
 const sessionRequestSchema = z.object({
   accessToken: z.string().min(1),
@@ -17,6 +20,15 @@ const sessionRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const ipAddress = getClientIp(request);
+
+  // Rate limit: 20 requests per 5 minutes per IP (fail-closed for auth)
+  const rl = await consumeSharedRateLimit(`auth:session:${ipAddress}`, 20, 300, { failOpen: false });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
 
   let requestBody: z.infer<typeof sessionRequestSchema>;
 
@@ -42,6 +54,20 @@ export async function POST(request: NextRequest) {
 
     if (!payload.sub || !role) {
       throw new Error("Token missing required claims");
+    }
+
+    // Reject non-active roles (pending, suspended, rejected)
+    if (!ACTIVE_ROLES.has(role)) {
+      logAuditEvent({
+        action: "auth.session.create",
+        actorId: payload.sub,
+        actorRole: role,
+        outcome: "failure",
+        resource: "session",
+        ipAddress,
+        metadata: { reason: "inactive_role", role },
+      });
+      return NextResponse.json({ error: "Account is not active" }, { status: 403 });
     }
 
     const isProduction = env.NODE_ENV === "production";

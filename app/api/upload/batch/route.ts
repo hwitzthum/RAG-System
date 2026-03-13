@@ -5,6 +5,7 @@ import { hasPdfSignature, looksLikePdfUpload } from "@/lib/ingestion/upload-help
 import { queueBatchUploadEntry } from "@/lib/ingestion/upload-queue";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
@@ -32,6 +33,15 @@ export async function POST(request: NextRequest) {
       metadata: { reason: "unauthorized" },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 10 batch uploads per 15 minutes per user
+  const rl = await consumeSharedRateLimit(`upload:batch:${authResult.user.id}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many batch upload requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   let formData: FormData;

@@ -15,8 +15,16 @@ const signupSchema = z.object({
 export async function POST(request: NextRequest) {
   const ipAddress = getClientIp(request);
 
-  // Rate limit: 3 signups per hour per IP
-  const rate = await consumeSharedRateLimit(`auth:signup:${ipAddress}`, 3, 3600);
+  // Parse body before consuming rate limit to avoid wasting attempts on invalid input
+  const parsed = signupSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { email, password } = parsed.data;
+
+  // Rate limit: 3 signups per hour per IP (fail-closed for auth)
+  const rate = await consumeSharedRateLimit(`auth:signup:${ipAddress}`, 3, 3600, { failOpen: false });
   if (!rate.allowed) {
     logAuditEvent({
       action: "auth.signup",
@@ -32,13 +40,6 @@ export async function POST(request: NextRequest) {
       { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
     );
   }
-
-  const parsed = signupSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
-
-  const { email, password } = parsed.data;
 
   // Call Supabase Auth REST API for signup
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";

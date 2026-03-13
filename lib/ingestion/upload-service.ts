@@ -102,7 +102,7 @@ async function uploadFileToStorage(
   supabase: SupabaseClient<Database>,
   storagePath: string,
   bytes: Buffer,
-): Promise<void> {
+): Promise<{ uploadedByUs: boolean }> {
   const { error } = await supabase.storage.from(env.RAG_STORAGE_BUCKET).upload(storagePath, bytes, {
     contentType: "application/pdf",
     cacheControl: "3600",
@@ -112,6 +112,8 @@ async function uploadFileToStorage(
   if (error && !isStorageAlreadyExists(error)) {
     throw error;
   }
+
+  return { uploadedByUs: !error };
 }
 
 async function requeueDeadLetterDocument(
@@ -207,7 +209,7 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
     return returnExistingDocumentResult(supabase, existingDocument);
   }
 
-  await uploadFileToStorage(supabase, storagePath, fileBytes);
+  const { uploadedByUs } = await uploadFileToStorage(supabase, storagePath, fileBytes);
 
   try {
     const created = await createDocumentWithInitialJob({
@@ -233,7 +235,11 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
       deduplicated: false,
     };
   } catch (error) {
-    await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([storagePath]);
+    // Only delete the storage file if this process was the one that uploaded it,
+    // to avoid removing a file uploaded by a concurrent request with the same checksum.
+    if (uploadedByUs) {
+      await supabase.storage.from(env.RAG_STORAGE_BUCKET).remove([storagePath]);
+    }
     throw error;
   }
 }

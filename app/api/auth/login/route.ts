@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
 
   const { email, password } = parsed.data;
 
-  // Rate limit: 20 attempts per 5 minutes per IP+email combo
-  const rate = await consumeSharedRateLimit(`auth:login:${ipAddress}:${email.toLowerCase()}`, 20, 300);
+  // Rate limit: 20 attempts per 5 minutes per IP+email combo (fail-closed for auth)
+  const rate = await consumeSharedRateLimit(`auth:login:${ipAddress}:${email.toLowerCase()}`, 20, 300, { failOpen: false });
   if (!rate.allowed) {
     logAuditEvent({
       action: "auth.login",

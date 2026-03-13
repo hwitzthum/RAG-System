@@ -439,8 +439,6 @@ export async function extractPages(
   enableOcrFallback: boolean,
   logger: RuntimeLogger,
 ): Promise<ExtractedPage[]> {
-  const fallbackBinaryText = Buffer.from(pdfBytes).toString("latin1");
-
   try {
     const pages = await extractPagesWithPdfJs(new Uint8Array(pdfBytes), logger);
     if (pages.some((page) => page.text.trim().length > 0)) {
@@ -455,6 +453,8 @@ export async function extractPages(
     logger.warn("pdfjs_extraction_failed", { message });
   }
 
+  // Only build the fallback binary text if pdfjs failed or returned empty.
+  const fallbackBinaryText = Buffer.from(pdfBytes).toString("latin1");
   const extracted = extractTextFromPdfOperators(pdfBytes, fallbackBinaryText);
 
   if (extracted) {

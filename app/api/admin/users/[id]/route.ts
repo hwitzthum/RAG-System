@@ -63,6 +63,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
 
+    // Guard: prevent demoting the last admin
+    if (previousRole === "admin") {
+      const { data: allUsers } = await supabase.auth.admin.listUsers();
+      const adminCount = (allUsers?.users ?? []).filter(
+        (u) => (u.app_metadata?.role as string) === "admin",
+      ).length;
+      if (adminCount <= 1) {
+        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
+      }
+    }
+
     // Spread existing app_metadata to avoid destructive overwrite
     const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(targetUserId, {
       app_metadata: { ...currentUser.user.app_metadata, role: newRole },

@@ -3,6 +3,7 @@ import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { createDeleteDocumentClient, deleteDocumentCascade } from "@/lib/documents/delete-document";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { pruneRetrievalCache } from "@/lib/retrieval/cache";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -69,6 +70,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       metadata: { reason: "storage_delete_failed", message: storageResult.error.message },
     });
   }
+
+  // Invalidate retrieval cache so deleted document chunks are not served from stale cache.
+  void pruneRetrievalCache(env.RAG_RETRIEVAL_VERSION).catch((cacheError) => {
+    console.warn("retrieval_cache_invalidation_on_delete_failed", cacheError instanceof Error ? cacheError.message : String(cacheError));
+  });
 
   logAuditEvent({
     action: "document.delete",

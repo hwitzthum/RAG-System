@@ -5,6 +5,7 @@ import { logAuditEvent } from "@/lib/observability/audit";
 import { generateDocxReport } from "@/lib/reports/docx-generator";
 import { generatePdfReport } from "@/lib/reports/pdf-generator";
 import type { ReportChunk, ReportInput } from "@/lib/reports/types";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -30,6 +31,15 @@ export async function POST(request: NextRequest) {
       metadata: { reason: "unauthorized" },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 10 reports per 15 minutes per user
+  const rl = await consumeSharedRateLimit(`report:generate:${authResult.user.id}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many report requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   const parsed = reportRequestSchema.safeParse(await request.json().catch(() => null));

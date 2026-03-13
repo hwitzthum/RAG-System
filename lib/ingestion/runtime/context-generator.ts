@@ -24,6 +24,7 @@ type OpenAiChatCompletionResponse = {
 export class ContextGenerator {
   private readonly apiKey: string | null;
   private readonly anthropicApiKey: string | null;
+  private readonly anthropicClient: Anthropic | null;
   private readonly settings: IngestionRuntimeSettings;
   private readonly logger: RuntimeLogger;
 
@@ -32,6 +33,9 @@ export class ContextGenerator {
     this.logger = logger;
     this.apiKey = settings.openAiApiKey;
     this.anthropicApiKey = settings.anthropicApiKey;
+    this.anthropicClient = this.anthropicApiKey
+      ? new Anthropic({ apiKey: this.anthropicApiKey, timeout: this.settings.openAiTimeoutSeconds * 1000 })
+      : null;
   }
 
   private heuristicContext(chunk: ChunkCandidate): string {
@@ -93,11 +97,7 @@ export class ContextGenerator {
   }
 
   private async claudeContext(chunk: ChunkCandidate): Promise<string> {
-    const client = new Anthropic({
-      apiKey: this.anthropicApiKey!,
-      timeout: this.settings.openAiTimeoutSeconds * 1000,
-    });
-    const response = await client.messages.create({
+    const response = await this.anthropicClient!.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 140,
       system: [

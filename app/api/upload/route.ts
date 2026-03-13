@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
-import { normalizeLanguageHint } from "@/lib/ingestion/upload-helpers";
+import { hasPdfSignature, normalizeLanguageHint } from "@/lib/ingestion/upload-helpers";
 import { queueSingleUpload } from "@/lib/ingestion/upload-queue";
 import { env } from "@/lib/config/env";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
@@ -32,6 +33,15 @@ export async function POST(request: NextRequest) {
     });
 
     return authResult.response;
+  }
+
+  // Rate limit: 20 uploads per 15 minutes per user
+  const rl = await consumeSharedRateLimit(`upload:single:${authResult.user.id}`, 20, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many upload requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   let formData: FormData;
@@ -80,9 +90,7 @@ export async function POST(request: NextRequest) {
 
   // Validate PDF magic bytes (%PDF-)
   const headerBytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
-  const pdfMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
-  const isValidPdfSignature = headerBytes.length >= 5 && headerBytes.every((b, i) => b === pdfMagic[i]);
-  if (!isValidPdfSignature) {
+  if (!hasPdfSignature(headerBytes)) {
     logAuditEvent({
       action: "upload.create",
       actorId: authResult.user.id,

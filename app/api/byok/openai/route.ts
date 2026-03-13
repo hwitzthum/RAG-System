@@ -8,6 +8,7 @@ import {
   isOpenAiByokVaultEnabled,
   upsertUserOpenAiApiKey,
 } from "@/lib/providers/openai-vault";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
@@ -69,6 +70,15 @@ export async function PUT(request: NextRequest) {
     return authResult.response;
   }
 
+  // Rate limit: 10 BYOK writes per 15 minutes per user
+  const rl = await consumeSharedRateLimit(`byok:openai:write:${authResult.user.id}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   if (!isOpenAiByokVaultEnabled()) {
     return vaultDisabledResponse();
   }
@@ -126,6 +136,15 @@ export async function DELETE(request: NextRequest) {
 
   if (!authResult.ok) {
     return authResult.response;
+  }
+
+  // Rate limit: shares BYOK write bucket
+  const rl = await consumeSharedRateLimit(`byok:openai:write:${authResult.user.id}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   if (!isOpenAiByokVaultEnabled()) {

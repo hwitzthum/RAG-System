@@ -4,6 +4,16 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+function isSafeRedirectPath(next: string | null): next is string {
+  if (!next) return false;
+  try {
+    const parsed = new URL(next, "http://localhost");
+    return parsed.hostname === "localhost" && parsed.pathname.startsWith("/");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Supabase auth callback.
  *
@@ -58,8 +68,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=confirmation_failed`);
   }
 
-  // Determine where to send the user after exchange
-  if (next && next.startsWith("/") && !next.startsWith("//")) {
+  // Determine where to send the user after exchange (safe redirect only)
+  if (isSafeRedirectPath(next)) {
     return NextResponse.redirect(`${origin}${next}`);
   }
 

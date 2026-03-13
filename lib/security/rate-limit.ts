@@ -72,15 +72,24 @@ export function createInMemoryRateLimiter(): InMemoryRateLimiter {
 
 const fallbackLimiter = createInMemoryRateLimiter();
 
+export type SharedRateLimitOptions = {
+  /** When false, returns `{ allowed: false }` if the Supabase RPC fails instead of
+   *  falling back to the (possibly empty) in-memory limiter. Use for auth routes. */
+  failOpen?: boolean;
+};
+
 /**
  * Shared rate limiter that calls the Supabase `consume_rate_limit` RPC.
- * Falls back to in-memory if the RPC call fails.
+ * Falls back to in-memory if the RPC call fails (unless `failOpen: false`).
  */
 export async function consumeSharedRateLimit(
   bucketKey: string,
   maxRequests: number,
   windowSeconds: number,
+  options: SharedRateLimitOptions = {},
 ): Promise<RateLimitDecision> {
+  const { failOpen = true } = options;
+
   try {
     // Lazy import to avoid triggering env validation in unit tests
     const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
@@ -106,12 +115,17 @@ export async function consumeSharedRateLimit(
       remaining: row.remaining as number,
       retryAfterSeconds: row.retry_after_seconds as number,
     };
-  } catch {
-    // Fall back to in-memory limiter if Supabase RPC fails.
+  } catch (error) {
+    console.warn("rate_limit_rpc_fallback", {
+      bucketKey,
+      failOpen,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    if (!failOpen) {
+      return { allowed: false, remaining: 0, retryAfterSeconds: 60 };
+    }
+
     return fallbackLimiter.consume(bucketKey, maxRequests, windowSeconds * 1000);
   }
 }
-
-// Keep the legacy in-memory limiter export for backwards compatibility
-// and for use cases where async is not desired.
-export const queryRateLimiter = createInMemoryRateLimiter();
