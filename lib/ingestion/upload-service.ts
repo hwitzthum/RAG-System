@@ -322,6 +322,7 @@ export async function processIngestionJobInline(
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
+    await repository.setDocumentStatus(documentId, "failed").catch(() => null);
     await repository.markJobFailed(job, message).catch(() => null);
     return { success: false, error: message };
   }

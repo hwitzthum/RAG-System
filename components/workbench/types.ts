@@ -101,6 +101,10 @@ export type SidebarRightProps = {
   uploadStatus: UploadStatusSnapshot | null;
   onDeleteDocument: (docId: string) => void;
   workspaceMessage: string;
+  documents: DocumentListItem[];
+  documentsLoading: boolean;
+  queryDocumentScopeId: string | null;
+  setQueryDocumentScopeId: (id: string | null) => void;
 };
 
 export type OpenAiKeyVaultProps = {

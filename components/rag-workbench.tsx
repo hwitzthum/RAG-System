@@ -114,7 +114,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     return turns[turns.length - 1] ?? null;
   }, [activeTurnId, turns]);
 
-  const effectiveQueryScopeId = queryDocumentScopeId ?? uploadStatus?.document.id ?? null;
+  const effectiveQueryScopeId = queryDocumentScopeId;
 
   // --- Data loading ---
 
@@ -287,7 +287,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         setWorkspaceMessage(`Upload indexed and ready. documentId=${documentId}`);
         return;
       }
-      if (documentStatus === "failed" || jobStatus === "dead_letter") {
+      if (documentStatus === "failed" || jobStatus === "dead_letter" || jobStatus === "failed") {
         setWorkspaceMessage(
           snapshot.latestIngestionJob?.last_error
             ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
@@ -309,6 +309,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       return;
     }
     setUploading(true);
+    setWorkspaceMessage("Uploading and processing PDF...");
     const formData = new FormData();
     formData.append("file", fileToUpload);
     formData.append("title", uploadTitle.trim() || fileToUpload.name);
@@ -319,9 +320,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       if (!response.ok || !payload.documentId) { setWorkspaceMessage(payload.error ?? "Upload failed."); return; }
       setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
       setQueryDocumentScopeId(payload.documentId);
+      void fetchDocuments();
+      await waitForUploadTerminalStatus(payload.documentId);
       setUploadFile(null);
       if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";
-      await waitForUploadTerminalStatus(payload.documentId);
       await fetchDocuments();
     } finally {
       setUploading(false);
@@ -338,7 +340,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
   function handleUploadButtonClick(): void {
     if (uploading) return;
-    if (!uploadFile) { uploadFileInputRef.current?.click(); setWorkspaceMessage("Select a PDF file first."); return; }
+    if (!uploadFile) { uploadFileInputRef.current?.click(); return; }
     void uploadPdf();
   }
 
@@ -593,6 +595,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           uploadStatus={uploadStatus}
           onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
           workspaceMessage={workspaceMessage}
+          documents={documents}
+          documentsLoading={documentsLoading}
+          queryDocumentScopeId={queryDocumentScopeId}
+          setQueryDocumentScopeId={setQueryDocumentScopeId}
         />
       </div>
     </ErrorBoundary>

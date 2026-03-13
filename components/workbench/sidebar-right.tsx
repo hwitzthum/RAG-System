@@ -21,6 +21,10 @@ export function SidebarRight({
   uploadStatus,
   onDeleteDocument,
   workspaceMessage,
+  documents,
+  documentsLoading,
+  queryDocumentScopeId,
+  setQueryDocumentScopeId,
 }: SidebarRightProps) {
   const workspaceToneClass = getMessageToneClass(workspaceMessage);
 
@@ -97,11 +101,26 @@ export function SidebarRight({
           ) : (
             <p className="text-xs text-zinc-500">Selected: {uploadFile.name}</p>
           )}
-          {effectiveQueryScopeId ? (
-            <p className="text-xs text-zinc-400">
-              Scope: {effectiveQueryScopeId.slice(0, 8)}...
-            </p>
-          ) : null}
+          {/* Document Scope Selector */}
+          <div className="mt-1">
+            <label htmlFor="doc-scope-select" className="text-[11px] font-medium text-zinc-500">
+              Query Scope
+            </label>
+            <select
+              id="doc-scope-select"
+              value={queryDocumentScopeId ?? ""}
+              onChange={(e) => setQueryDocumentScopeId(e.target.value || null)}
+              className="mt-0.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+              disabled={documentsLoading}
+            >
+              <option value="">All documents</option>
+              {documents.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {getDocumentDisplayName(doc)} ({doc.status})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Batch Upload */}
