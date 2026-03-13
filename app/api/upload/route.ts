@@ -3,11 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { normalizeLanguageHint } from "@/lib/ingestion/upload-helpers";
-import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
+import { persistUploadAndQueueJob, processIngestionJobInline } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const uploadMetadataSchema = z.object({
   title: z.string().trim().max(240).optional(),
@@ -113,6 +114,14 @@ export async function POST(request: NextRequest) {
       title: parsedMetadata.data.title ?? null,
       languageHint: parsedMetadata.data.languageHint,
     });
+
+    // Process ingestion inline (cron is fallback for retries)
+    if (!persisted.deduplicated || persisted.documentStatus !== "ready") {
+      const result = await processIngestionJobInline(persisted.documentId, persisted.ingestionJobId);
+      if (!result.success) {
+        console.error("Inline ingestion failed, cron will retry:", result.error);
+      }
+    }
 
     logAuditEvent({
       action: "upload.create",

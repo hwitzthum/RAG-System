@@ -2,11 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { hasPdfSignature, looksLikePdfUpload } from "@/lib/ingestion/upload-helpers";
-import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
+import { persistUploadAndQueueJob, processIngestionJobInline } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 type BatchResult = {
   fileName: string;
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
         title: file.name,
         languageHint: null,
       });
+
+      // Process ingestion inline (cron is fallback for retries)
+      if (!persisted.deduplicated || persisted.documentStatus !== "ready") {
+        const inlineResult = await processIngestionJobInline(persisted.documentId, persisted.ingestionJobId);
+        if (!inlineResult.success) {
+          console.error(`Inline ingestion failed for ${file.name}, cron will retry:`, inlineResult.error);
+        }
+      }
 
       results.push({
         fileName: file.name,

@@ -3,6 +3,9 @@
 # -------------------------
 .DS_Store
 Thumbs.db
+
+# Playwright auth state
+tests/e2e/.auth/
 .idea/
 .vscode/
 *.swp

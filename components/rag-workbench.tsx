@@ -20,7 +20,8 @@ import { ChatView } from "@/components/workbench/chat-view";
 import { ChatInput } from "@/components/workbench/chat-input";
 import { SidebarLeft } from "@/components/workbench/sidebar-left";
 import { SidebarRight } from "@/components/workbench/sidebar-right";
-import { SessionSettings } from "@/components/workbench/session-settings";
+import { OpenAiKeyVault } from "@/components/workbench/openai-key-vault";
+import { DevSessionControls } from "@/components/workbench/dev-session-controls";
 import type { Turn, UploadStatusSnapshot, DocumentListItem } from "@/components/workbench/types";
 
 type RagWorkbenchProps = {
@@ -349,15 +350,15 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     for (let i = 0; i < entries.length; i++) {
       setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "uploading" } : e)));
       const formData = new FormData();
-      formData.append("file", entries[i].file);
-      formData.append("title", entries[i].file.name);
+      formData.append("files", entries[i].file);
       try {
         const response = await fetch("/api/upload/batch", { method: "POST", headers: csrfHeaders(), body: formData });
-        const payload = (await response.json()) as { documentId?: string; error?: string };
-        if (!response.ok || !payload.documentId) {
-          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "failed", error: payload.error ?? "Upload failed" } : e)));
+        const payload = (await response.json()) as { results?: Array<{ documentId?: string; status: string; error?: string }> };
+        const first = payload.results?.[0];
+        if (!response.ok || !first || first.status !== "accepted" || !first.documentId) {
+          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "failed", error: first?.error ?? "Upload failed" } : e)));
         } else {
-          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "queued", documentId: payload.documentId } : e)));
+          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "queued", documentId: first.documentId } : e)));
         }
       } catch {
         setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "failed", error: "Network error" } : e)));
@@ -550,13 +551,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             effectiveQueryScopeId={effectiveQueryScopeId}
             onClearScope={() => setQueryDocumentScopeId(null)}
           />
-          {process.env.NODE_ENV === "development" && (
-            <SessionSettings
+          {user && (
+            <OpenAiKeyVault
               user={user}
-              token={token}
-              setToken={setToken}
-              createSession={() => void createSession()}
-              clearSession={() => void clearSession()}
               openAiByokInput={openAiByokInput}
               setOpenAiByokInput={setOpenAiByokInput}
               openAiByokStatus={openAiByokStatus}
@@ -564,6 +561,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
               saveOpenAiByokKey={() => void saveOpenAiByokKey()}
               deleteOpenAiByokKey={() => void deleteOpenAiByokKey()}
               loadOpenAiByokStatus={() => void loadOpenAiByokStatus()}
+            />
+          )}
+          {process.env.NODE_ENV === "development" && (
+            <DevSessionControls
+              token={token}
+              setToken={setToken}
+              createSession={() => void createSession()}
+              clearSession={() => void clearSession()}
             />
           )}
         </div>

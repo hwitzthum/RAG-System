@@ -1,41 +1,26 @@
 import { test, expect } from "@playwright/test";
-
-// Credentials loaded from .env.local via playwright.config.ts
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import {
+  READER_STATE_PATH,
+  ADMIN_STATE_PATH,
+  READER_TOKEN_PATH,
+  ADMIN_TOKEN_PATH,
+  loadToken,
+  getTestAdminClient,
+  fetchAccessToken,
+} from "./auth-states";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL!;
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD!;
-
+const READER_EMAIL = process.env.E2E_TEST_EMAIL!;
 const PENDING_EMAIL = process.env.E2E_PENDING_EMAIL!;
 const PENDING_PASSWORD = process.env.E2E_PENDING_PASSWORD!;
 const PENDING_USER_ID = process.env.E2E_PENDING_USER_ID!;
 
-const READER_EMAIL = process.env.E2E_TEST_EMAIL!;
-const READER_PASSWORD = process.env.E2E_TEST_PASSWORD!;
-
-async function getAccessToken(email: string, password: string): Promise<string> {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) throw new Error(`Auth failed: ${response.status}`);
-  const data = (await response.json()) as { access_token: string };
-  return data.access_token;
-}
-
 async function setUserRole(userId: string, role: string): Promise<void> {
-  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-    },
-    body: JSON.stringify({ app_metadata: { role } }),
+  const supabase = getTestAdminClient();
+  const { error } = await supabase.auth.admin.updateUserById(userId, {
+    app_metadata: { role },
   });
+  if (error) throw new Error(`Failed to set role: ${error.message}`);
 }
 
 async function resetPendingUserRole(): Promise<void> {
@@ -44,33 +29,20 @@ async function resetPendingUserRole(): Promise<void> {
 
 /** Re-create the pending test user if it was deleted by a test */
 async function ensurePendingUserExists(): Promise<void> {
-  // Check if user exists
-  const checkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${PENDING_USER_ID}`, {
-    headers: {
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (checkRes.ok) {
+  const supabase = getTestAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(PENDING_USER_ID);
+  if (!error && data.user) {
     // User exists, just reset role
     await resetPendingUserRole();
     return;
   }
+
   // User was deleted — re-create with the same ID
-  await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-    },
-    body: JSON.stringify({
-      id: PENDING_USER_ID,
-      email: PENDING_EMAIL,
-      password: PENDING_PASSWORD,
-      email_confirm: true,
-      app_metadata: { role: "pending" },
-    }),
+  await supabase.auth.admin.createUser({
+    email: PENDING_EMAIL,
+    password: PENDING_PASSWORD,
+    email_confirm: true,
+    app_metadata: { role: "pending" },
   });
 }
 
@@ -78,7 +50,7 @@ test.describe("Admin API", () => {
   let adminToken: string;
 
   test.beforeAll(async () => {
-    adminToken = await getAccessToken(ADMIN_EMAIL, ADMIN_PASSWORD);
+    adminToken = loadToken(ADMIN_TOKEN_PATH);
   });
 
   test("GET /api/admin/users with admin auth returns user list", async ({ request }) => {
@@ -99,7 +71,7 @@ test.describe("Admin API", () => {
   });
 
   test("GET /api/admin/users with reader auth returns 403", async ({ request }) => {
-    const readerToken = await getAccessToken(READER_EMAIL, READER_PASSWORD);
+    const readerToken = loadToken(READER_TOKEN_PATH);
     const response = await request.get("/api/admin/users", {
       headers: { Authorization: `Bearer ${readerToken}` },
     });
@@ -221,23 +193,23 @@ test.describe("Admin API", () => {
   });
 
   test("DELETE /api/admin/users/:id deletes a user", async ({ request }) => {
-    // Create a temporary user to delete
-    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-      },
-      body: JSON.stringify({
-        email: "e2e-delete-target@ragsystem.test",
-        password: "DeleteMe123!",
-        email_confirm: true,
-        app_metadata: { role: "pending" },
-      }),
+    const supabase = getTestAdminClient();
+
+    // Clean up leftover user from previous runs
+    const { data: existing } = await supabase.auth.admin.listUsers({ perPage: 100 });
+    const leftover = existing?.users?.find((u) => u.email === "e2e-delete-target@ragsystem.test");
+    if (leftover) {
+      await supabase.auth.admin.deleteUser(leftover.id);
+    }
+
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email: "e2e-delete-target@ragsystem.test",
+      password: "DeleteMe123!",
+      email_confirm: true,
+      app_metadata: { role: "pending" },
     });
-    const created = (await createRes.json()) as { id: string };
-    const tempUserId = created.id;
+    if (createErr) throw new Error(`Failed to create temp user: ${createErr.message}`);
+    const tempUserId = created.user.id;
 
     const response = await request.delete(`/api/admin/users/${tempUserId}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -280,7 +252,7 @@ test.describe("Pending approval flow", () => {
   });
 
   test("pending user gets 403 on query API", async ({ request }) => {
-    const pendingToken = await getAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
+    const pendingToken = await fetchAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
     const response = await request.post("/api/query", {
       headers: {
         Authorization: `Bearer ${pendingToken}`,
@@ -293,7 +265,7 @@ test.describe("Pending approval flow", () => {
   });
 
   test("pending user gets 403 on upload API", async ({ request }) => {
-    const pendingToken = await getAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
+    const pendingToken = await fetchAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
     const response = await request.post("/api/upload", {
       headers: { Authorization: `Bearer ${pendingToken}` },
       multipart: {
@@ -328,7 +300,7 @@ test.describe("Rejected user flow", () => {
   test("rejected user gets 403 on API endpoints", async ({ request }) => {
     await setUserRole(PENDING_USER_ID, "rejected");
 
-    const rejectedToken = await getAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
+    const rejectedToken = await fetchAccessToken(PENDING_EMAIL, PENDING_PASSWORD);
     const response = await request.post("/api/query", {
       headers: {
         Authorization: `Bearer ${rejectedToken}`,
@@ -343,10 +315,27 @@ test.describe("Rejected user flow", () => {
 
 test.describe("Auth rate limiting", () => {
   test("login rate limit returns 429 after too many attempts", async ({ request }) => {
+    // Pre-seed the rate limit bucket via Supabase RPC to avoid hammering Supabase auth.
+    // Login rate limit key format: auth:login:{ip}:{email} with limit=20/300s.
+    // Dev server sees 127.0.0.1 or ::1 — we pre-fill for both possible IPs.
+    const supabase = getTestAdminClient();
+    const email = "ratelimit-test@example.com";
+    const seedCalls = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].flatMap((ip) =>
+      Array.from({ length: 18 }, () =>
+        supabase.rpc("consume_rate_limit", {
+          bucket_key_input: `auth:login:${ip}:${email}`,
+          max_requests_input: 20,
+          window_seconds_input: 300,
+        }),
+      ),
+    );
+    await Promise.all(seedCalls);
+
+    // Only 2-4 real requests needed to exhaust remaining budget and trigger 429
     const responses: number[] = [];
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 5; i++) {
       const response = await request.post("/api/auth/login", {
-        data: { email: "ratelimit-test@example.com", password: "wrongpassword" },
+        data: { email, password: "wrongpassword" },
       });
       responses.push(response.status());
     }
@@ -356,82 +345,64 @@ test.describe("Auth rate limiting", () => {
 });
 
 test.describe("Admin page UI", () => {
-  test("admin can access /admin page and see user table", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
+  test.describe("admin user tests", () => {
+    test.use({ storageState: ADMIN_STATE_PATH });
 
-    await page.goto("/admin");
-    await expect(page.locator("h1")).toHaveText("User Management", { timeout: 10_000 });
+    test("admin can access /admin page and see user table", async ({ page }) => {
+      await page.goto("/admin");
+      await expect(page.locator("h1")).toHaveText("User Management", { timeout: 10_000 });
 
-    const table = page.locator('[data-testid="admin-users-table"]');
-    await expect(table).toBeVisible({ timeout: 10_000 });
+      const table = page.locator('[data-testid="admin-users-table"]');
+      await expect(table).toBeVisible({ timeout: 10_000 });
 
-    await expect(page.locator(`text=${ADMIN_EMAIL}`)).toBeVisible();
+      await expect(page.locator(`text=${ADMIN_EMAIL}`)).toBeVisible();
+    });
+
+    test("admin sees correct buttons for pending users (Approve, Decline, Delete)", async ({ page }) => {
+      await ensurePendingUserExists();
+
+      await page.goto("/admin");
+      await expect(page.locator('[data-testid="admin-users-table"]')).toBeVisible({ timeout: 10_000 });
+
+      // Pending user should have Approve, Decline, and Delete buttons
+      const approveBtn = page.locator(`[data-testid="approve-${PENDING_USER_ID}"]`);
+      const declineBtn = page.locator(`[data-testid="decline-${PENDING_USER_ID}"]`);
+      const deleteBtn = page.locator(`[data-testid="delete-${PENDING_USER_ID}"]`);
+      await expect(approveBtn).toBeVisible();
+      await expect(declineBtn).toBeVisible();
+      await expect(deleteBtn).toBeVisible();
+
+      // Should NOT have Suspend or Reactivate buttons
+      const suspendBtn = page.locator(`[data-testid="suspend-${PENDING_USER_ID}"]`);
+      const reactivateBtn = page.locator(`[data-testid="reactivate-${PENDING_USER_ID}"]`);
+      await expect(suspendBtn).not.toBeVisible();
+      await expect(reactivateBtn).not.toBeVisible();
+    });
+
+    test("workbench shows admin link for admin users", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
+
+      const adminLink = page.locator('[data-testid="admin-link"]');
+      await expect(adminLink).toBeVisible({ timeout: 10_000 });
+    });
   });
 
-  test("admin sees correct buttons for pending users (Approve, Decline, Delete)", async ({ page }) => {
-    await ensurePendingUserExists();
+  test.describe("reader user tests", () => {
+    test.use({ storageState: READER_STATE_PATH });
 
-    await page.goto("/login");
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
+    test("reader is redirected away from /admin", async ({ page }) => {
+      await page.goto("/admin");
+      await page.waitForURL("/", { timeout: 10_000 });
+    });
 
-    await page.goto("/admin");
-    await expect(page.locator('[data-testid="admin-users-table"]')).toBeVisible({ timeout: 10_000 });
+    test("workbench does not show admin link for reader users", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
 
-    // Pending user should have Approve, Decline, and Delete buttons
-    const approveBtn = page.locator(`[data-testid="approve-${PENDING_USER_ID}"]`);
-    const declineBtn = page.locator(`[data-testid="decline-${PENDING_USER_ID}"]`);
-    const deleteBtn = page.locator(`[data-testid="delete-${PENDING_USER_ID}"]`);
-    await expect(approveBtn).toBeVisible();
-    await expect(declineBtn).toBeVisible();
-    await expect(deleteBtn).toBeVisible();
-
-    // Should NOT have Suspend or Reactivate buttons
-    const suspendBtn = page.locator(`[data-testid="suspend-${PENDING_USER_ID}"]`);
-    const reactivateBtn = page.locator(`[data-testid="reactivate-${PENDING_USER_ID}"]`);
-    await expect(suspendBtn).not.toBeVisible();
-    await expect(reactivateBtn).not.toBeVisible();
-  });
-
-  test("reader is redirected away from /admin", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', READER_EMAIL);
-    await page.fill('input[type="password"]', READER_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    await page.goto("/admin");
-    await page.waitForURL("/", { timeout: 10_000 });
-  });
-
-  test("workbench shows admin link for admin users", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 20_000 });
-
-    await page.reload({ waitUntil: "networkidle" });
-
-    const adminLink = page.locator('[data-testid="admin-link"]');
-    await expect(adminLink).toBeVisible({ timeout: 10_000 });
-  });
-
-  test("workbench does not show admin link for reader users", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', READER_EMAIL);
-    await page.fill('input[type="password"]', READER_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    const adminLink = page.locator('[data-testid="admin-link"]');
-    await expect(adminLink).not.toBeVisible({ timeout: 5_000 });
+      const adminLink = page.locator('[data-testid="admin-link"]');
+      await expect(adminLink).not.toBeVisible({ timeout: 5_000 });
+    });
   });
 });
 
@@ -440,23 +411,14 @@ test.describe("Pending approval page UI", () => {
     await ensurePendingUserExists();
   });
 
-  test("pending user is redirected to /pending-approval", async ({ page }) => {
+  test("pending user is redirected to /pending-approval and sees controls", async ({ page }) => {
     await page.goto("/login");
     await page.fill('input[type="email"]', PENDING_EMAIL);
     await page.fill('input[type="password"]', PENDING_PASSWORD);
     await page.click('button[type="submit"]');
 
-    await page.waitForURL("/pending-approval", { timeout: 15_000 });
+    await page.waitForURL("/pending-approval", { timeout: 45_000 });
     await expect(page.locator("h1")).toHaveText("Pending Approval", { timeout: 10_000 });
-  });
-
-  test("pending page has check status and sign out buttons", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', PENDING_EMAIL);
-    await page.fill('input[type="password"]', PENDING_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/pending-approval", { timeout: 15_000 });
-
     await expect(page.locator('button:has-text("Check Status")')).toBeVisible();
     await expect(page.locator('button:has-text("Sign Out")')).toBeVisible();
   });

@@ -1,34 +1,11 @@
 import { test, expect } from "@playwright/test";
-
-// Credentials loaded from .env.local via playwright.config.ts
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL!;
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD!;
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
-
-async function getAccessToken(): Promise<string> {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Auth failed: ${response.status} ${await response.text()}`);
-  }
-
-  const data = (await response.json()) as { access_token: string };
-  return data.access_token;
-}
+import { READER_STATE_PATH, READER_TOKEN_PATH, loadToken } from "./auth-states";
 
 test.describe("Authenticated API flows", () => {
   let accessToken: string;
 
   test.beforeAll(async () => {
-    accessToken = await getAccessToken();
+    accessToken = loadToken(READER_TOKEN_PATH);
   });
 
   test("POST /api/query with valid auth returns SSE stream", async ({ request }) => {
@@ -164,20 +141,10 @@ test.describe("Authenticated API flows", () => {
 });
 
 test.describe("Authenticated Workbench UI", () => {
+  test.use({ storageState: READER_STATE_PATH });
+
   test("workbench renders after Supabase login", async ({ page }) => {
-    // Go to login page
-    await page.goto("/login");
-    await expect(page.locator("h1")).toHaveText("Sign In");
-
-    // Fill in credentials
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-
-    // Wait for redirect to workbench (home page)
-    await page.waitForURL("/", { timeout: 15_000 });
-
-    // Verify workbench elements render
+    await page.goto("/");
     await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=Grounded Answer Operations")).toBeVisible();
     await expect(page.locator("text=Ingestion Desk")).toBeVisible();
@@ -186,11 +153,8 @@ test.describe("Authenticated Workbench UI", () => {
   });
 
   test("workbench has web research toggle", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
+    await page.goto("/");
+    await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
 
     const toggle = page.locator('[data-testid="web-research-toggle"]');
     await expect(toggle).toBeVisible({ timeout: 10_000 });
@@ -202,11 +166,8 @@ test.describe("Authenticated Workbench UI", () => {
   });
 
   test("workbench has batch upload input", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15_000 });
+    await page.goto("/");
+    await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
 
     const batchInput = page.locator('[data-testid="batch-upload-input"]');
     await expect(batchInput).toBeVisible({ timeout: 10_000 });
@@ -217,16 +178,8 @@ test.describe("Authenticated Workbench UI", () => {
   });
 
   test("workbench shows session identity after login", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 20_000 });
-
-    // Reload to sync server session cookie
-    await page.reload({ waitUntil: "networkidle" });
-
-    // Should show signed-in session identity
+    await page.goto("/");
+    // Storage state includes the reload from setup, so session cookie is already synced
     await expect(page.locator("text=Signed in as reader")).toBeVisible({ timeout: 15_000 });
   });
 });

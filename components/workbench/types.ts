@@ -103,12 +103,8 @@ export type SidebarRightProps = {
   workspaceMessage: string;
 };
 
-export type SessionSettingsProps = {
+export type OpenAiKeyVaultProps = {
   user: AuthUser | null;
-  token: string;
-  setToken: (v: string) => void;
-  createSession: () => void;
-  clearSession: () => void;
   openAiByokInput: string;
   setOpenAiByokInput: (v: string) => void;
   openAiByokStatus: OpenAiByokStatusResponse | null;
@@ -116,6 +112,13 @@ export type SessionSettingsProps = {
   saveOpenAiByokKey: () => void;
   deleteOpenAiByokKey: () => void;
   loadOpenAiByokStatus: () => void;
+};
+
+export type DevSessionControlsProps = {
+  token: string;
+  setToken: (v: string) => void;
+  createSession: () => void;
+  clearSession: () => void;
 };
 
 export function formatTime(iso: string): string {

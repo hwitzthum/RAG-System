@@ -4,6 +4,7 @@ import { env } from "@/lib/config/env";
 import { buildIdempotencyKey, buildStoragePath } from "@/lib/ingestion/upload-helpers";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, DocumentStatus, IngestionJobStatus, SupportedLanguage } from "@/lib/supabase/database.types";
+import type { IngestionJob } from "@/lib/ingestion/runtime/types";
 
 export type UploadPersistenceInput = {
   file: File;
@@ -286,5 +287,42 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
     }
 
     throw error;
+  }
+}
+
+export async function processIngestionJobInline(
+  documentId: string,
+  ingestionJobId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const [
+    { resolveIngestionRuntimeSettings },
+    { SupabaseIngestionRuntimeRepository },
+    { IngestionPipeline },
+  ] = await Promise.all([
+    import("@/lib/ingestion/runtime/types"),
+    import("@/lib/ingestion/runtime/repository"),
+    import("@/lib/ingestion/runtime/pipeline"),
+  ]);
+
+  const settings = resolveIngestionRuntimeSettings({
+    workerName: "inline-upload-processor",
+  });
+  const repository = new SupabaseIngestionRuntimeRepository({ settings, logger: console });
+  const pipeline = new IngestionPipeline({ settings, repository, logger: console });
+
+  const job: IngestionJob = {
+    id: ingestionJobId,
+    documentId,
+    status: "queued",
+    attempt: 0,
+  };
+
+  try {
+    await pipeline.processJob(job);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_error";
+    await repository.markJobFailed(job, message).catch(() => null);
+    return { success: false, error: message };
   }
 }
