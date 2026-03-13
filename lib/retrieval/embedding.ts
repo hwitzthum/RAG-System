@@ -26,6 +26,7 @@ export async function createQueryEmbedding(normalizedQuery: string): Promise<num
     body: JSON.stringify({
       model: env.RAG_QUERY_EMBEDDING_MODEL,
       input: normalizedQuery,
+      dimensions: env.RAG_QUERY_EMBEDDING_DIMENSIONS,
     }),
   });
 

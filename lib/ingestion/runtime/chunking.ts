@@ -74,6 +74,27 @@ function decodeTokens(tokens: string[], tokenStart: number, tokenEnd: number): s
   return tokens.slice(tokenStart, tokenEnd).join(" ");
 }
 
+const SENTENCE_END_PATTERN = /[.!?]$/;
+const SCAN_RADIUS = 50;
+
+function findSentenceBoundary(tokens: string[], nominalEnd: number, totalTokens: number): number {
+  if (nominalEnd >= totalTokens) return totalTokens;
+  const searchStart = Math.max(1, nominalEnd - SCAN_RADIUS);
+  const searchEnd = Math.min(totalTokens, nominalEnd + SCAN_RADIUS);
+  let bestPosition = nominalEnd;
+  let bestDistance = Infinity;
+  for (let i = searchStart; i < searchEnd; i++) {
+    if (tokens[i - 1] && SENTENCE_END_PATTERN.test(tokens[i - 1])) {
+      const distance = Math.abs(i - nominalEnd);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestPosition = i;
+      }
+    }
+  }
+  return bestPosition;
+}
+
 export function chunkSections(input: {
   sections: Section[];
   language: SupportedLanguage;
@@ -112,7 +133,8 @@ export function chunkSections(input: {
     let emittedSectionChunk = false;
 
     while (start < totalTokens) {
-      const end = Math.min(start + targetTokens, totalTokens);
+      const rawEnd = Math.min(start + targetTokens, totalTokens);
+      const end = rawEnd < totalTokens ? findSentenceBoundary(tokens, rawEnd, totalTokens) : rawEnd;
       const content = decodeTokens(tokens, start, end).trim();
 
       if (content.length >= minChars) {

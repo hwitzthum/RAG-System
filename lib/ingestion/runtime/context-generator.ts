@@ -1,9 +1,14 @@
+import Anthropic from "@anthropic-ai/sdk";
+
 import type {
   ChunkCandidate,
   ChunkWithContext,
   IngestionRuntimeSettings,
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
+
+const CONTEXT_SYSTEM_PROMPT =
+  "Create a concise retrieval context summary for this document chunk. Keep factual entities and key qualifiers. Max 2 sentences.";
 
 type OpenAiChatCompletionResponse = {
   choices?: Array<{
@@ -18,6 +23,7 @@ type OpenAiChatCompletionResponse = {
 
 export class ContextGenerator {
   private readonly apiKey: string | null;
+  private readonly anthropicApiKey: string | null;
   private readonly settings: IngestionRuntimeSettings;
   private readonly logger: RuntimeLogger;
 
@@ -25,6 +31,7 @@ export class ContextGenerator {
     this.settings = settings;
     this.logger = logger;
     this.apiKey = settings.openAiApiKey;
+    this.anthropicApiKey = settings.anthropicApiKey;
   }
 
   private heuristicContext(chunk: ChunkCandidate): string {
@@ -38,13 +45,10 @@ export class ContextGenerator {
     return `${prefix}: ${compact}`;
   }
 
-  private async llmContext(chunk: ChunkCandidate): Promise<string> {
+  private async openAiContext(chunk: ChunkCandidate): Promise<string> {
     if (!this.apiKey) {
       return this.heuristicContext(chunk);
     }
-
-    const systemPrompt =
-      "Create a concise retrieval context summary for this document chunk. Keep factual entities and key qualifiers. Max 2 sentences.";
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -60,7 +64,7 @@ export class ContextGenerator {
         messages: [
           {
             role: "system",
-            content: systemPrompt,
+            content: CONTEXT_SYSTEM_PROMPT,
           },
           {
             role: "user",
@@ -88,18 +92,64 @@ export class ContextGenerator {
     return content;
   }
 
+  private async claudeContext(chunk: ChunkCandidate): Promise<string> {
+    const client = new Anthropic({ apiKey: this.anthropicApiKey! });
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 140,
+      system: [
+        {
+          type: "text",
+          text: CONTEXT_SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [
+        {
+          role: "user",
+          content:
+            `Language: ${chunk.language}\n` +
+            `Section: ${chunk.sectionTitle}\n` +
+            `Page: ${chunk.pageNumber}\n` +
+            `Chunk:\n${chunk.content}`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (textBlock && textBlock.type === "text") {
+      const text = textBlock.text?.trim();
+      if (text) return text;
+    }
+    return this.heuristicContext(chunk);
+  }
+
   private async enrichSingle(chunk: ChunkCandidate): Promise<ChunkWithContext> {
     let context: string;
-    if (!this.settings.contextEnabled || !this.apiKey) {
+    if (!this.settings.contextEnabled) {
       context = this.heuristicContext(chunk);
-    } else {
+    } else if (this.anthropicApiKey) {
       try {
-        context = await this.llmContext(chunk);
+        context = await this.claudeContext(chunk);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown_claude_context_error";
+        this.logger.warn("claude_context_failed_trying_openai", { chunkIndex: chunk.chunkIndex, message });
+        try {
+          context = await this.openAiContext(chunk);
+        } catch {
+          context = this.heuristicContext(chunk);
+        }
+      }
+    } else if (this.apiKey) {
+      try {
+        context = await this.openAiContext(chunk);
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown_context_generation_error";
         this.logger.warn("context_generation_failed", { chunkIndex: chunk.chunkIndex, message });
         context = this.heuristicContext(chunk);
       }
+    } else {
+      context = this.heuristicContext(chunk);
     }
 
     return {

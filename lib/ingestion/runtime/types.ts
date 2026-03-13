@@ -73,6 +73,8 @@ export type IngestionRuntimeSettings = {
   embeddingBatchSize: number;
   openAiTimeoutSeconds: number;
   openAiApiKey: string | null;
+  anthropicApiKey: string | null;
+  embeddingDimensions: number | null;
   ocrFallbackEnabled: boolean;
   lockTimeoutSeconds: number;
   chunkInsertBatchSize: number;
@@ -121,11 +123,13 @@ export function resolveIngestionRuntimeSettings(
     contextEnabled: parseBooleanEnv(process.env.WORKER_CONTEXT_ENABLED, true),
     contextMaxChars: parseIntegerEnv(process.env.WORKER_CONTEXT_MAX_CHARS, 280),
     embeddingModel:
-      process.env.WORKER_EMBEDDING_MODEL?.trim() || process.env.RAG_QUERY_EMBEDDING_MODEL?.trim() || "text-embedding-3-small",
-    embeddingDim: parseIntegerEnv(process.env.WORKER_EMBEDDING_DIM, 1536),
+      process.env.WORKER_EMBEDDING_MODEL?.trim() || process.env.RAG_QUERY_EMBEDDING_MODEL?.trim() || "text-embedding-3-large",
+    embeddingDim: parseIntegerEnv(process.env.WORKER_EMBEDDING_DIM, 1024),
     embeddingBatchSize: parseIntegerEnv(process.env.WORKER_EMBEDDING_BATCH_SIZE, 32),
     openAiTimeoutSeconds: parseIntegerEnv(process.env.WORKER_OPENAI_TIMEOUT_SECONDS, 40),
     openAiApiKey: process.env.OPENAI_API_KEY?.trim() || null,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || null,
+    embeddingDimensions: parseIntegerEnv(process.env.WORKER_EMBEDDING_DIMENSIONS, 1024),
     ocrFallbackEnabled: parseBooleanEnv(process.env.WORKER_OCR_FALLBACK_ENABLED, true),
     lockTimeoutSeconds: parseIntegerEnv(
       process.env.WORKER_LOCK_TIMEOUT_SECONDS,

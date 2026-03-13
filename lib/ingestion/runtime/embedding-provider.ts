@@ -57,6 +57,7 @@ export class EmbeddingProvider {
         body: JSON.stringify({
           model: this.settings.embeddingModel,
           input: batch,
+          ...(this.settings.embeddingDimensions ? { dimensions: this.settings.embeddingDimensions } : {}),
         }),
       });
 

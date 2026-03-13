@@ -15,6 +15,7 @@ import { searchKeywordCandidates, searchVectorCandidates } from "@/lib/retrieval
 import { buildRetrievalCacheKey } from "@/lib/retrieval/trace";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
+import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 
 const MIN_CANDIDATE_LIMIT = 20;
 
@@ -152,35 +153,77 @@ export async function retrieveRankedCandidates(
   }
 
   const candidateLimit = Math.max(topK * 4, env.RAG_RERANK_POOL_SIZE, MIN_CANDIDATE_LIMIT);
-  const queryEmbedding = await deps.createEmbedding(normalizedQuery);
   const tokens = extractQueryTokens(normalizedQuery);
 
-  const [languageVectorCandidates, languageKeywordCandidates] = await Promise.all([
-    deps.searchVector({
-      queryEmbedding,
-      language,
-      limit: candidateLimit,
-      documentIds: scopedDocumentIds,
-    }),
-    deps.searchKeyword({
+  let vectorCandidates: RetrievedChunk[];
+  let keywordCandidates: RetrievedChunk[];
+  let primaryEmbedding: number[];
+
+  if (env.RAG_MULTI_QUERY_ENABLED) {
+    const queries = await generateQueryVariations(normalizedQuery);
+    const embeddings = await Promise.all(queries.map((q) => deps.createEmbedding(q)));
+    primaryEmbedding = embeddings[0]!;
+
+    const vectorResults = await Promise.all(
+      embeddings.map((emb) =>
+        deps.searchVector({
+          queryEmbedding: emb,
+          language,
+          limit: candidateLimit,
+          documentIds: scopedDocumentIds,
+        }),
+      ),
+    );
+
+    // Merge vector results, keeping the best score per chunk
+    const chunkMap = new Map<string, RetrievedChunk>();
+    for (const results of vectorResults) {
+      for (const chunk of results) {
+        const existing = chunkMap.get(chunk.chunkId);
+        if (!existing || chunk.retrievalScore > existing.retrievalScore) {
+          chunkMap.set(chunk.chunkId, chunk);
+        }
+      }
+    }
+    vectorCandidates = [...chunkMap.values()];
+
+    keywordCandidates = await deps.searchKeyword({
       normalizedQuery,
       tokens,
       language,
       limit: candidateLimit,
       documentIds: scopedDocumentIds,
-    }),
-  ]);
+    });
+  } else {
+    primaryEmbedding = await deps.createEmbedding(normalizedQuery);
 
-  let vectorCandidates = languageVectorCandidates;
-  let keywordCandidates = languageKeywordCandidates;
-  const languageConstrainedTotal = languageVectorCandidates.length + languageKeywordCandidates.length;
+    const [vc, kc] = await Promise.all([
+      deps.searchVector({
+        queryEmbedding: primaryEmbedding,
+        language,
+        limit: candidateLimit,
+        documentIds: scopedDocumentIds,
+      }),
+      deps.searchKeyword({
+        normalizedQuery,
+        tokens,
+        language,
+        limit: candidateLimit,
+        documentIds: scopedDocumentIds,
+      }),
+    ]);
+    vectorCandidates = vc;
+    keywordCandidates = kc;
+  }
+
+  const languageConstrainedTotal = vectorCandidates.length + keywordCandidates.length;
   const shouldUseCrossLanguageFallback =
-    languageConstrainedTotal < topK || languageKeywordCandidates.length === 0;
+    languageConstrainedTotal < topK || keywordCandidates.length === 0;
 
   if (shouldUseCrossLanguageFallback) {
     const [crossLanguageVectorCandidates, crossLanguageKeywordCandidates] = await Promise.all([
       deps.searchVector({
-        queryEmbedding,
+        queryEmbedding: primaryEmbedding,
         language: null,
         limit: candidateLimit,
         documentIds: scopedDocumentIds,
@@ -194,8 +237,8 @@ export async function retrieveRankedCandidates(
       }),
     ]);
 
-    vectorCandidates = mergeUniqueChunks(languageVectorCandidates, crossLanguageVectorCandidates);
-    keywordCandidates = mergeUniqueChunks(languageKeywordCandidates, crossLanguageKeywordCandidates);
+    vectorCandidates = mergeUniqueChunks(vectorCandidates, crossLanguageVectorCandidates);
+    keywordCandidates = mergeUniqueChunks(keywordCandidates, crossLanguageKeywordCandidates);
   }
 
   const fusedCandidates = reciprocalRankFusion({
