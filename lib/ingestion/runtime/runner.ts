@@ -1,17 +1,18 @@
 import { IngestionPipeline } from "@/lib/ingestion/runtime/pipeline";
 import { resolveIngestionRuntimeSettings } from "@/lib/ingestion/runtime/types";
 import type { IngestionRuntimeRepository } from "@/lib/ingestion/runtime/repository";
-import type { IngestionRuntimeSettings, RuntimeLogger } from "@/lib/ingestion/runtime/types";
+import type { IngestionRuntimeSettings, ProcessJobResult, RuntimeLogger } from "@/lib/ingestion/runtime/types";
 
 export type IngestionRunMetrics = {
   claimed: number;
   completed: number;
+  partial: number;
   failed: number;
   deadLettered: number;
   durationMs: number;
   jobs: Array<{
     id: string;
-    outcome: "completed" | "failed" | "dead_letter";
+    outcome: "completed" | "partial" | "failed" | "dead_letter";
     attempt: number;
     error?: string;
   }>;
@@ -44,11 +45,13 @@ export async function runIngestionBatch(input?: {
     workerName: settings.workerName,
     batchSize: settings.ingestionBatchSize,
     lockTimeoutSeconds: settings.lockTimeoutSeconds,
+    maxRetries: settings.maxRetries,
   });
 
   const metrics: IngestionRunMetrics = {
     claimed: jobs.length,
     completed: 0,
+    partial: 0,
     failed: 0,
     deadLettered: 0,
     durationMs: 0,
@@ -57,13 +60,30 @@ export async function runIngestionBatch(input?: {
 
   for (const job of jobs) {
     try {
-      await pipeline.processJob(job);
-      metrics.completed += 1;
-      metrics.jobs.push({
-        id: job.id,
-        outcome: "completed",
-        attempt: job.attempt,
-      });
+      const result: ProcessJobResult = await pipeline.processJob(job);
+
+      if (result.status === "completed") {
+        await repository.markJobCompleted(job.id);
+        metrics.completed += 1;
+        metrics.jobs.push({
+          id: job.id,
+          outcome: "completed",
+          attempt: job.attempt,
+        });
+      } else {
+        await repository.yieldJob(job.id);
+        metrics.partial += 1;
+        metrics.jobs.push({
+          id: job.id,
+          outcome: "partial",
+          attempt: job.attempt,
+        });
+        logger.info("ingestion_job_yielded", {
+          jobId: job.id,
+          chunksProcessed: result.chunksProcessed,
+          chunksTotal: result.chunksTotal,
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error";
       const deadLettered = await repository.markJobFailed(job, message);

@@ -47,6 +47,18 @@ export type ChunkWithContext = {
   language: SupportedLanguage;
 };
 
+export type ProcessJobResult = {
+  status: "completed" | "partial";
+  chunksProcessed: number;
+  chunksTotal: number;
+};
+
+export type JobProgress = {
+  candidates: ChunkCandidate[] | null;
+  chunksProcessed: number;
+  chunksTotal: number;
+};
+
 export type PreparedChunkRecord = {
   documentId: string;
   chunkIndex: number;
@@ -77,6 +89,7 @@ export type IngestionRuntimeSettings = {
   embeddingDimensions: number | null;
   ocrFallbackEnabled: boolean;
   lockTimeoutSeconds: number;
+  chunksPerRun: number;
   chunkInsertBatchSize: number;
   ragStorageBucket: string;
 };
@@ -135,6 +148,7 @@ export function resolveIngestionRuntimeSettings(
       process.env.WORKER_LOCK_TIMEOUT_SECONDS,
       parseIntegerEnv(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 900),
     ),
+    chunksPerRun: parseIntegerEnv(process.env.WORKER_CHUNKS_PER_RUN, 15),
     chunkInsertBatchSize: parseIntegerEnv(process.env.WORKER_CHUNK_INSERT_BATCH_SIZE, 100),
     ragStorageBucket: process.env.RAG_STORAGE_BUCKET?.trim() || "documents",
     ...overrides,

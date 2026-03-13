@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  ChunkCandidate,
   DocumentRecord,
   IngestionJob,
   IngestionRuntimeSettings,
+  JobProgress,
   PreparedChunkRecord,
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
@@ -16,6 +18,7 @@ export type ClaimIngestionJobsInput = {
   workerName: string;
   batchSize: number;
   lockTimeoutSeconds: number;
+  maxRetries?: number;
 };
 
 export interface IngestionRuntimeRepository {
@@ -27,6 +30,11 @@ export interface IngestionRuntimeRepository {
   markJobCompleted(jobId: string): Promise<void>;
   markJobFailed(job: IngestionJob, errorMessage: string): Promise<boolean>;
   invalidateRetrievalCache(): Promise<void>;
+  saveChunkCandidates(jobId: string, chunks: ChunkCandidate[], total: number): Promise<void>;
+  loadJobProgress(jobId: string): Promise<JobProgress>;
+  updateJobProgress(jobId: string, chunksProcessed: number): Promise<void>;
+  yieldJob(jobId: string): Promise<void>;
+  insertChunkBatch(documentId: string, chunks: PreparedChunkRecord[]): Promise<void>;
 }
 
 function toIngestionJob(row: ClaimedJobRow): IngestionJob {
@@ -100,6 +108,7 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
       worker_name: input.workerName,
       batch_size: Math.max(1, input.batchSize),
       lock_timeout_seconds: Math.max(1, input.lockTimeoutSeconds),
+      max_retries: input.maxRetries ?? this.settings.maxRetries,
     });
 
     if (!rpcError) {
@@ -293,6 +302,96 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     const { error } = await this.supabase.from("retrieval_cache").delete().gt("retrieval_version", 0);
     if (error) {
       throw new Error(`Failed to invalidate retrieval cache: ${error.message}`);
+    }
+  }
+
+  async saveChunkCandidates(jobId: string, chunks: ChunkCandidate[], total: number): Promise<void> {
+    const { error } = await this.supabase
+      .from("ingestion_jobs")
+      .update({
+        chunk_candidates: chunks as unknown as Record<string, unknown>[],
+        chunks_total: total,
+        chunks_processed: 0,
+      })
+      .eq("id", jobId);
+
+    if (error) {
+      throw new Error(`Failed to save chunk candidates: ${error.message}`);
+    }
+  }
+
+  async loadJobProgress(jobId: string): Promise<JobProgress> {
+    const { data, error } = await this.supabase
+      .from("ingestion_jobs")
+      .select("chunk_candidates,chunks_total,chunks_processed")
+      .eq("id", jobId)
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to load job progress: ${error.message}`);
+    }
+
+    const candidates = data.chunk_candidates
+      ? (data.chunk_candidates as unknown as ChunkCandidate[])
+      : null;
+
+    return {
+      candidates,
+      chunksProcessed: data.chunks_processed,
+      chunksTotal: data.chunks_total,
+    };
+  }
+
+  async updateJobProgress(jobId: string, chunksProcessed: number): Promise<void> {
+    const { error } = await this.supabase
+      .from("ingestion_jobs")
+      .update({ chunks_processed: chunksProcessed })
+      .eq("id", jobId);
+
+    if (error) {
+      throw new Error(`Failed to update job progress: ${error.message}`);
+    }
+  }
+
+  async yieldJob(jobId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("ingestion_jobs")
+      .update({
+        status: "queued" as const,
+        locked_at: null,
+        locked_by: null,
+        attempt: 0,
+      })
+      .eq("id", jobId);
+
+    if (error) {
+      throw new Error(`Failed to yield job: ${error.message}`);
+    }
+  }
+
+  async insertChunkBatch(documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
+    if (chunks.length === 0) {
+      return;
+    }
+
+    const batchSize = Math.max(1, this.settings.chunkInsertBatchSize);
+    for (let index = 0; index < chunks.length; index += batchSize) {
+      const batch = chunks.slice(index, index + batchSize);
+      const rows = batch.map((chunk) => ({
+        document_id: chunk.documentId,
+        chunk_index: chunk.chunkIndex,
+        page_number: chunk.pageNumber,
+        section_title: chunk.sectionTitle,
+        content: chunk.content,
+        context: chunk.context,
+        language: chunk.language,
+        embedding: chunk.embedding,
+      }));
+
+      const { error: insertError } = await this.supabase.from("document_chunks").insert(rows);
+      if (insertError) {
+        throw new Error(`Failed to insert chunk batch: ${insertError.message}`);
+      }
     }
   }
 }

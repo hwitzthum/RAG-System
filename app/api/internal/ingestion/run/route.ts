@@ -7,7 +7,7 @@ import { getClientIp } from "@/lib/security/request";
 import { extractBearerTokenString } from "@/lib/security/token";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function isCronAuthorized(request: NextRequest): boolean {
   if (!env.CRON_SECRET) {

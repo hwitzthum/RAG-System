@@ -6,7 +6,9 @@ import type {
   ChunkCandidate,
   IngestionJob,
   IngestionRuntimeSettings,
+  JobProgress,
   PreparedChunkRecord,
+  ProcessJobResult,
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
 import type { IngestionRuntimeRepository } from "@/lib/ingestion/runtime/repository";
@@ -137,74 +139,113 @@ export class IngestionPipeline {
     this.embeddingProvider = input.embeddingProvider ?? new EmbeddingProvider(input.settings, this.logger);
   }
 
-  async processJob(job: IngestionJob): Promise<void> {
+  async processJob(job: IngestionJob): Promise<ProcessJobResult> {
     const pipelineStart = Date.now();
     const elapsed = () => `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;
 
     const document = await this.repository.getDocument(job.documentId);
     await this.repository.setDocumentStatus(document.id, "processing");
-    this.logger.info("pipeline_step", { step: "document_loaded", elapsed: elapsed(), jobId: job.id, documentId: document.id });
 
-    const pdfBytes = await this.repository.downloadDocument(document.storagePath);
-    this.logger.info("pipeline_step", { step: "pdf_downloaded", elapsed: elapsed(), bytes: pdfBytes.length });
+    // Load incremental state
+    let progress: JobProgress = await this.repository.loadJobProgress(job.id);
 
-    const pages = await this.extractPagesFn(pdfBytes, this.settings.ocrFallbackEnabled, this.logger);
-    this.logger.info("pipeline_step", { step: "pages_extracted", elapsed: elapsed(), pageCount: pages.length });
+    // Phase 1: Extract (first invocation only — no candidates saved yet)
+    if (!progress.candidates) {
+      this.logger.info("pipeline_step", { step: "extraction_start", elapsed: elapsed(), jobId: job.id, documentId: document.id });
 
-    const sections = [];
-    for (const page of pages) {
-      if (page.text.trim()) {
-        sections.push(...splitIntoSections(page));
-      }
-    }
+      const pdfBytes = await this.repository.downloadDocument(document.storagePath);
+      this.logger.info("pipeline_step", { step: "pdf_downloaded", elapsed: elapsed(), bytes: pdfBytes.length });
 
-    if (sections.length === 0) {
-      throw new Error("No extractable text found in document");
-    }
+      const pages = await this.extractPagesFn(pdfBytes, this.settings.ocrFallbackEnabled, this.logger);
+      this.logger.info("pipeline_step", { step: "pages_extracted", elapsed: elapsed(), pageCount: pages.length });
 
-    let chunkCandidates: ChunkCandidate[] = [];
-    for (const section of sections) {
-      const language = detectLanguage(section.text, document.language);
-      const sectionChunks = chunkSections({
-        sections: [section],
-        language,
-        targetTokens: this.settings.chunkTargetTokens,
-        overlapTokens: this.settings.chunkOverlapTokens,
-        minChars: this.settings.chunkMinChars,
-      });
-      chunkCandidates = chunkCandidates.concat(sectionChunks);
-    }
-
-    chunkCandidates = reindexChunks(chunkCandidates);
-
-    if (chunkCandidates.length === 0) {
-      const relaxedFallbackChunk = buildRelaxedDocumentFallbackChunk(sections, document.language);
-      if (!relaxedFallbackChunk) {
-        throw new Error("No chunks generated from extracted sections");
+      const sections = [];
+      for (const page of pages) {
+        if (page.text.trim()) {
+          sections.push(...splitIntoSections(page));
+        }
       }
 
-      chunkCandidates = [relaxedFallbackChunk];
-      this.logger.warn("ingestion_chunk_generation_relaxed_fallback", {
-        jobId: job.id,
-        documentId: document.id,
-        fallbackChars: relaxedFallbackChunk.content.length,
-      });
+      if (sections.length === 0) {
+        throw new Error("No extractable text found in document");
+      }
+
+      let chunkCandidates: ChunkCandidate[] = [];
+      for (const section of sections) {
+        const language = detectLanguage(section.text, document.language);
+        const sectionChunks = chunkSections({
+          sections: [section],
+          language,
+          targetTokens: this.settings.chunkTargetTokens,
+          overlapTokens: this.settings.chunkOverlapTokens,
+          minChars: this.settings.chunkMinChars,
+        });
+        chunkCandidates = chunkCandidates.concat(sectionChunks);
+      }
+
+      chunkCandidates = reindexChunks(chunkCandidates);
+
+      if (chunkCandidates.length === 0) {
+        const relaxedFallbackChunk = buildRelaxedDocumentFallbackChunk(sections, document.language);
+        if (!relaxedFallbackChunk) {
+          throw new Error("No chunks generated from extracted sections");
+        }
+
+        chunkCandidates = [relaxedFallbackChunk];
+        this.logger.warn("ingestion_chunk_generation_relaxed_fallback", {
+          jobId: job.id,
+          documentId: document.id,
+          fallbackChars: relaxedFallbackChunk.content.length,
+        });
+      }
+
+      await this.repository.saveChunkCandidates(job.id, chunkCandidates, chunkCandidates.length);
+      this.logger.info("pipeline_step", { step: "candidates_saved", elapsed: elapsed(), total: chunkCandidates.length });
+
+      progress = {
+        candidates: chunkCandidates,
+        chunksProcessed: 0,
+        chunksTotal: chunkCandidates.length,
+      };
     }
 
-    this.logger.info("pipeline_step", { step: "chunks_created", elapsed: elapsed(), chunkCount: chunkCandidates.length, sectionCount: sections.length });
+    // Phase 2: Process next batch of chunks
+    const { candidates, chunksProcessed, chunksTotal } = progress;
+    if (!candidates || candidates.length === 0) {
+      throw new Error("No chunk candidates found for job");
+    }
 
-    const chunksWithContext = await this.contextGenerator.enrich(chunkCandidates);
-    this.logger.info("pipeline_step", { step: "context_enriched", elapsed: elapsed(), chunkCount: chunksWithContext.length });
+    // Early return if already fully processed (idempotent re-call)
+    if (chunksProcessed >= chunksTotal) {
+      return { status: "completed", chunksProcessed, chunksTotal };
+    }
 
-    const embeddingInputs = chunksWithContext.map((item) => `${item.context}\n\n${item.content}`);
+    // Delete existing chunks on first batch (fresh start or retry from 0)
+    if (chunksProcessed === 0) {
+      await this.repository.replaceDocumentChunks(document.id, []);
+      this.logger.info("pipeline_step", { step: "existing_chunks_cleared", elapsed: elapsed(), documentId: document.id });
+    }
+
+    const batchStart = chunksProcessed;
+    const batchEnd = Math.min(batchStart + this.settings.chunksPerRun, chunksTotal);
+    const batch = candidates.slice(batchStart, batchEnd);
+
+    this.logger.info("pipeline_step", { step: "batch_start", elapsed: elapsed(), batchStart, batchEnd, total: chunksTotal });
+
+    // Enrich batch with context
+    const batchWithContext = await this.contextGenerator.enrich(batch);
+    this.logger.info("pipeline_step", { step: "batch_context_enriched", elapsed: elapsed(), count: batchWithContext.length });
+
+    // Generate embeddings for batch
+    const embeddingInputs = batchWithContext.map((item) => `${item.context}\n\n${item.content}`);
     const embeddings = await this.embeddingProvider.embedTexts(embeddingInputs);
-    this.logger.info("pipeline_step", { step: "embeddings_generated", elapsed: elapsed(), embeddingCount: embeddings.length });
+    this.logger.info("pipeline_step", { step: "batch_embeddings_generated", elapsed: elapsed(), count: embeddings.length });
 
-    if (embeddings.length !== chunksWithContext.length) {
+    if (embeddings.length !== batchWithContext.length) {
       throw new Error("Embedding response size mismatch");
     }
 
-    const preparedChunks: PreparedChunkRecord[] = chunksWithContext.map((chunk, index) => {
+    const preparedChunks: PreparedChunkRecord[] = batchWithContext.map((chunk, index) => {
       const embedding = embeddings[index];
       if (!embedding || embedding.length !== this.settings.embeddingDim) {
         throw new Error(
@@ -224,32 +265,51 @@ export class IngestionPipeline {
       };
     });
 
-    await this.repository.replaceDocumentChunks(document.id, preparedChunks);
-    this.logger.info("pipeline_step", { step: "chunks_stored", elapsed: elapsed(), chunkCount: preparedChunks.length });
+    // Insert batch (append)
+    await this.repository.insertChunkBatch(document.id, preparedChunks);
+    this.logger.info("pipeline_step", { step: "batch_stored", elapsed: elapsed(), count: preparedChunks.length });
 
-    const selectedLanguage = determineDocumentLanguage(
-      chunksWithContext.map((item) => item.language),
-      document.language,
-    );
-    await this.repository.setDocumentStatus(document.id, "ready", selectedLanguage);
-    await this.repository.markJobCompleted(job.id);
+    // Update progress
+    const newChunksProcessed = batchEnd;
+    await this.repository.updateJobProgress(job.id, newChunksProcessed);
 
-    try {
-      await this.repository.invalidateRetrievalCache();
-    } catch (error) {
-      this.logger.warn("retrieval_cache_invalidation_failed", {
+    // Check if all chunks are processed
+    if (newChunksProcessed >= chunksTotal) {
+      const selectedLanguage = determineDocumentLanguage(
+        candidates.map((item) => item.language),
+        document.language,
+      );
+      await this.repository.setDocumentStatus(document.id, "ready", selectedLanguage);
+
+      try {
+        await this.repository.invalidateRetrievalCache();
+      } catch (error) {
+        this.logger.warn("retrieval_cache_invalidation_failed", {
+          jobId: job.id,
+          documentId: document.id,
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+
+      this.logger.info("ingestion_job_completed", {
         jobId: job.id,
         documentId: document.id,
-        message: error instanceof Error ? error.message : "unknown_error",
+        chunks: chunksTotal,
+        language: selectedLanguage,
+        totalSeconds: ((Date.now() - pipelineStart) / 1000).toFixed(1),
       });
+
+      return { status: "completed", chunksProcessed: newChunksProcessed, chunksTotal };
     }
 
-    this.logger.info("ingestion_job_completed", {
-      jobId: job.id,
-      documentId: document.id,
-      chunks: preparedChunks.length,
-      language: selectedLanguage,
-      totalSeconds: ((Date.now() - pipelineStart) / 1000).toFixed(1),
+    this.logger.info("pipeline_step", {
+      step: "batch_partial",
+      elapsed: elapsed(),
+      chunksProcessed: newChunksProcessed,
+      chunksTotal,
+      remaining: chunksTotal - newChunksProcessed,
     });
+
+    return { status: "partial", chunksProcessed: newChunksProcessed, chunksTotal };
   }
 }

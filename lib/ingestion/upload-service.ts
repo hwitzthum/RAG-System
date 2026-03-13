@@ -320,13 +320,35 @@ export async function processIngestionJobInline(
   };
 
   try {
-    const pipelinePromise = pipeline.processJob(job);
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Inline pipeline timeout exceeded")), INLINE_PIPELINE_TIMEOUT_MS);
-    });
+    const deadline = Date.now() + INLINE_PIPELINE_TIMEOUT_MS;
 
-    await Promise.race([pipelinePromise, timeoutPromise]);
-    return { success: true };
+    // Loop until all chunks are processed (incremental pipeline)
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        throw new Error("Inline pipeline timeout exceeded");
+      }
+
+      const batchPromise = pipeline.processJob(job);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Inline pipeline timeout exceeded")), remaining);
+      });
+
+      const result = await Promise.race([batchPromise, timeoutPromise]);
+
+      if (result.status === "completed") {
+        await repository.markJobCompleted(job.id);
+        return { success: true };
+      }
+
+      // Partial — log progress and continue
+      console.info("inline_pipeline_partial", {
+        documentId,
+        chunksProcessed: result.chunksProcessed,
+        chunksTotal: result.chunksTotal,
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     console.error(`processIngestionJobInline failed [doc=${documentId}]:`, message);

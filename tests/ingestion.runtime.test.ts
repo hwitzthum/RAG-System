@@ -6,12 +6,21 @@ import { extractPages } from "../lib/ingestion/runtime/pdf-extractor";
 import { runIngestionBatch } from "../lib/ingestion/runtime/runner";
 import { resolveIngestionRuntimeSettings } from "../lib/ingestion/runtime/types";
 import type {
+  ChunkCandidate,
   DocumentRecord,
   IngestionJob,
+  JobProgress,
   PreparedChunkRecord,
+  ProcessJobResult,
 } from "../lib/ingestion/runtime/types";
 import type { ClaimIngestionJobsInput, IngestionRuntimeRepository } from "../lib/ingestion/runtime/repository";
 import type { DocumentStatus, SupportedLanguage } from "../lib/supabase/database.types";
+
+const quietLogger = {
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
 
 test("splitIntoSections detects uppercase headings and preserves page metadata", () => {
   const sections = splitIntoSections({
@@ -83,6 +92,13 @@ class FakeRepository implements IngestionRuntimeRepository {
   public retrievalCacheInvalidationCalls = 0;
   public deadLetterIds = new Set<string>();
 
+  // Incremental state
+  public savedCandidates: ChunkCandidate[] | null = null;
+  public savedChunksTotal = 0;
+  public currentChunksProcessed = 0;
+  public yieldedJobs: string[] = [];
+  public insertedChunkBatches: PreparedChunkRecord[][] = [];
+
   async claimIngestionJobs(_input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
     void _input;
     return this.claimedJobs;
@@ -118,6 +134,31 @@ class FakeRepository implements IngestionRuntimeRepository {
 
   async invalidateRetrievalCache(): Promise<void> {
     this.retrievalCacheInvalidationCalls += 1;
+  }
+
+  async saveChunkCandidates(_jobId: string, chunks: ChunkCandidate[], total: number): Promise<void> {
+    this.savedCandidates = chunks;
+    this.savedChunksTotal = total;
+  }
+
+  async loadJobProgress(_jobId: string): Promise<JobProgress> {
+    return {
+      candidates: this.savedCandidates,
+      chunksProcessed: this.currentChunksProcessed,
+      chunksTotal: this.savedChunksTotal,
+    };
+  }
+
+  async updateJobProgress(_jobId: string, chunksProcessed: number): Promise<void> {
+    this.currentChunksProcessed = chunksProcessed;
+  }
+
+  async yieldJob(jobId: string): Promise<void> {
+    this.yieldedJobs.push(jobId);
+  }
+
+  async insertChunkBatch(_documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
+    this.insertedChunkBatches.push(chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })));
   }
 }
 
@@ -156,7 +197,7 @@ test("extractPages fallback parses TJ arrays with literal operands", async () =>
   assert.equal(pages[0]?.text.includes("zum System"), true);
 });
 
-test("IngestionPipeline reindexes per-section chunks and remains idempotent across reprocessing", async () => {
+test("IngestionPipeline extracts and processes all chunks in a single invocation when chunksPerRun is large", async () => {
   const repository = new FakeRepository();
   const settings = resolveIngestionRuntimeSettings({
     openAiApiKey: null,
@@ -165,16 +206,13 @@ test("IngestionPipeline reindexes per-section chunks and remains idempotent acro
     chunkMinChars: 20,
     chunkTargetTokens: 700,
     chunkOverlapTokens: 120,
+    chunksPerRun: 100, // Large enough to process all chunks in one batch
   });
 
   const pipeline = new IngestionPipeline({
     settings,
     repository,
-    logger: {
-      info: () => undefined,
-      warn: () => undefined,
-      error: () => undefined,
-    },
+    logger: quietLogger,
     extractPagesFn: async () => [
       {
         pageNumber: 1,
@@ -202,27 +240,95 @@ test("IngestionPipeline reindexes per-section chunks and remains idempotent acro
     attempt: 1,
   };
 
-  await pipeline.processJob(job);
-  await pipeline.processJob(job);
+  const result = await pipeline.processJob(job);
 
-  assert.equal(repository.replacedChunksHistory.length, 2);
-  const firstPass = repository.replacedChunksHistory[0] ?? [];
-  const secondPass = repository.replacedChunksHistory[1] ?? [];
+  assert.equal(result.status, "completed");
+  assert.equal(result.chunksTotal, 2);
+  assert.equal(result.chunksProcessed, 2);
 
+  // Chunks stored via insertChunkBatch (one batch)
+  assert.equal(repository.insertedChunkBatches.length, 1);
   assert.deepEqual(
-    firstPass.map((chunk) => chunk.chunkIndex),
-    [0, 1],
-  );
-  assert.deepEqual(
-    secondPass.map((chunk) => chunk.chunkIndex),
+    repository.insertedChunkBatches[0]?.map((chunk) => chunk.chunkIndex),
     [0, 1],
   );
 
-  const firstSignature = firstPass.map((chunk) => [chunk.chunkIndex, chunk.pageNumber, chunk.sectionTitle]);
-  const secondSignature = secondPass.map((chunk) => [chunk.chunkIndex, chunk.pageNumber, chunk.sectionTitle]);
-  assert.deepEqual(firstSignature, secondSignature);
-  assert.deepEqual(repository.completedJobs, ["job-1", "job-1"]);
-  assert.equal(repository.retrievalCacheInvalidationCalls, 2);
+  // Existing chunks were cleared (replaceDocumentChunks called with empty array)
+  assert.equal(repository.replacedChunksHistory.length, 1);
+  assert.equal(repository.replacedChunksHistory[0]?.length, 0);
+
+  // Document set to "ready" with detected language
+  const readyUpdate = repository.statusUpdates.find((u) => u.status === "ready");
+  assert.ok(readyUpdate);
+
+  assert.equal(repository.retrievalCacheInvalidationCalls, 1);
+});
+
+test("IngestionPipeline processes chunks incrementally across multiple invocations", async () => {
+  const repository = new FakeRepository();
+  const settings = resolveIngestionRuntimeSettings({
+    openAiApiKey: null,
+    contextEnabled: false,
+    embeddingDim: 3,
+    chunkMinChars: 20,
+    chunkTargetTokens: 700,
+    chunkOverlapTokens: 120,
+    chunksPerRun: 1, // Process one chunk at a time
+  });
+
+  const pipeline = new IngestionPipeline({
+    settings,
+    repository,
+    logger: quietLogger,
+    extractPagesFn: async () => [
+      {
+        pageNumber: 1,
+        text:
+          "OVERVIEW\nThis is the first section with enough content to become one chunk.\n\n" +
+          "DETAILS\nThis is the second section with enough content to become one chunk as well.",
+      },
+    ],
+    contextGenerator: {
+      enrich: async (chunks) =>
+        chunks.map((chunk) => ({
+          ...chunk,
+          context: `Context for ${chunk.sectionTitle}`,
+        })),
+    },
+    embeddingProvider: {
+      embedTexts: async (texts) => texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
+    },
+  });
+
+  const job: IngestionJob = {
+    id: "job-inc",
+    documentId: "doc-1",
+    status: "processing",
+    attempt: 1,
+  };
+
+  // First invocation: extract + process chunk 0 only
+  const r1 = await pipeline.processJob(job);
+  assert.equal(r1.status, "partial");
+  assert.equal(r1.chunksProcessed, 1);
+  assert.equal(r1.chunksTotal, 2);
+  assert.equal(repository.insertedChunkBatches.length, 1);
+  assert.equal(repository.insertedChunkBatches[0]?.length, 1);
+  assert.equal(repository.insertedChunkBatches[0]?.[0]?.chunkIndex, 0);
+
+  // Second invocation: process chunk 1 (candidates loaded from saved state)
+  const r2 = await pipeline.processJob(job);
+  assert.equal(r2.status, "completed");
+  assert.equal(r2.chunksProcessed, 2);
+  assert.equal(r2.chunksTotal, 2);
+  assert.equal(repository.insertedChunkBatches.length, 2);
+  assert.equal(repository.insertedChunkBatches[1]?.length, 1);
+  assert.equal(repository.insertedChunkBatches[1]?.[0]?.chunkIndex, 1);
+
+  // Document set to "ready" only on completion
+  const readyUpdate = repository.statusUpdates.find((u) => u.status === "ready");
+  assert.ok(readyUpdate);
+  assert.equal(repository.retrievalCacheInvalidationCalls, 1);
 });
 
 test("IngestionPipeline uses relaxed document fallback when all sections are below minChars", async () => {
@@ -234,16 +340,13 @@ test("IngestionPipeline uses relaxed document fallback when all sections are bel
     chunkMinChars: 120,
     chunkTargetTokens: 700,
     chunkOverlapTokens: 120,
+    chunksPerRun: 100,
   });
 
   const pipeline = new IngestionPipeline({
     settings,
     repository,
-    logger: {
-      info: () => undefined,
-      warn: () => undefined,
-      error: () => undefined,
-    },
+    logger: quietLogger,
     extractPagesFn: async () => [
       {
         pageNumber: 1,
@@ -262,21 +365,21 @@ test("IngestionPipeline uses relaxed document fallback when all sections are bel
     },
   });
 
-  await pipeline.processJob({
+  const result = await pipeline.processJob({
     id: "job-short",
     documentId: "doc-1",
     status: "processing",
     attempt: 1,
   });
 
-  assert.equal(repository.replacedChunksHistory.length, 1);
-  assert.equal(repository.replacedChunksHistory[0]?.length, 1);
-  assert.equal(repository.replacedChunksHistory[0]?.[0]?.content.includes("Tiny text"), true);
-  assert.deepEqual(repository.completedJobs, ["job-short"]);
+  assert.equal(result.status, "completed");
+  assert.equal(repository.insertedChunkBatches.length, 1);
+  assert.equal(repository.insertedChunkBatches[0]?.length, 1);
+  assert.equal(repository.insertedChunkBatches[0]?.[0]?.content.includes("Tiny text"), true);
   assert.equal(repository.retrievalCacheInvalidationCalls, 1);
 });
 
-test("runIngestionBatch reports completed, failed, and dead-letter outcomes with per-job metrics", async () => {
+test("runIngestionBatch reports completed, partial, failed, and dead-letter outcomes with per-job metrics", async () => {
   const repository = new FakeRepository();
   repository.claimedJobs = [
     { id: "job-1", documentId: "doc-1", status: "processing", attempt: 1 },
@@ -292,19 +395,16 @@ test("runIngestionBatch reports completed, failed, and dead-letter outcomes with
   const metrics = await runIngestionBatch({
     settings,
     repository,
-    logger: {
-      info: () => undefined,
-      warn: () => undefined,
-      error: () => undefined,
-    },
+    logger: quietLogger,
     pipeline: {
-      processJob: async (job) => {
+      processJob: async (job): Promise<ProcessJobResult> => {
         if (job.id === "job-2") {
           throw new Error("transient failure");
         }
         if (job.id === "job-3") {
           throw new Error("terminal failure");
         }
+        return { status: "completed", chunksProcessed: 1, chunksTotal: 1 };
       },
     },
   });
@@ -314,6 +414,8 @@ test("runIngestionBatch reports completed, failed, and dead-letter outcomes with
   assert.equal(metrics.failed, 1);
   assert.equal(metrics.deadLettered, 1);
   assert.equal(repository.failedCalls.length, 2);
+  assert.equal(repository.completedJobs.length, 1);
+  assert.equal(repository.completedJobs[0], "job-1");
   assert.equal(metrics.jobs.length, 3);
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
@@ -322,5 +424,38 @@ test("runIngestionBatch reports completed, failed, and dead-letter outcomes with
       ["job-2", "failed"],
       ["job-3", "dead_letter"],
     ],
+  );
+});
+
+test("runIngestionBatch yields partial jobs back to queue", async () => {
+  const repository = new FakeRepository();
+  repository.claimedJobs = [
+    { id: "job-partial", documentId: "doc-1", status: "processing", attempt: 1 },
+  ];
+
+  const settings = resolveIngestionRuntimeSettings({
+    ingestionBatchSize: 1,
+  });
+
+  const metrics = await runIngestionBatch({
+    settings,
+    repository,
+    logger: quietLogger,
+    pipeline: {
+      processJob: async (): Promise<ProcessJobResult> => {
+        return { status: "partial", chunksProcessed: 5, chunksTotal: 20 };
+      },
+    },
+  });
+
+  assert.equal(metrics.claimed, 1);
+  assert.equal(metrics.completed, 0);
+  assert.equal(metrics.partial, 1);
+  assert.equal(metrics.failed, 0);
+  assert.equal(repository.yieldedJobs.length, 1);
+  assert.equal(repository.yieldedJobs[0], "job-partial");
+  assert.deepEqual(
+    metrics.jobs.map((job) => [job.id, job.outcome]),
+    [["job-partial", "partial"]],
   );
 });

@@ -93,6 +93,9 @@ export type Database = {
           idempotency_key: string | null;
           locked_at: string | null;
           locked_by: string | null;
+          chunk_candidates: Record<string, unknown>[] | null;
+          chunks_total: number;
+          chunks_processed: number;
           created_at: string;
           updated_at: string;
         };
@@ -105,6 +108,9 @@ export type Database = {
           idempotency_key?: string | null;
           locked_at?: string | null;
           locked_by?: string | null;
+          chunk_candidates?: Record<string, unknown>[] | null;
+          chunks_total?: number;
+          chunks_processed?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -117,6 +123,9 @@ export type Database = {
           idempotency_key?: string | null;
           locked_at?: string | null;
           locked_by?: string | null;
+          chunk_candidates?: Record<string, unknown>[] | null;
+          chunks_total?: number;
+          chunks_processed?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -244,6 +253,7 @@ export type Database = {
           worker_name: string;
           batch_size?: number;
           lock_timeout_seconds?: number;
+          max_retries?: number;
         };
         Returns: {
           id: string;
