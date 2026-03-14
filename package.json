@@ -33,6 +33,8 @@
     "obs:validate": "node scripts/production/validate-observability.mjs",
     "obs:ingestion:check": "tsx scripts/production/check-ingestion-health.ts --mode live",
     "obs:ingestion:check:dry": "tsx scripts/production/check-ingestion-health.ts --mode dry-run --no-fail-on-gate",
+    "obs:embedding:check": "node -r dotenv/config --import tsx scripts/production/check-embedding-drift.ts --mode live dotenv_config_path=.env.local",
+    "obs:embedding:check:dry": "node -r dotenv/config --import tsx scripts/production/check-embedding-drift.ts --mode dry-run --no-fail-on-gate dotenv_config_path=.env.local",
     "perf:load": "tsx scripts/production/run-load-test.ts --mode live",
     "perf:load:dry": "tsx scripts/production/run-load-test.ts --mode dry-run --duration-seconds 60 --concurrency 20",
     "perf:resilience": "tsx scripts/production/run-resilience-checks.ts --mode live",

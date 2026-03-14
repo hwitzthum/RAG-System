@@ -1,0 +1,135 @@
+{
+  "generatedAt": "2026-03-14T07:42:20.361Z",
+  "mode": "dry-run",
+  "passed": true,
+  "baselineUpdated": false,
+  "thresholds": {
+    "minSamples": 3,
+    "minLanguageSamples": 1,
+    "maxZeroVectorRate": 0,
+    "maxNearZeroVectorRate": 0.01,
+    "maxNormMeanDeltaRatio": 0.15,
+    "maxNormStdDevDeltaRatio": 0.25,
+    "maxCentroidCosineDistance": 0.08,
+    "maxLanguageCentroidCosineDistance": 0.12
+  },
+  "current": {
+    "sampleCount": 3,
+    "dimension": 3,
+    "zeroVectorCount": 0,
+    "nearZeroVectorCount": 0,
+    "normMean": 0.9398876907854768,
+    "normStdDev": 0.03844210421673562,
+    "normP95": 0.9513148795220223,
+    "centroid": [
+      0.6366666666666666,
+      0.3633333333333333,
+      0
+    ],
+    "languageStats": {
+      "EN": {
+        "count": 2,
+        "normMean": 0.9341740964172041,
+        "normStdDev": 0.046029963970223464,
+        "centroid": [
+          0.9299999999999999,
+          0.06999999999999999,
+          0
+        ]
+      },
+      "DE": {
+        "count": 1,
+        "normMean": 0.9513148795220223,
+        "normStdDev": 0,
+        "centroid": [
+          0.05,
+          0.95,
+          0
+        ]
+      }
+    }
+  },
+  "baseline": {
+    "sampleCount": 3,
+    "dimension": 3,
+    "zeroVectorCount": 0,
+    "nearZeroVectorCount": 0,
+    "normMean": 0.9685128379379139,
+    "normStdDev": 0.04452957162884173,
+    "normP95": 1,
+    "centroid": [
+      0.6333333333333333,
+      0.3666666666666667,
+      0
+    ],
+    "languageStats": {
+      "EN": {
+        "count": 2,
+        "normMean": 0.9527692569068709,
+        "normStdDev": 0.047230743093129135,
+        "centroid": [
+          0.95,
+          0.05,
+          0
+        ]
+      },
+      "DE": {
+        "count": 1,
+        "normMean": 1,
+        "normStdDev": 0,
+        "centroid": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  },
+  "checks": [
+    {
+      "name": "sample_size_sufficient",
+      "passed": true,
+      "detail": "sample_count=3, min_samples=3"
+    },
+    {
+      "name": "zero_vectors_absent",
+      "passed": true,
+      "detail": "zero_vector_rate=0, threshold=0"
+    },
+    {
+      "name": "near_zero_vectors_within_limit",
+      "passed": true,
+      "detail": "near_zero_vector_rate=0, threshold=0.01"
+    },
+    {
+      "name": "embedding_dimension_consistent",
+      "passed": true,
+      "detail": "current_dimension=3, baseline_dimension=3"
+    },
+    {
+      "name": "norm_mean_drift_within_limit",
+      "passed": true,
+      "detail": "current=0.939888, baseline=0.968513, max_ratio_delta=0.15"
+    },
+    {
+      "name": "norm_stddev_drift_within_limit",
+      "passed": true,
+      "detail": "current=0.038442, baseline=0.044530, max_ratio_delta=0.25"
+    },
+    {
+      "name": "centroid_drift_within_limit",
+      "passed": true,
+      "detail": "cosine_distance=0.000019, threshold=0.08"
+    },
+    {
+      "name": "language_en_centroid_drift_within_limit",
+      "passed": true,
+      "detail": "language=EN, cosine_distance=0.000254, threshold=0.12"
+    },
+    {
+      "name": "language_de_centroid_drift_within_limit",
+      "passed": true,
+      "detail": "language=DE, cosine_distance=0.001382, threshold=0.12"
+    }
+  ]
+}
