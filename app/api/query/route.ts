@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+              documentScopeId: requestBody.documentId ?? null,
               webSources,
             })
           : await generateGroundedAnswer({
@@ -173,6 +174,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+              documentScopeId: requestBody.documentId ?? null,
             });
         const latencyMs = Date.now() - startedAt;
 

@@ -4,6 +4,7 @@ export type EvidencePolicyInput = {
   chunks: RetrievedChunk[];
   minEvidenceChunks: number;
   minRerankScore: number;
+  documentScoped?: boolean;
 };
 
 function resolveScore(chunk: RetrievedChunk): number {
@@ -11,7 +12,9 @@ function resolveScore(chunk: RetrievedChunk): number {
 }
 
 export function hasSufficientEvidence(input: EvidencePolicyInput): boolean {
-  if (input.chunks.length < Math.max(1, input.minEvidenceChunks)) {
+  const requiredChunkCount = input.documentScoped ? 1 : Math.max(1, input.minEvidenceChunks);
+
+  if (input.chunks.length < requiredChunkCount) {
     return false;
   }
 
@@ -25,7 +28,7 @@ export function hasSufficientEvidence(input: EvidencePolicyInput): boolean {
   // to avoid answering when only one chunk is marginally relevant.
   // Set at half the per-chunk minimum: a strong lead chunk can compensate for weaker supporting ones.
   const AVG_SCORE_THRESHOLD_RATIO = 0.5;
-  const topChunks = input.chunks.slice(0, Math.max(1, input.minEvidenceChunks));
+  const topChunks = input.chunks.slice(0, requiredChunkCount);
   const avgScore = topChunks.reduce((sum, c) => sum + resolveScore(c), 0) / topChunks.length;
   return avgScore >= input.minRerankScore * AVG_SCORE_THRESHOLD_RATIO;
 }

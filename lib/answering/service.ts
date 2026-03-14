@@ -20,6 +20,7 @@ export type GenerateGroundedAnswerInput = {
   minEvidenceChunks: number;
   minRerankScore: number;
   maxOutputTokens: number;
+  documentScopeId?: string | null;
 };
 
 export type GenerateGroundedAnswerResult = {
@@ -67,6 +68,7 @@ export async function generateGroundedAnswer(
     chunks: input.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
+    documentScoped: Boolean(input.documentScopeId),
   });
 
   if (!sufficientEvidence) {
@@ -112,6 +114,7 @@ export async function generateWebAugmentedAnswer(
     chunks: input.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
+    documentScoped: Boolean(input.documentScopeId),
   });
 
   if (!sufficientEvidence && input.webSources.length === 0) {

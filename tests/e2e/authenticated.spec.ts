@@ -104,6 +104,9 @@ async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> 
     buffer: pdfBuffer,
   });
 
+  await expect(page.getByTestId("upload-title-input")).toHaveValue("rag-smoke.pdf");
+  await page.getByTestId("upload-submit-button").click();
+
   const uploadResponse = await uploadResponsePromise;
   expect(uploadResponse.ok()).toBe(true);
   const uploadJson = (await uploadResponse.json()) as { documentId?: string };
@@ -322,15 +325,17 @@ test.describe("Authenticated Workbench UI", () => {
       // Click Upload tab to check upload status panel
       await clickUploadTab(page);
       await expect(page.getByTestId("upload-status-panel")).toContainText("Status: ready", { timeout: 30_000 });
+      await expect(page.getByTestId("upload-status-panel")).toContainText("Document: rag-smoke.pdf", { timeout: 30_000 });
 
-      await page.getByTestId("chat-query-input").fill("What exact smoke phrase appears in the uploaded document?");
+      await page.getByTestId("chat-query-input").fill("What is this document about?");
       await page.getByTestId("chat-send-button").click();
 
       // Click Status tab to check query completion
       await clickStatusTab(page);
       await expect(page.getByTestId("workspace-status-message")).toContainText("Query complete.", { timeout: 60_000 });
-      await expect(page.getByTestId("chat-turn").last()).toContainText("What exact smoke phrase appears in the uploaded document?");
+      await expect(page.getByTestId("chat-turn").last()).toContainText("What is this document about?");
       await expect(page.getByTestId("chat-turn").last()).not.toContainText("Query failed.");
+      await expect(page.getByTestId("chat-turn").last()).not.toContainText("I do not have enough evidence");
       await expect(page.locator(`a[href="/api/upload/${documentId}"]`).first()).toBeVisible({ timeout: 30_000 });
     } finally {
       if (documentId) {

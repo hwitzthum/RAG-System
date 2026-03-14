@@ -355,6 +355,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       setQueryDocumentScopeId(payload.documentId);
       await waitForUploadTerminalStatus(payload.documentId);
       setUploadFile(null);
+      setUploadTitle("");
+      setUploadLanguageHint("");
       if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";
       await fetchDocuments();
     } finally {
@@ -365,9 +367,15 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   function handleUploadFileChange(event: ChangeEvent<HTMLInputElement>): void {
     const selected = event.target.files?.[0] ?? null;
     setUploadFile(selected);
-    if (!selected) return;
-    if (!user) { setWorkspaceMessage("File selected. Create a session before uploading."); return; }
-    void uploadPdf(selected);
+    setUploadTitle(selected?.name ?? "");
+    if (!selected) {
+      return;
+    }
+    if (!user) {
+      setWorkspaceMessage("File selected. Create a session before uploading.");
+      return;
+    }
+    setWorkspaceMessage("PDF selected. Review details and click Upload PDF.");
   }
 
   function handleUploadButtonClick(): void {

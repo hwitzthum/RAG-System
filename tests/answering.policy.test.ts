@@ -77,3 +77,45 @@ test("generateGroundedAnswer returns insufficient-evidence fallback when evidenc
   assert.ok(result.answer.toLowerCase().includes("enough evidence"));
   assert.equal(result.citations.length, 1);
 });
+
+test("hasSufficientEvidence allows a single strong chunk for document-scoped queries", () => {
+  const result = hasSufficientEvidence({
+    chunks: [buildChunk({ rerankScore: 0.18 })],
+    minEvidenceChunks: 2,
+    minRerankScore: 0.1,
+    documentScoped: true,
+  });
+
+  assert.equal(result, true);
+});
+
+test("generateGroundedAnswer uses the LLM when a document-scoped query has one strong chunk", async () => {
+  process.env.SUPABASE_URL ??= "https://example.supabase.co";
+  process.env.SUPABASE_ANON_KEY ??= "anon-key";
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-key";
+  process.env.OPENAI_API_KEY ??= "test-openai-key";
+
+  const { generateGroundedAnswer } = await import("../lib/answering/service");
+  const result = await generateGroundedAnswer(
+    {
+      query: "What is this document about?",
+      language: "EN",
+      documentScopeId: "doc-1",
+      chunks: [buildChunk({ rerankScore: 0.18, content: "The document explains retrieval-augmented generation fundamentals." })],
+      minEvidenceChunks: 2,
+      minRerankScore: 0.1,
+      maxOutputTokens: 200,
+    },
+    {
+      llmProvider: {
+        async generateAnswer() {
+          return "It explains retrieval-augmented generation fundamentals.";
+        },
+      },
+    },
+  );
+
+  assert.equal(result.insufficientEvidence, false);
+  assert.equal(result.answer, "It explains retrieval-augmented generation fundamentals.");
+  assert.equal(result.citations.length, 1);
+});

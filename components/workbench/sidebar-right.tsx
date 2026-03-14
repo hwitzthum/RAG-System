@@ -118,11 +118,21 @@ export function SidebarRight({
                   onChange={handleUploadFileChange}
                   data-testid="single-upload-input"
                 />
+                <label htmlFor="upload-title-input" className="text-xs font-medium text-zinc-500">
+                  Document Title
+                </label>
                 <input
+                  id="upload-title-input"
+                  name="document_title"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   placeholder="Optional title"
                   className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-testid="upload-title-input"
                 />
                 <select
                   value={uploadLanguageHint}
@@ -141,6 +151,7 @@ export function SidebarRight({
                   onClick={handleUploadButtonClick}
                   disabled={uploading}
                   className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+                  data-testid="upload-submit-button"
                 >
                   {uploading ? "Uploading..." : uploadFile ? "Upload PDF" : "Select PDF"}
                 </button>
