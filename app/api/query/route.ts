@@ -71,6 +71,12 @@ function buildQueryStreamResponse(input: {
       suspiciousWebSourceCount: number;
       blockedWebSourceCount: number;
     };
+    outputFilter: {
+      blocked: boolean;
+      filtered: boolean;
+      reasons: string[];
+      redactionCount: number;
+    };
   };
   webSources?: WebSource[];
   queryHistoryId?: string;
@@ -213,6 +219,12 @@ export async function POST(request: NextRequest) {
         suspiciousWebSourceCount: 0,
         blockedWebSourceCount: 0,
       },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: [],
+        redactionCount: 0,
+      },
     };
 
     logAuditEvent({
@@ -321,6 +333,7 @@ export async function POST(request: NextRequest) {
             retryAfterSeconds: rate.retryAfterSeconds,
           },
           promptInjection: answerResult.promptInjection,
+          outputFilter: answerResult.outputFilter,
         };
 
         const supabase = getSupabaseAdminClient();
@@ -392,6 +405,7 @@ export async function POST(request: NextRequest) {
             retrievalVersion: retrievalResult.trace.retrievalVersion,
             insufficientEvidence: answerResult.insufficientEvidence,
             promptInjection: answerResult.promptInjection,
+            outputFilter: answerResult.outputFilter,
             resolvedConversationId: conversationId,
             openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
           },

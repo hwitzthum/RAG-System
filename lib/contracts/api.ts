@@ -63,6 +63,12 @@ export type QueryResponseMeta = {
     suspiciousWebSourceCount: number;
     blockedWebSourceCount: number;
   };
+  outputFilter?: {
+    blocked: boolean;
+    filtered: boolean;
+    reasons: string[];
+    redactionCount: number;
+  };
 };
 
 export type QuerySseMetaEvent = {

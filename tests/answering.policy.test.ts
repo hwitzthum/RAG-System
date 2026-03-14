@@ -190,3 +190,36 @@ test("generateGroundedAnswer falls back when the LLM output appears to leak hidd
   assert.equal(result.insufficientEvidence, true);
   assert.ok(result.answer.toLowerCase().includes("enough evidence"));
 });
+
+test("generateGroundedAnswer filters unsafe markdown links and secret-like tokens from model output", async () => {
+  process.env.SUPABASE_URL ??= "https://example.supabase.co";
+  process.env.SUPABASE_ANON_KEY ??= "anon-key";
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-key";
+  process.env.OPENAI_API_KEY ??= "test-openai-key";
+
+  const { generateGroundedAnswer } = await import("../lib/answering/service");
+  const result = await generateGroundedAnswer(
+    {
+      query: "Summarize the document.",
+      language: "EN",
+      documentScopeId: "doc-1",
+      chunks: [buildChunk({ rerankScore: 0.18, content: "The document explains retrieval safeguards." })],
+      minEvidenceChunks: 2,
+      minRerankScore: 0.1,
+      maxOutputTokens: 200,
+    },
+    {
+      llmProvider: {
+        async generateAnswer() {
+          return "Use key sk-testsecretsecretsecret and click [here](javascript:alert(1)).";
+        },
+      },
+    },
+  );
+
+  assert.equal(result.insufficientEvidence, false);
+  assert.ok(result.answer.includes("[REDACTED]"));
+  assert.ok(result.answer.includes("[here](#)"));
+  assert.equal(result.outputFilter.filtered, true);
+  assert.ok(result.outputFilter.reasons.includes("secret_redaction"));
+});

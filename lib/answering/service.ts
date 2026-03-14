@@ -11,6 +11,7 @@ import {
 } from "@/lib/answering/web-augmented-prompts";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import type { LlmProvider } from "@/lib/providers/types";
+import { filterAnswerOutput } from "@/lib/security/output-filter";
 import {
   containsSensitiveLeakage,
   protectRetrievedChunks,
@@ -38,6 +39,12 @@ export type GenerateGroundedAnswerResult = {
     suspiciousWebSourceCount: number;
     blockedWebSourceCount: number;
     blockedUserQuery: boolean;
+  };
+  outputFilter: {
+    blocked: boolean;
+    filtered: boolean;
+    reasons: string[];
+    redactionCount: number;
   };
 };
 
@@ -96,6 +103,12 @@ export async function generateGroundedAnswer(
         blockedWebSourceCount: 0,
         blockedUserQuery: false,
       },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: [],
+        redactionCount: 0,
+      },
     };
   }
 
@@ -124,19 +137,37 @@ export async function generateGroundedAnswer(
         blockedWebSourceCount: 0,
         blockedUserQuery: false,
       },
+      outputFilter: {
+        blocked: true,
+        filtered: true,
+        reasons: ["sensitive_leakage"],
+        redactionCount: 0,
+      },
     };
   }
 
-  return {
+  const filteredOutput = filterAnswerOutput({
     answer,
     citations,
-    insufficientEvidence: false,
+    language: input.language,
+  });
+
+  return {
+    answer: filteredOutput.answer,
+    citations: filteredOutput.citations,
+    insufficientEvidence: filteredOutput.blocked ? true : false,
     promptInjection: {
       suspiciousChunkCount: protectedChunks.suspiciousCount,
       blockedChunkCount: protectedChunks.blockedCount,
       suspiciousWebSourceCount: 0,
       blockedWebSourceCount: 0,
       blockedUserQuery: false,
+    },
+    outputFilter: {
+      blocked: filteredOutput.blocked,
+      filtered: filteredOutput.filtered,
+      reasons: filteredOutput.reasons,
+      redactionCount: filteredOutput.redactionCount,
     },
   };
 }
@@ -173,6 +204,12 @@ export async function generateWebAugmentedAnswer(
         blockedWebSourceCount: protectedWebSources.blockedCount,
         blockedUserQuery: false,
       },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: [],
+        redactionCount: 0,
+      },
     };
   }
 
@@ -202,19 +239,37 @@ export async function generateWebAugmentedAnswer(
         blockedWebSourceCount: protectedWebSources.blockedCount,
         blockedUserQuery: false,
       },
+      outputFilter: {
+        blocked: true,
+        filtered: true,
+        reasons: ["sensitive_leakage"],
+        redactionCount: 0,
+      },
     };
   }
 
-  return {
+  const filteredOutput = filterAnswerOutput({
     answer,
     citations,
-    insufficientEvidence: false,
+    language: input.language,
+  });
+
+  return {
+    answer: filteredOutput.answer,
+    citations: filteredOutput.citations,
+    insufficientEvidence: filteredOutput.blocked ? true : false,
     promptInjection: {
       suspiciousChunkCount: protectedChunks.suspiciousCount,
       blockedChunkCount: protectedChunks.blockedCount,
       suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
       blockedWebSourceCount: protectedWebSources.blockedCount,
       blockedUserQuery: false,
+    },
+    outputFilter: {
+      blocked: filteredOutput.blocked,
+      filtered: filteredOutput.filtered,
+      reasons: filteredOutput.reasons,
+      redactionCount: filteredOutput.redactionCount,
     },
   };
 }
