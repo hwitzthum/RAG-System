@@ -7,8 +7,11 @@ import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
 import { markUserOpenAiApiKeyUsed, resolveUserOpenAiApiKey } from "@/lib/providers/openai-vault";
+import { detectQueryLanguage } from "@/lib/retrieval/language";
+import { normalizeQuery } from "@/lib/retrieval/query";
 import { retrieveRankedCandidates } from "@/lib/retrieval/service";
 import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
+import { buildPromptInjectionRefusal, shouldBlockUserPrompt } from "@/lib/security/prompt-injection";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -38,6 +41,83 @@ function chunkAnswerText(answer: string): string[] {
     return [];
   }
   return tokens.map((token, index) => (index === tokens.length - 1 ? token : `${token} `));
+}
+
+function buildQueryStreamResponse(input: {
+  queryId: string;
+  answer: string;
+  citations: Array<{
+    documentId: string;
+    pageNumber: number;
+    chunkId: string;
+  }>;
+  retrievalMeta: {
+    cacheHit: boolean;
+    latencyMs: number;
+    selectedChunkIds: string[];
+    selectedDocumentIds: string[];
+    retrievalTrace?: unknown;
+    insufficientEvidence: boolean;
+    conversationId: string;
+    documentScopeId: string | null;
+    rateLimit: {
+      remaining: number;
+      retryAfterSeconds: number;
+    };
+    promptInjection: {
+      blockedUserQuery: boolean;
+      suspiciousChunkCount: number;
+      blockedChunkCount: number;
+      suspiciousWebSourceCount: number;
+      blockedWebSourceCount: number;
+    };
+  };
+  webSources?: WebSource[];
+  queryHistoryId?: string;
+}): Response {
+  const answerTokens = chunkAnswerText(input.answer);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(
+        encodeSseEvent("meta", {
+          queryId: input.queryId,
+          retrievalMeta: input.retrievalMeta,
+        }),
+      );
+
+      for (const token of answerTokens) {
+        controller.enqueue(
+          encodeSseEvent("token", {
+            queryId: input.queryId,
+            token,
+          }),
+        );
+      }
+
+      controller.enqueue(
+        encodeSseEvent("final", {
+          queryId: input.queryId,
+          answer: input.answer,
+          citations: input.citations,
+          retrievalMeta: input.retrievalMeta,
+          webSources: input.webSources?.length ? input.webSources : undefined,
+          queryHistoryId: input.queryHistoryId,
+        }),
+      );
+      controller.enqueue(encodeSseEvent("done", { queryId: input.queryId }));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -107,6 +187,54 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid query payload" }, { status: 400 });
   }
   const requestBody = parsedRequestBody.data;
+  const normalizedQuery = normalizeQuery(requestBody.query);
+  const requestLanguage = detectQueryLanguage(normalizedQuery, requestBody.languageHint);
+  const queryId = randomUUID();
+  const conversationId = requestBody.conversationId ?? queryId;
+
+  if (shouldBlockUserPrompt(requestBody.query)) {
+    const answer = buildPromptInjectionRefusal(requestLanguage);
+    const retrievalMeta = {
+      cacheHit: false,
+      latencyMs: 0,
+      selectedChunkIds: [],
+      selectedDocumentIds: requestBody.documentId ? [requestBody.documentId] : [],
+      insufficientEvidence: true,
+      conversationId,
+      documentScopeId: requestBody.documentId ?? null,
+      rateLimit: {
+        remaining: rate.remaining,
+        retryAfterSeconds: rate.retryAfterSeconds,
+      },
+      promptInjection: {
+        blockedUserQuery: true,
+        suspiciousChunkCount: 0,
+        blockedChunkCount: 0,
+        suspiciousWebSourceCount: 0,
+        blockedWebSourceCount: 0,
+      },
+    };
+
+    logAuditEvent({
+      action: "query.execute",
+      actorId: authResult.user.id,
+      actorRole: authResult.user.role,
+      outcome: "failure",
+      resource: "query",
+      ipAddress,
+      metadata: {
+        reason: "prompt_injection_blocked",
+        documentId: requestBody.documentId ?? null,
+      },
+    });
+
+    return buildQueryStreamResponse({
+      queryId,
+      answer,
+      citations: [],
+      retrievalMeta,
+    });
+  }
 
   let userOpenAiApiKey: string | null = null;
   try {
@@ -136,8 +264,6 @@ export async function POST(request: NextRequest) {
       const topK = requestBody.topK ?? env.RAG_DEFAULT_TOP_K;
 
       try {
-        const queryId = randomUUID();
-        const conversationId = requestBody.conversationId ?? queryId;
         const retrievalResult = await retrieveRankedCandidates({
           query: requestBody.query,
           topK,
@@ -194,6 +320,7 @@ export async function POST(request: NextRequest) {
             remaining: rate.remaining,
             retryAfterSeconds: rate.retryAfterSeconds,
           },
+          promptInjection: answerResult.promptInjection,
         };
 
         const supabase = getSupabaseAdminClient();
@@ -264,53 +391,19 @@ export async function POST(request: NextRequest) {
             cacheHit: retrievalResult.trace.cacheHit,
             retrievalVersion: retrievalResult.trace.retrievalVersion,
             insufficientEvidence: answerResult.insufficientEvidence,
+            promptInjection: answerResult.promptInjection,
             resolvedConversationId: conversationId,
             openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
           },
         });
 
-        const answerTokens = chunkAnswerText(answerResult.answer);
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(
-              encodeSseEvent("meta", {
-                queryId,
-                retrievalMeta,
-              }),
-            );
-
-            for (const token of answerTokens) {
-              controller.enqueue(
-                encodeSseEvent("token", {
-                  queryId,
-                  token,
-                }),
-              );
-            }
-
-            controller.enqueue(
-              encodeSseEvent("final", {
-                queryId,
-                answer: answerResult.answer,
-                citations: answerResult.citations,
-                retrievalMeta,
-                webSources: webSources.length > 0 ? webSources : undefined,
-                queryHistoryId,
-              }),
-            );
-            controller.enqueue(encodeSseEvent("done", { queryId }));
-            controller.close();
-          },
-        });
-
-        return new Response(stream, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
+        return buildQueryStreamResponse({
+          queryId,
+          answer: answerResult.answer,
+          citations: answerResult.citations,
+          retrievalMeta,
+          webSources,
+          queryHistoryId,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown_error";

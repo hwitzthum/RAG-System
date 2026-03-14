@@ -56,6 +56,13 @@ export type QueryResponseMeta = {
   selectedDocumentIds?: string[];
   documentScopeId?: string | null;
   retrievalTrace?: RetrievalTrace;
+  promptInjection?: {
+    blockedUserQuery: boolean;
+    suspiciousChunkCount: number;
+    blockedChunkCount: number;
+    suspiciousWebSourceCount: number;
+    blockedWebSourceCount: number;
+  };
 };
 
 export type QuerySseMetaEvent = {

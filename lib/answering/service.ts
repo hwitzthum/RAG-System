@@ -11,6 +11,11 @@ import {
 } from "@/lib/answering/web-augmented-prompts";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import type { LlmProvider } from "@/lib/providers/types";
+import {
+  containsSensitiveLeakage,
+  protectRetrievedChunks,
+  protectWebSources,
+} from "@/lib/security/prompt-injection";
 import type { WebSource } from "@/lib/web-research/types";
 
 export type GenerateGroundedAnswerInput = {
@@ -27,6 +32,13 @@ export type GenerateGroundedAnswerResult = {
   answer: string;
   citations: Citation[];
   insufficientEvidence: boolean;
+  promptInjection: {
+    suspiciousChunkCount: number;
+    blockedChunkCount: number;
+    suspiciousWebSourceCount: number;
+    blockedWebSourceCount: number;
+    blockedUserQuery: boolean;
+  };
 };
 
 export type AnswerServiceDependencies = {
@@ -62,10 +74,11 @@ export async function generateGroundedAnswer(
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
+  const protectedChunks = protectRetrievedChunks(input.chunks);
 
   const citations = uniqueCitations(buildCitations(input.chunks));
   const sufficientEvidence = hasSufficientEvidence({
-    chunks: input.chunks,
+    chunks: protectedChunks.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
     documentScoped: Boolean(input.documentScopeId),
@@ -76,13 +89,20 @@ export async function generateGroundedAnswer(
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: 0,
+        blockedWebSourceCount: 0,
+        blockedUserQuery: false,
+      },
     };
   }
 
   const prompt = buildGroundedAnswerUserPrompt({
     query: input.query,
     language: input.language,
-    chunks: input.chunks,
+    chunks: protectedChunks.chunks,
   });
 
   const answer = await llmProvider.generateAnswer({
@@ -92,10 +112,32 @@ export async function generateGroundedAnswer(
     maxOutputTokens: input.maxOutputTokens,
   });
 
+  if (containsSensitiveLeakage(answer)) {
+    return {
+      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: citations.slice(0, 3),
+      insufficientEvidence: true,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: 0,
+        blockedWebSourceCount: 0,
+        blockedUserQuery: false,
+      },
+    };
+  }
+
   return {
     answer,
     citations,
     insufficientEvidence: false,
+    promptInjection: {
+      suspiciousChunkCount: protectedChunks.suspiciousCount,
+      blockedChunkCount: protectedChunks.blockedCount,
+      suspiciousWebSourceCount: 0,
+      blockedWebSourceCount: 0,
+      blockedUserQuery: false,
+    },
   };
 }
 
@@ -108,28 +150,37 @@ export async function generateWebAugmentedAnswer(
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
+  const protectedChunks = protectRetrievedChunks(input.chunks);
+  const protectedWebSources = protectWebSources(input.webSources);
 
   const citations = uniqueCitations(buildCitations(input.chunks));
   const sufficientEvidence = hasSufficientEvidence({
-    chunks: input.chunks,
+    chunks: protectedChunks.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
     documentScoped: Boolean(input.documentScopeId),
   });
 
-  if (!sufficientEvidence && input.webSources.length === 0) {
+  if (!sufficientEvidence && protectedWebSources.webSources.length === 0) {
     return {
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
+        blockedWebSourceCount: protectedWebSources.blockedCount,
+        blockedUserQuery: false,
+      },
     };
   }
 
   const prompt = buildWebAugmentedUserPrompt({
     query: input.query,
     language: input.language,
-    chunks: input.chunks,
-    webSources: input.webSources,
+    chunks: protectedChunks.chunks,
+    webSources: protectedWebSources.webSources,
   });
 
   const answer = await llmProvider.generateAnswer({
@@ -139,9 +190,31 @@ export async function generateWebAugmentedAnswer(
     maxOutputTokens: input.maxOutputTokens,
   });
 
+  if (containsSensitiveLeakage(answer)) {
+    return {
+      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: citations.slice(0, 3),
+      insufficientEvidence: true,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
+        blockedWebSourceCount: protectedWebSources.blockedCount,
+        blockedUserQuery: false,
+      },
+    };
+  }
+
   return {
     answer,
     citations,
     insufficientEvidence: false,
+    promptInjection: {
+      suspiciousChunkCount: protectedChunks.suspiciousCount,
+      blockedChunkCount: protectedChunks.blockedCount,
+      suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
+      blockedWebSourceCount: protectedWebSources.blockedCount,
+      blockedUserQuery: false,
+    },
   };
 }
