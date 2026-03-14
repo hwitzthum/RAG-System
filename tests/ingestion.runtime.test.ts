@@ -52,6 +52,15 @@ test("splitIntoSections detects uppercase headings and preserves page metadata",
   assert.equal(sections[0]?.pageNumber, 1);
 });
 
+test("splitIntoSections preserves paragraph breaks within a section", () => {
+  const sections = splitIntoSections({
+    pageNumber: 2,
+    text: "OVERVIEW\nFirst paragraph.\n\nSecond paragraph.\n\nDETAILS\nThird paragraph.",
+  });
+
+  assert.equal(sections[0]?.text.includes("First paragraph.\n\nSecond paragraph."), true);
+});
+
 test("chunkSections respects overlap and emits sequential chunk indices per call", () => {
   const repeated = new Array(1800).fill("token").join(" ");
   const chunks = chunkSections({
@@ -90,6 +99,56 @@ test("chunkSections emits relaxed fallback chunk for short but meaningful sectio
   assert.equal(chunks.length, 1);
   assert.equal(chunks[0]?.chunkIndex, 0);
   assert.equal(chunks[0]?.content.includes("still be indexed"), true);
+});
+
+test("chunkSections merges adjacent short sections into a single adaptive chunk", () => {
+  const chunks = chunkSections({
+    sections: [
+      {
+        pageNumber: 1,
+        sectionTitle: "Overview",
+        text: "Short introduction about the handbook.",
+      },
+      {
+        pageNumber: 1,
+        sectionTitle: "Scope",
+        text: "Short scope note describing supported cases.",
+      },
+    ],
+    language: "EN",
+    targetTokens: 80,
+    overlapTokens: 20,
+    minChars: 80,
+  });
+
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.sectionTitle, "Overview / Scope");
+  assert.equal(chunks[0]?.content.includes("supported cases"), true);
+});
+
+test("chunkSections prefers paragraph-aware chunk boundaries", () => {
+  const chunks = chunkSections({
+    sections: [
+      {
+        pageNumber: 1,
+        sectionTitle: "Overview",
+        text: [
+          "Paragraph one explains the first part of the process in a complete thought.",
+          "",
+          "Paragraph two explains the second part of the process in another complete thought.",
+          "",
+          "Paragraph three explains the third part of the process in a final complete thought.",
+        ].join("\n"),
+      },
+    ],
+    language: "EN",
+    targetTokens: 28,
+    overlapTokens: 6,
+    minChars: 20,
+  });
+
+  assert.equal(chunks.length >= 2, true);
+  assert.equal(chunks[0]?.content.includes("\n\n"), true);
 });
 
 class FakeRepository implements IngestionRuntimeRepository {

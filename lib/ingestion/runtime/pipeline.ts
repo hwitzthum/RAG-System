@@ -111,6 +111,37 @@ function buildRelaxedDocumentFallbackChunk(
   };
 }
 
+function groupSectionsByLanguage(
+  sections: { pageNumber: number; sectionTitle: string; text: string; language: SupportedLanguage }[],
+): Array<{ language: SupportedLanguage; sections: { pageNumber: number; sectionTitle: string; text: string }[] }> {
+  const groups: Array<{ language: SupportedLanguage; sections: { pageNumber: number; sectionTitle: string; text: string }[] }> = [];
+
+  for (const section of sections) {
+    const currentGroup = groups[groups.length - 1];
+    if (currentGroup && currentGroup.language === section.language) {
+      currentGroup.sections.push({
+        pageNumber: section.pageNumber,
+        sectionTitle: section.sectionTitle,
+        text: section.text,
+      });
+      continue;
+    }
+
+    groups.push({
+      language: section.language,
+      sections: [
+        {
+          pageNumber: section.pageNumber,
+          sectionTitle: section.sectionTitle,
+          text: section.text,
+        },
+      ],
+    });
+  }
+
+  return groups;
+}
+
 type ExtractPagesFn = typeof extractPages;
 type ContextGeneratorPort = Pick<ContextGenerator, "enrich">;
 type EmbeddingProviderPort = Pick<EmbeddingProvider, "embedTexts">;
@@ -178,12 +209,16 @@ export class IngestionPipeline {
         throw new Error("No extractable text found in document");
       }
 
+      const sectionsWithLanguage = sections.map((section) => ({
+        ...section,
+        language: detectLanguage(section.text, document.language),
+      }));
+
       let chunkCandidates: ChunkCandidate[] = [];
-      for (const section of sections) {
-        const language = detectLanguage(section.text, document.language);
+      for (const group of groupSectionsByLanguage(sectionsWithLanguage)) {
         const sectionChunks = chunkSections({
-          sections: [section],
-          language,
+          sections: group.sections,
+          language: group.language,
           targetTokens: this.settings.chunkTargetTokens,
           overlapTokens: this.settings.chunkOverlapTokens,
           minChars: this.settings.chunkMinChars,
