@@ -154,6 +154,7 @@ test("chunkSections prefers paragraph-aware chunk boundaries", () => {
 class FakeRepository implements IngestionRuntimeRepository {
   public readonly document: DocumentRecord = {
     id: "doc-1",
+    userId: null,
     storagePath: "uploads/doc-1.pdf",
     sha256: "abc123",
     title: "Test",

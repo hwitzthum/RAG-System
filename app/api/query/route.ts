@@ -6,6 +6,7 @@ import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
+import { markUserCohereApiKeyUsed, resolveUserCohereApiKey } from "@/lib/providers/cohere-vault";
 import { markUserOpenAiApiKeyUsed, resolveUserOpenAiApiKey } from "@/lib/providers/openai-vault";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
@@ -249,8 +250,12 @@ export async function POST(request: NextRequest) {
   }
 
   let userOpenAiApiKey: string | null = null;
+  let userCohereApiKey: string | null = null;
   try {
-    userOpenAiApiKey = await resolveUserOpenAiApiKey(authResult.user.id);
+    [userOpenAiApiKey, userCohereApiKey] = await Promise.all([
+      resolveUserOpenAiApiKey(authResult.user.id),
+      resolveUserCohereApiKey(authResult.user.id),
+    ]);
   } catch (error) {
     logAuditEvent({
       action: "query.execute",
@@ -260,16 +265,17 @@ export async function POST(request: NextRequest) {
       resource: "query",
       ipAddress,
       metadata: {
-        reason: "openai_byok_resolve_failed",
+        reason: "provider_byok_resolve_failed",
         message: error instanceof Error ? error.message : "unknown_error",
       },
     });
-    return NextResponse.json({ error: "Failed to resolve OpenAI credentials" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to resolve user provider credentials" }, { status: 500 });
   }
 
   return runWithRuntimeSecrets(
     {
       openAiApiKey: userOpenAiApiKey ?? undefined,
+      cohereApiKey: userCohereApiKey ?? undefined,
     },
     async () => {
       const startedAt = Date.now();
@@ -387,6 +393,23 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
+          void markUserCohereApiKeyUsed(authResult.user.id).catch((touchError) => {
+            logAuditEvent({
+              action: "cohere.byok.touch",
+              actorId: authResult.user.id,
+              actorRole: authResult.user.role,
+              outcome: "failure",
+              resource: "cohere_byok_vault",
+              ipAddress,
+              metadata: {
+                reason: "touch_failed",
+                message: touchError instanceof Error ? touchError.message : "unknown_error",
+              },
+            });
+          });
+        }
+
         logAuditEvent({
           action: "query.execute",
           actorId: authResult.user.id,
@@ -408,6 +431,7 @@ export async function POST(request: NextRequest) {
             outputFilter: answerResult.outputFilter,
             resolvedConversationId: conversationId,
             openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
+            cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",
           },
         });
 

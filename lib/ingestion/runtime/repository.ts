@@ -61,6 +61,7 @@ function toIngestionJob(row: ClaimedJobRow): IngestionJob {
 function toDocumentRecord(row: DocumentRow): DocumentRecord {
   return {
     id: row.id,
+    userId: row.user_id,
     storagePath: row.storage_path,
     sha256: row.sha256,
     title: row.title,
@@ -148,7 +149,7 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
   async getDocument(documentId: string): Promise<DocumentRecord> {
     const { data, error } = await this.supabase
       .from("documents")
-      .select("id,storage_path,sha256,title,language,status,ingestion_version")
+      .select("id,user_id,storage_path,sha256,title,language,status,ingestion_version")
       .eq("id", documentId)
       .single<DocumentRow>();
 

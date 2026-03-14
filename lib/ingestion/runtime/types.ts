@@ -12,6 +12,7 @@ export type IngestionJob = {
 
 export type DocumentRecord = {
   id: string;
+  userId: string | null;
   storagePath: string;
   sha256: string;
   title: string | null;

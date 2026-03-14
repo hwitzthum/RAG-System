@@ -1,5 +1,5 @@
 import type {
-  OpenAiByokStatusResponse,
+  ProviderByokStatusResponse,
   QueryHistoryItem,
   QuerySseMetaEvent,
   WebSource,
@@ -107,26 +107,21 @@ export type SidebarRightProps = {
   documentsLoading: boolean;
   queryDocumentScopeId: string | null;
   setQueryDocumentScopeId: (id: string | null) => void;
-  // BYOK props
-  user: AuthUser | null;
-  openAiByokInput: string;
-  setOpenAiByokInput: (v: string) => void;
-  openAiByokStatus: OpenAiByokStatusResponse | null;
-  openAiByokLoading: boolean;
-  saveOpenAiByokKey: () => void;
-  deleteOpenAiByokKey: () => void;
-  loadOpenAiByokStatus: () => void;
+  providerVaults: ProviderKeyVaultProps[];
 };
 
-export type OpenAiKeyVaultProps = {
+export type ProviderKeyVaultProps = {
+  providerLabel: string;
+  providerSlug: string;
+  placeholder: string;
   user: AuthUser | null;
-  openAiByokInput: string;
-  setOpenAiByokInput: (v: string) => void;
-  openAiByokStatus: OpenAiByokStatusResponse | null;
-  openAiByokLoading: boolean;
-  saveOpenAiByokKey: () => void;
-  deleteOpenAiByokKey: () => void;
-  loadOpenAiByokStatus: () => void;
+  inputValue: string;
+  setInputValue: (v: string) => void;
+  status: ProviderByokStatusResponse | null;
+  loading: boolean;
+  saveKey: () => void;
+  deleteKey: () => void;
+  loadStatus: () => void;
 };
 
 export type DevSessionControlsProps = {

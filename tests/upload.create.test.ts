@@ -14,10 +14,11 @@ function createRpcSuccessClient(): UploadCreateClient {
             job_status: "queued",
             ingestion_version: 1,
             storage_path: "uploads/doc-1.pdf",
-            sha256: "sha-1",
-            idempotency_key: "sha-1:v1",
-            created_at: "2026-03-13T00:00:00.000Z",
-          },
+          sha256: "sha-1",
+          idempotency_key: "sha-1:v1",
+          created_at: "2026-03-13T00:00:00.000Z",
+          user_id: "user-1",
+        },
         ],
         error: null,
       };
@@ -32,6 +33,7 @@ test("createDocumentWithInitialJob returns mapped RPC rows", async () => {
     checksumSha256: "sha-1",
     title: "Test",
     languageHint: "EN",
+    userId: "user-1",
   });
 
   assert.deepEqual(result, {
@@ -57,6 +59,7 @@ test("createDocumentWithInitialJob returns null when RPC reports no insert", asy
     checksumSha256: "sha-1",
     title: "Test",
     languageHint: null,
+    userId: "user-1",
   });
 
   assert.equal(result, null);
@@ -67,7 +70,7 @@ test("createDocumentWithInitialJob throws when the RPC is unavailable", async ()
     async runCreateDocumentWithInitialJobRpc() {
       return {
         data: null,
-        error: { message: "Could not find the function public.create_document_with_ingestion_job" },
+        error: { message: "Could not find the function public.create_document_with_ingestion_job_for_user" },
       };
     },
   };
@@ -79,7 +82,8 @@ test("createDocumentWithInitialJob throws when the RPC is unavailable", async ()
       checksumSha256: "sha-fallback",
       title: "Fallback",
       languageHint: "DE",
+      userId: "user-1",
     }),
-    /Required ingestion RPC create_document_with_ingestion_job is unavailable/,
+    /Required ingestion RPC create_document_with_ingestion_job_for_user is unavailable/,
   );
 });

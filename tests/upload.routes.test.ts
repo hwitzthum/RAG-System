@@ -22,7 +22,7 @@ function buildPdfFile(name: string): File {
 }
 
 test("queueSingleUpload persists the document and returns the queued response payload", async () => {
-  const persistCalls: Array<{ fileName: string; title: string | null; languageHint: string | null }> = [];
+  const persistCalls: Array<{ fileName: string; title: string | null; languageHint: string | null; userId: string }> = [];
   const auditEvents: Array<Record<string, unknown>> = [];
   const persisted: PersistedResult = {
     documentId: "doc-single",
@@ -47,6 +47,7 @@ test("queueSingleUpload persists the document and returns the queued response pa
           fileName: input.file.name,
           title: input.title,
           languageHint: input.languageHint,
+          userId: input.userId,
         });
         return persisted;
       },
@@ -61,6 +62,7 @@ test("queueSingleUpload persists the document and returns the queued response pa
       fileName: "single.pdf",
       title: "Single Upload",
       languageHint: "DE",
+      userId: "user-1",
     },
   ]);
   assert.equal(result.statusCode, 201);
@@ -72,7 +74,7 @@ test("queueSingleUpload persists the document and returns the queued response pa
 });
 
 test("queueBatchUploadEntry persists a valid PDF and marks it accepted", async () => {
-  const persistCalls: Array<{ fileName: string; title: string | null; languageHint: string | null }> = [];
+  const persistCalls: Array<{ fileName: string; title: string | null; languageHint: string | null; userId: string }> = [];
   const auditEvents: Array<Record<string, unknown>> = [];
   const persisted: PersistedResult = {
     documentId: "doc-batch",
@@ -97,6 +99,7 @@ test("queueBatchUploadEntry persists a valid PDF and marks it accepted", async (
           fileName: input.file.name,
           title: input.title,
           languageHint: input.languageHint,
+          userId: input.userId,
         });
         return persisted;
       },
@@ -111,6 +114,7 @@ test("queueBatchUploadEntry persists a valid PDF and marks it accepted", async (
       fileName: "batch.pdf",
       title: "batch.pdf",
       languageHint: null,
+      userId: "user-1",
     },
   ]);
   assert.deepEqual(result, {

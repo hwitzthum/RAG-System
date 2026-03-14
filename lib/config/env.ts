@@ -20,6 +20,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_BYOK_VAULT_KEY: z.string().min(1).optional(),
   OPENAI_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
+  COHERE_BYOK_VAULT_KEY: z.string().min(1).optional(),
+  COHERE_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
   RAG_QUERY_EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-large"),
   RAG_RETRIEVAL_VERSION: z.coerce.number().int().positive().default(1),
   RAG_RRF_K: z.coerce.number().int().positive().default(60),
@@ -57,6 +59,8 @@ const envSchema = z.object({
   RAG_MULTI_QUERY_VARIATIONS: z.coerce.number().int().positive().default(3),
   RAG_QUERY_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1024),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_BYOK_VAULT_KEY: z.string().min(1).optional(),
+  ANTHROPIC_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: z.string().min(1).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
 });
@@ -78,6 +82,8 @@ const parsed = envSchema.safeParse({
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_BYOK_VAULT_KEY: process.env.OPENAI_BYOK_VAULT_KEY || undefined,
   OPENAI_BYOK_VAULT_KEY_VERSION: process.env.OPENAI_BYOK_VAULT_KEY_VERSION,
+  COHERE_BYOK_VAULT_KEY: process.env.COHERE_BYOK_VAULT_KEY || undefined,
+  COHERE_BYOK_VAULT_KEY_VERSION: process.env.COHERE_BYOK_VAULT_KEY_VERSION,
   RAG_QUERY_EMBEDDING_MODEL: process.env.RAG_QUERY_EMBEDDING_MODEL,
   RAG_RETRIEVAL_VERSION: process.env.RAG_RETRIEVAL_VERSION,
   RAG_RRF_K: process.env.RAG_RRF_K,
@@ -103,6 +109,8 @@ const parsed = envSchema.safeParse({
   RAG_MULTI_QUERY_VARIATIONS: process.env.RAG_MULTI_QUERY_VARIATIONS,
   RAG_QUERY_EMBEDDING_DIMENSIONS: process.env.RAG_QUERY_EMBEDDING_DIMENSIONS,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
+  ANTHROPIC_BYOK_VAULT_KEY: process.env.ANTHROPIC_BYOK_VAULT_KEY || undefined,
+  ANTHROPIC_BYOK_VAULT_KEY_VERSION: process.env.ANTHROPIC_BYOK_VAULT_KEY_VERSION,
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: process.env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN || undefined,
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
 });
@@ -127,6 +135,14 @@ if (config.NODE_ENV === "production" && config.AUTH_DEV_INSECURE_BYPASS) {
 
 if (config.OPENAI_BYOK_VAULT_KEY && Buffer.from(config.OPENAI_BYOK_VAULT_KEY, "base64").length !== 32) {
   throw new Error("OPENAI_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
+}
+
+if (config.COHERE_BYOK_VAULT_KEY && Buffer.from(config.COHERE_BYOK_VAULT_KEY, "base64").length !== 32) {
+  throw new Error("COHERE_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
+}
+
+if (config.ANTHROPIC_BYOK_VAULT_KEY && Buffer.from(config.ANTHROPIC_BYOK_VAULT_KEY, "base64").length !== 32) {
+  throw new Error("ANTHROPIC_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
 }
 
 if (config.NODE_ENV === "production" && !config.OPENAI_BYOK_VAULT_KEY) {

@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 type RuntimeSecrets = {
   openAiApiKey?: string;
+  cohereApiKey?: string;
+  anthropicApiKey?: string;
 };
 
 const runtimeSecretsStorage = new AsyncLocalStorage<RuntimeSecrets>();
@@ -23,6 +25,8 @@ export function runWithRuntimeSecrets<T>(secrets: RuntimeSecrets, handler: () =>
   return runtimeSecretsStorage.run(
     {
       openAiApiKey: sanitizeSecretValue(secrets.openAiApiKey),
+      cohereApiKey: sanitizeSecretValue(secrets.cohereApiKey),
+      anthropicApiKey: sanitizeSecretValue(secrets.anthropicApiKey),
     },
     handler,
   );

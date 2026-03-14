@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { SidebarRightProps } from "./types";
 import { getDocumentDisplayName, getMessageToneClass } from "./types";
-import { OpenAiKeyVault } from "./openai-key-vault";
+import { ProviderKeyVault } from "./provider-key-vault";
 
 type Tab = "evidence" | "upload" | "status";
 
@@ -30,15 +30,7 @@ export function SidebarRight({
   documentsLoading,
   queryDocumentScopeId,
   setQueryDocumentScopeId,
-  // BYOK props
-  user,
-  openAiByokInput,
-  setOpenAiByokInput,
-  openAiByokStatus,
-  openAiByokLoading,
-  saveOpenAiByokKey,
-  deleteOpenAiByokKey,
-  loadOpenAiByokStatus,
+  providerVaults,
 }: SidebarRightProps) {
   const [activeTab, setActiveTab] = useState<Tab>("evidence");
   const workspaceToneClass = getMessageToneClass(workspaceMessage);
@@ -242,16 +234,9 @@ export function SidebarRight({
             </section>
 
             {/* BYOK Vault */}
-            <OpenAiKeyVault
-              user={user}
-              openAiByokInput={openAiByokInput}
-              setOpenAiByokInput={setOpenAiByokInput}
-              openAiByokStatus={openAiByokStatus}
-              openAiByokLoading={openAiByokLoading}
-              saveOpenAiByokKey={saveOpenAiByokKey}
-              deleteOpenAiByokKey={deleteOpenAiByokKey}
-              loadOpenAiByokStatus={loadOpenAiByokStatus}
-            />
+            {providerVaults.map((providerVault) => (
+              <ProviderKeyVault key={providerVault.providerSlug} {...providerVault} />
+            ))}
           </div>
         )}
 

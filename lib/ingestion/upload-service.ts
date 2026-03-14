@@ -15,6 +15,7 @@ export type UploadPersistenceInput = {
   file: File;
   title: string | null;
   languageHint: SupportedLanguage | null;
+  userId: string;
 };
 
 export type UploadPersistenceResult = {
@@ -218,6 +219,7 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
       checksumSha256,
       title: input.title,
       languageHint: input.languageHint,
+      userId: input.userId,
     });
 
     if (!created) {

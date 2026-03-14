@@ -128,16 +128,19 @@ export type QueryHistoryResponse = {
   items: QueryHistoryItem[];
 };
 
-export type OpenAiByokStatusResponse = {
+export type ProviderByokStatusResponse = {
   vaultEnabled: boolean;
   configured: boolean;
   keyLast4: string | null;
   updatedAt: string | null;
 };
 
-export type OpenAiByokUpsertRequest = {
+export type ProviderByokUpsertRequest = {
   apiKey: string;
 };
+
+export type OpenAiByokStatusResponse = ProviderByokStatusResponse;
+export type OpenAiByokUpsertRequest = ProviderByokUpsertRequest;
 
 export type AdminRuntimeStatusResponse = {
   generatedAt: string;

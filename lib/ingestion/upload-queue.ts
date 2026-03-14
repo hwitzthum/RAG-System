@@ -31,6 +31,7 @@ export async function queueSingleUpload(input: {
     file: input.file,
     title: input.title,
     languageHint: input.languageHint,
+    userId: input.user.id,
   });
 
   input.dependencies.logAuditEvent({
@@ -81,6 +82,7 @@ export async function queueBatchUploadEntry(input: {
     file: input.file,
     title: input.title,
     languageHint: input.languageHint,
+    userId: input.user.id,
   });
 
   input.dependencies.logAuditEvent({

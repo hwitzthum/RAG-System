@@ -4,6 +4,7 @@ import { EmbeddingProvider } from "@/lib/ingestion/runtime/embedding-provider";
 import { extractPages } from "@/lib/ingestion/runtime/pdf-extractor";
 import type {
   ChunkCandidate,
+  DocumentRecord,
   IngestionJob,
   IngestionRuntimeSettings,
   JobProgress,
@@ -145,14 +146,21 @@ function groupSectionsByLanguage(
 type ExtractPagesFn = typeof extractPages;
 type ContextGeneratorPort = Pick<ContextGenerator, "enrich">;
 type EmbeddingProviderPort = Pick<EmbeddingProvider, "embedTexts">;
+type ContextGeneratorFactory = (settings: IngestionRuntimeSettings, logger: RuntimeLogger) => ContextGeneratorPort;
+type EmbeddingProviderFactory = (settings: IngestionRuntimeSettings, logger: RuntimeLogger) => EmbeddingProviderPort;
+type ResolveJobSecrets = (document: DocumentRecord) => Promise<{
+  openAiApiKey: string | null;
+  anthropicApiKey: string | null;
+}>;
 
 export class IngestionPipeline {
   private readonly settings: IngestionRuntimeSettings;
   private readonly repository: IngestionRuntimeRepository;
   private readonly logger: RuntimeLogger;
   private readonly extractPagesFn: ExtractPagesFn;
-  private readonly contextGenerator: ContextGeneratorPort;
-  private readonly embeddingProvider: EmbeddingProviderPort;
+  private readonly contextGeneratorFactory: ContextGeneratorFactory;
+  private readonly embeddingProviderFactory: EmbeddingProviderFactory;
+  private readonly resolveJobSecrets: ResolveJobSecrets;
 
   constructor(input: {
     settings: IngestionRuntimeSettings;
@@ -161,13 +169,32 @@ export class IngestionPipeline {
     extractPagesFn?: ExtractPagesFn;
     contextGenerator?: ContextGeneratorPort;
     embeddingProvider?: EmbeddingProviderPort;
+    resolveJobSecrets?: ResolveJobSecrets;
   }) {
     this.settings = input.settings;
     this.repository = input.repository;
     this.logger = input.logger ?? console;
     this.extractPagesFn = input.extractPagesFn ?? extractPages;
-    this.contextGenerator = input.contextGenerator ?? new ContextGenerator(input.settings, this.logger);
-    this.embeddingProvider = input.embeddingProvider ?? new EmbeddingProvider(input.settings, this.logger);
+    this.contextGeneratorFactory = input.contextGenerator
+      ? () => input.contextGenerator as ContextGeneratorPort
+      : (settings, logger) => new ContextGenerator(settings, logger);
+    this.embeddingProviderFactory = input.embeddingProvider
+      ? () => input.embeddingProvider as EmbeddingProviderPort
+      : (settings, logger) => new EmbeddingProvider(settings, logger);
+    this.resolveJobSecrets = input.resolveJobSecrets ?? (async (document) => {
+      if (!document.userId) {
+        return {
+          openAiApiKey: this.settings.openAiApiKey,
+          anthropicApiKey: this.settings.anthropicApiKey,
+        };
+      }
+      const { resolveDocumentProviderSecrets } = await import("@/lib/providers/document-provider-secrets");
+      return resolveDocumentProviderSecrets({
+        userId: document.userId,
+        fallbackOpenAiApiKey: this.settings.openAiApiKey,
+        fallbackAnthropicApiKey: this.settings.anthropicApiKey,
+      });
+    });
   }
 
   async processJob(job: IngestionJob): Promise<ProcessJobResult> {
@@ -182,6 +209,14 @@ export class IngestionPipeline {
     };
 
     const document = await this.repository.getDocument(job.documentId);
+    const jobSecrets = await this.resolveJobSecrets(document);
+    const jobSettings: IngestionRuntimeSettings = {
+      ...this.settings,
+      openAiApiKey: jobSecrets.openAiApiKey,
+      anthropicApiKey: jobSecrets.anthropicApiKey,
+    };
+    const contextGenerator = this.contextGeneratorFactory(jobSettings, this.logger);
+    const embeddingProvider = this.embeddingProviderFactory(jobSettings, this.logger);
 
     // Load incremental state
     let progress: JobProgress = await this.repository.loadJobProgress(job.id);
@@ -280,13 +315,13 @@ export class IngestionPipeline {
 
     // Enrich batch with context
     await setStage("contextualizing");
-    const batchWithContext = await this.contextGenerator.enrich(batch);
+    const batchWithContext = await contextGenerator.enrich(batch);
     this.logger.info("pipeline_step", { step: "batch_context_enriched", elapsed: elapsed(), count: batchWithContext.length });
 
     // Generate embeddings for batch
     await setStage("embedding");
     const embeddingInputs = batchWithContext.map((item) => `${item.context}\n\n${item.content}`);
-    const embeddings = await this.embeddingProvider.embedTexts(embeddingInputs);
+    const embeddings = await embeddingProvider.embedTexts(embeddingInputs);
     this.logger.info("pipeline_step", { step: "batch_embeddings_generated", elapsed: elapsed(), count: embeddings.length });
 
     if (embeddings.length !== batchWithContext.length) {

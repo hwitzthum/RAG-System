@@ -245,6 +245,30 @@ test.describe("Authenticated API flows", () => {
     }
   });
 
+  test("GET /api/byok/cohere with valid auth returns vault status", async ({ request }) => {
+    const response = await request.get("/api/byok/cohere", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (response.status() === 200) {
+      const json = await response.json();
+      expect(json).toHaveProperty("vaultEnabled");
+      expect(json).toHaveProperty("configured");
+    }
+  });
+
+  test("GET /api/byok/anthropic with valid auth returns vault status", async ({ request }) => {
+    const response = await request.get("/api/byok/anthropic", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (response.status() === 200) {
+      const json = await response.json();
+      expect(json).toHaveProperty("vaultEnabled");
+      expect(json).toHaveProperty("configured");
+    }
+  });
+
   test("DELETE /api/auth/session clears session", async ({ request }) => {
     const response = await request.delete("/api/auth/session");
     expect(response.ok()).toBe(true);

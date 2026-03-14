@@ -6,7 +6,7 @@ import { Toaster, toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuthUser } from "@/lib/auth/types";
 import type {
-  OpenAiByokStatusResponse,
+  ProviderByokStatusResponse,
   QueryHistoryItem,
   QueryHistoryResponse,
   QuerySseFinalEvent,
@@ -23,7 +23,12 @@ import { SidebarLeft } from "@/components/workbench/sidebar-left";
 import { SidebarRight } from "@/components/workbench/sidebar-right";
 import { DevSessionControls } from "@/components/workbench/dev-session-controls";
 import { getDocumentDisplayName } from "@/components/workbench/types";
-import type { Turn, UploadStatusSnapshot, DocumentListItem } from "@/components/workbench/types";
+import type {
+  Turn,
+  UploadStatusSnapshot,
+  DocumentListItem,
+  ProviderKeyVaultProps,
+} from "@/components/workbench/types";
 
 type RagWorkbenchProps = {
   initialUser: AuthUser | null;
@@ -79,8 +84,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [token, setToken] = useState("");
   const [openAiByokInput, setOpenAiByokInput] = useState("");
-  const [openAiByokStatus, setOpenAiByokStatus] = useState<OpenAiByokStatusResponse | null>(null);
+  const [openAiByokStatus, setOpenAiByokStatus] = useState<ProviderByokStatusResponse | null>(null);
   const [openAiByokLoading, setOpenAiByokLoading] = useState(false);
+  const [cohereByokInput, setCohereByokInput] = useState("");
+  const [cohereByokStatus, setCohereByokStatus] = useState<ProviderByokStatusResponse | null>(null);
+  const [cohereByokLoading, setCohereByokLoading] = useState(false);
+  const [anthropicByokInput, setAnthropicByokInput] = useState("");
+  const [anthropicByokStatus, setAnthropicByokStatus] = useState<ProviderByokStatusResponse | null>(null);
+  const [anthropicByokLoading, setAnthropicByokLoading] = useState(false);
   const [conversationId, setConversationId] = useState(newUuid);
   const [query, setQuery] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -179,6 +190,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setUser(null);
     setOpenAiByokInput("");
     setOpenAiByokStatus(null);
+    setCohereByokInput("");
+    setCohereByokStatus(null);
+    setAnthropicByokInput("");
+    setAnthropicByokStatus(null);
     setTurns([]);
     setQueryHistory([]);
     setQueryDocumentScopeId(null);
@@ -203,24 +218,58 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     };
   }, [user, clearSession]);
 
-  const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
-    if (!user) { setOpenAiByokStatus(null); return; }
-    setOpenAiByokLoading(true);
+  const loadProviderByokStatus = useCallback(async (
+    providerSlug: "openai" | "cohere" | "anthropic",
+    setters: {
+      setStatus: (status: ProviderByokStatusResponse | null) => void;
+      setLoading: (loading: boolean) => void;
+    },
+  ): Promise<void> => {
+    if (!user) {
+      setters.setStatus(null);
+      return;
+    }
+    setters.setLoading(true);
     try {
-      const response = await fetch("/api/byok/openai");
+      const response = await fetch(`/api/byok/${providerSlug}`);
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        setWorkspaceMessage(payload.error ?? "Unable to load OpenAI BYOK status.");
+        setWorkspaceMessage(payload.error ?? `Unable to load ${providerSlug} BYOK status.`);
         return;
       }
-      const payload = (await response.json()) as OpenAiByokStatusResponse;
-      setOpenAiByokStatus(payload);
+      const payload = (await response.json()) as ProviderByokStatusResponse;
+      setters.setStatus(payload);
     } finally {
-      setOpenAiByokLoading(false);
+      setters.setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => { void loadOpenAiByokStatus(); }, [loadOpenAiByokStatus]);
+  const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
+    return loadProviderByokStatus("openai", {
+      setStatus: setOpenAiByokStatus,
+      setLoading: setOpenAiByokLoading,
+    });
+  }, [loadProviderByokStatus]);
+
+  const loadCohereByokStatus = useCallback(async (): Promise<void> => {
+    return loadProviderByokStatus("cohere", {
+      setStatus: setCohereByokStatus,
+      setLoading: setCohereByokLoading,
+    });
+  }, [loadProviderByokStatus]);
+
+  const loadAnthropicByokStatus = useCallback(async (): Promise<void> => {
+    return loadProviderByokStatus("anthropic", {
+      setStatus: setAnthropicByokStatus,
+      setLoading: setAnthropicByokLoading,
+    });
+  }, [loadProviderByokStatus]);
+
+  useEffect(() => {
+    void loadOpenAiByokStatus();
+    void loadCohereByokStatus();
+    void loadAnthropicByokStatus();
+  }, [loadAnthropicByokStatus, loadCohereByokStatus, loadOpenAiByokStatus]);
 
   // --- Actions ---
 
@@ -245,49 +294,70 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     toast.success(`Session created for role=${payload.user.role}.`);
   }
 
-  async function saveOpenAiByokKey(): Promise<void> {
-    if (!user) { setWorkspaceMessage("Create a session before configuring OpenAI BYOK."); return; }
-    if (!openAiByokInput.trim()) { setWorkspaceMessage("Enter an OpenAI API key first."); return; }
-    setOpenAiByokLoading(true);
+  const saveProviderByokKey = useCallback(async (input: {
+    providerSlug: "openai" | "cohere" | "anthropic";
+    providerLabel: string;
+    apiKey: string;
+    setStatus: (status: ProviderByokStatusResponse | null) => void;
+    setInput: (value: string) => void;
+    setLoading: (loading: boolean) => void;
+  }): Promise<void> => {
+    if (!user) {
+      setWorkspaceMessage(`Create a session before configuring ${input.providerLabel} BYOK.`);
+      return;
+    }
+    if (!input.apiKey.trim()) {
+      setWorkspaceMessage(`Enter a ${input.providerLabel} API key first.`);
+      return;
+    }
+    input.setLoading(true);
     try {
-      const response = await fetch("/api/byok/openai", {
+      const response = await fetch(`/api/byok/${input.providerSlug}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ apiKey: openAiByokInput }),
+        body: JSON.stringify({ apiKey: input.apiKey }),
       });
-      const payload = (await response.json()) as OpenAiByokStatusResponse & { error?: string };
+      const payload = (await response.json()) as ProviderByokStatusResponse & { error?: string };
       if (!response.ok) {
-        setWorkspaceMessage(payload.error ?? "Failed to save OpenAI API key.");
-        toast.error(payload.error ?? "Failed to save OpenAI API key.");
+        setWorkspaceMessage(payload.error ?? `Failed to save ${input.providerLabel} API key.`);
+        toast.error(payload.error ?? `Failed to save ${input.providerLabel} API key.`);
         return;
       }
-      setOpenAiByokStatus(payload);
-      setOpenAiByokInput("");
-      setWorkspaceMessage("OpenAI BYOK key stored in encrypted vault.");
-      toast.success("OpenAI BYOK key stored in encrypted vault.");
+      input.setStatus(payload);
+      input.setInput("");
+      setWorkspaceMessage(`${input.providerLabel} BYOK key stored in encrypted vault.`);
+      toast.success(`${input.providerLabel} BYOK key stored in encrypted vault.`);
     } finally {
-      setOpenAiByokLoading(false);
+      input.setLoading(false);
     }
-  }
+  }, [user]);
 
-  async function deleteOpenAiByokKey(): Promise<void> {
+  const deleteProviderByokKey = useCallback(async (input: {
+    providerSlug: "openai" | "cohere" | "anthropic";
+    providerLabel: string;
+    setStatus: (status: ProviderByokStatusResponse | null) => void;
+    setLoading: (loading: boolean) => void;
+  }): Promise<void> => {
     if (!user) return;
-    setOpenAiByokLoading(true);
+    input.setLoading(true);
     try {
-      const response = await fetch("/api/byok/openai", { method: "DELETE", headers: csrfHeaders() });
-      const payload = (await response.json()) as OpenAiByokStatusResponse & { error?: string };
+      const response = await fetch(`/api/byok/${input.providerSlug}`, {
+        method: "DELETE",
+        headers: csrfHeaders(),
+      });
+      const payload = (await response.json()) as ProviderByokStatusResponse & { error?: string };
       if (!response.ok) {
-        setWorkspaceMessage(payload.error ?? "Failed to remove OpenAI API key.");
-        toast.error(payload.error ?? "Failed to remove OpenAI API key.");
+        setWorkspaceMessage(payload.error ?? `Failed to remove ${input.providerLabel} API key.`);
+        toast.error(payload.error ?? `Failed to remove ${input.providerLabel} API key.`);
         return;
       }
-      setOpenAiByokStatus(payload);
-      setWorkspaceMessage("OpenAI BYOK key removed from vault.");
-      toast.success("OpenAI BYOK key removed from vault.");
+      input.setStatus(payload);
+      setWorkspaceMessage(`${input.providerLabel} BYOK key removed from vault.`);
+      toast.success(`${input.providerLabel} BYOK key removed from vault.`);
     } finally {
-      setOpenAiByokLoading(false);
+      input.setLoading(false);
     }
-  }
+  }, [user]);
 
   async function refreshUploadStatus(documentId: string): Promise<UploadStatusSnapshot | null> {
     const response = await fetch(`/api/upload/${documentId}`);
@@ -569,6 +639,100 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setQuery("");
   }
 
+  const providerVaults = useMemo<ProviderKeyVaultProps[]>(() => [
+    {
+      providerLabel: "OpenAI",
+      providerSlug: "openai",
+      placeholder: "OpenAI API key (sk-...)",
+      user,
+      inputValue: openAiByokInput,
+      setInputValue: setOpenAiByokInput,
+      status: openAiByokStatus,
+      loading: openAiByokLoading,
+      saveKey: () => void saveProviderByokKey({
+        providerSlug: "openai",
+        providerLabel: "OpenAI",
+        apiKey: openAiByokInput,
+        setStatus: setOpenAiByokStatus,
+        setInput: setOpenAiByokInput,
+        setLoading: setOpenAiByokLoading,
+      }),
+      deleteKey: () => void deleteProviderByokKey({
+        providerSlug: "openai",
+        providerLabel: "OpenAI",
+        setStatus: setOpenAiByokStatus,
+        setLoading: setOpenAiByokLoading,
+      }),
+      loadStatus: () => void loadOpenAiByokStatus(),
+    },
+    {
+      providerLabel: "Cohere",
+      providerSlug: "cohere",
+      placeholder: "Cohere API key",
+      user,
+      inputValue: cohereByokInput,
+      setInputValue: setCohereByokInput,
+      status: cohereByokStatus,
+      loading: cohereByokLoading,
+      saveKey: () => void saveProviderByokKey({
+        providerSlug: "cohere",
+        providerLabel: "Cohere",
+        apiKey: cohereByokInput,
+        setStatus: setCohereByokStatus,
+        setInput: setCohereByokInput,
+        setLoading: setCohereByokLoading,
+      }),
+      deleteKey: () => void deleteProviderByokKey({
+        providerSlug: "cohere",
+        providerLabel: "Cohere",
+        setStatus: setCohereByokStatus,
+        setLoading: setCohereByokLoading,
+      }),
+      loadStatus: () => void loadCohereByokStatus(),
+    },
+    {
+      providerLabel: "Anthropic",
+      providerSlug: "anthropic",
+      placeholder: "Anthropic API key",
+      user,
+      inputValue: anthropicByokInput,
+      setInputValue: setAnthropicByokInput,
+      status: anthropicByokStatus,
+      loading: anthropicByokLoading,
+      saveKey: () => void saveProviderByokKey({
+        providerSlug: "anthropic",
+        providerLabel: "Anthropic",
+        apiKey: anthropicByokInput,
+        setStatus: setAnthropicByokStatus,
+        setInput: setAnthropicByokInput,
+        setLoading: setAnthropicByokLoading,
+      }),
+      deleteKey: () => void deleteProviderByokKey({
+        providerSlug: "anthropic",
+        providerLabel: "Anthropic",
+        setStatus: setAnthropicByokStatus,
+        setLoading: setAnthropicByokLoading,
+      }),
+      loadStatus: () => void loadAnthropicByokStatus(),
+    },
+  ], [
+    anthropicByokInput,
+    anthropicByokLoading,
+    anthropicByokStatus,
+    cohereByokInput,
+    cohereByokLoading,
+    cohereByokStatus,
+    deleteProviderByokKey,
+    loadAnthropicByokStatus,
+    loadCohereByokStatus,
+    loadOpenAiByokStatus,
+    openAiByokInput,
+    openAiByokLoading,
+    openAiByokStatus,
+    saveProviderByokKey,
+    user,
+  ]);
+
   return (
     <ErrorBoundary>
       <Toaster position="bottom-right" richColors />
@@ -675,14 +839,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           documentsLoading={documentsLoading}
           queryDocumentScopeId={queryDocumentScopeId}
           setQueryDocumentScopeId={setQueryDocumentScopeId}
-          user={user}
-          openAiByokInput={openAiByokInput}
-          setOpenAiByokInput={setOpenAiByokInput}
-          openAiByokStatus={openAiByokStatus}
-          openAiByokLoading={openAiByokLoading}
-          saveOpenAiByokKey={() => void saveOpenAiByokKey()}
-          deleteOpenAiByokKey={() => void deleteOpenAiByokKey()}
-          loadOpenAiByokStatus={() => void loadOpenAiByokStatus()}
+          providerVaults={providerVaults}
         />
       </div>
     </ErrorBoundary>

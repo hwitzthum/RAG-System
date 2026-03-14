@@ -10,6 +10,7 @@ export type Database = {
           id: string;
           storage_path: string;
           sha256: string;
+          user_id: string | null;
           title: string | null;
           language: SupportedLanguage | null;
           status: DocumentStatus;
@@ -21,6 +22,7 @@ export type Database = {
           id?: string;
           storage_path: string;
           sha256: string;
+          user_id?: string | null;
           title?: string | null;
           language?: SupportedLanguage | null;
           status?: DocumentStatus;
@@ -32,6 +34,7 @@ export type Database = {
           id?: string;
           storage_path?: string;
           sha256?: string;
+          user_id?: string | null;
           title?: string | null;
           language?: SupportedLanguage | null;
           status?: DocumentStatus;
@@ -257,6 +260,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_cohere_keys: {
+        Row: {
+          user_id: string;
+          encrypted_key: string;
+          iv: string;
+          auth_tag: string;
+          key_version: number;
+          key_last4: string;
+          key_fingerprint: string;
+          created_at: string;
+          updated_at: string;
+          last_used_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          encrypted_key: string;
+          iv: string;
+          auth_tag: string;
+          key_version?: number;
+          key_last4: string;
+          key_fingerprint: string;
+          created_at?: string;
+          updated_at?: string;
+          last_used_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          encrypted_key?: string;
+          iv?: string;
+          auth_tag?: string;
+          key_version?: number;
+          key_last4?: string;
+          key_fingerprint?: string;
+          created_at?: string;
+          updated_at?: string;
+          last_used_at?: string | null;
+        };
+        Relationships: [];
+      };
+      user_anthropic_keys: {
+        Row: {
+          user_id: string;
+          encrypted_key: string;
+          iv: string;
+          auth_tag: string;
+          key_version: number;
+          key_last4: string;
+          key_fingerprint: string;
+          created_at: string;
+          updated_at: string;
+          last_used_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          encrypted_key: string;
+          iv: string;
+          auth_tag: string;
+          key_version?: number;
+          key_last4: string;
+          key_fingerprint: string;
+          created_at?: string;
+          updated_at?: string;
+          last_used_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          encrypted_key?: string;
+          iv?: string;
+          auth_tag?: string;
+          key_version?: number;
+          key_last4?: string;
+          key_fingerprint?: string;
+          created_at?: string;
+          updated_at?: string;
+          last_used_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       document_effective_statuses: {
@@ -370,6 +451,27 @@ export type Database = {
           sha256: string;
           idempotency_key: string;
           created_at: string;
+        }[];
+      };
+      create_document_with_ingestion_job_for_user: {
+        Args: {
+          target_storage_path: string;
+          target_sha256: string;
+          target_title?: string | null;
+          target_language?: SupportedLanguage | null;
+          target_user_id?: string | null;
+        };
+        Returns: {
+          document_id: string;
+          ingestion_job_id: string;
+          document_status: DocumentStatus;
+          job_status: IngestionJobStatus;
+          ingestion_version: number;
+          storage_path: string;
+          sha256: string;
+          idempotency_key: string;
+          created_at: string;
+          user_id: string | null;
         }[];
       };
       delete_document_cascade: {

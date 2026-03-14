@@ -14,10 +14,12 @@ type SupabaseError = {
   message: string;
 };
 
-type RpcResponseRow = Database["public"]["Functions"]["create_document_with_ingestion_job"]["Returns"][number];
+type RpcResponseRow = Database["public"]["Functions"]["create_document_with_ingestion_job_for_user"]["Returns"][number];
 
 export type UploadCreateClient = {
-  runCreateDocumentWithInitialJobRpc(args: Database["public"]["Functions"]["create_document_with_ingestion_job"]["Args"]): Promise<{
+  runCreateDocumentWithInitialJobRpc(
+    args: Database["public"]["Functions"]["create_document_with_ingestion_job_for_user"]["Args"],
+  ): Promise<{
     data: RpcResponseRow[] | null;
     error: SupabaseError | null;
   }>;
@@ -37,7 +39,7 @@ function mapRpcRow(row: RpcResponseRow): CreatedDocumentWithJob {
 export function createUploadCreateClient(supabase: SupabaseClient<Database>): UploadCreateClient {
   return {
     async runCreateDocumentWithInitialJobRpc(args) {
-      const { data, error } = await supabase.rpc("create_document_with_ingestion_job", args);
+      const { data, error } = await supabase.rpc("create_document_with_ingestion_job_for_user", args);
       return { data, error };
     },
   };
@@ -49,12 +51,14 @@ export async function createDocumentWithInitialJob(input: {
   checksumSha256: string;
   title: string | null;
   languageHint: SupportedLanguage | null;
+  userId: string;
 }): Promise<CreatedDocumentWithJob | null> {
   const { data, error } = await input.client.runCreateDocumentWithInitialJobRpc({
     target_storage_path: input.storagePath,
     target_sha256: input.checksumSha256,
     target_title: input.title,
     target_language: input.languageHint,
+    target_user_id: input.userId,
   });
 
   if (!error) {
@@ -63,7 +67,7 @@ export async function createDocumentWithInitialJob(input: {
   }
 
   if (error.message.includes("Could not find the function")) {
-    throw new Error(`Required ingestion RPC create_document_with_ingestion_job is unavailable (${error.message})`);
+    throw new Error(`Required ingestion RPC create_document_with_ingestion_job_for_user is unavailable (${error.message})`);
   }
 
   throw new Error(`Failed to create document with ingestion job via RPC: ${error.message}`);

@@ -1,6 +1,7 @@
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 import { CohereClient } from "cohere-ai";
 import { env } from "@/lib/config/env";
+import { getRuntimeSecrets } from "@/lib/runtime/secrets";
 
 export type CrossEncoderInput = {
   query: string;
@@ -16,7 +17,10 @@ export async function crossEncoderRerank(input: CrossEncoderInput): Promise<Retr
     return [];
   }
 
-  if (!env.COHERE_API_KEY) {
+  const runtimeCohereApiKey = getRuntimeSecrets().cohereApiKey;
+  const apiKey = runtimeCohereApiKey ?? env.COHERE_API_KEY;
+
+  if (!apiKey) {
     return input.chunks.slice(0, input.topK);
   }
 
@@ -27,7 +31,7 @@ export async function crossEncoderRerank(input: CrossEncoderInput): Promise<Retr
   );
 
   try {
-    const cohere = new CohereClient({ token: env.COHERE_API_KEY });
+    const cohere = new CohereClient({ token: apiKey });
 
     const response = await cohere.v2.rerank({
       model: input.model,
