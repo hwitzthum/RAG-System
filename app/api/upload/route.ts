@@ -1,9 +1,11 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { hasPdfSignature, normalizeLanguageHint } from "@/lib/ingestion/upload-helpers";
 import { queueSingleUpload } from "@/lib/ingestion/upload-queue";
 import { env } from "@/lib/config/env";
+import { scheduleIngestionAutoKick } from "@/lib/ingestion/runtime/auto-kick";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
@@ -127,6 +129,16 @@ export async function POST(request: NextRequest) {
       dependencies: {
         persistUploadAndQueueJob,
         logAuditEvent,
+      },
+    });
+
+    scheduleIngestionAutoKick({
+      acceptedCount: 1,
+      cronSecret: env.CRON_SECRET,
+      region: process.env.VERCEL_REGION,
+      logger: console,
+      dependencies: {
+        schedule: after,
       },
     });
 

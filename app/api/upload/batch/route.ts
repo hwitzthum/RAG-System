@@ -1,8 +1,10 @@
+import { after } from "next/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
 import { hasPdfSignature, looksLikePdfUpload } from "@/lib/ingestion/upload-helpers";
 import { queueBatchUploadEntry } from "@/lib/ingestion/upload-queue";
+import { scheduleIngestionAutoKick } from "@/lib/ingestion/runtime/auto-kick";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
@@ -118,6 +120,16 @@ export async function POST(request: NextRequest) {
       totalFiles: files.length,
       accepted: results.filter((r) => r.status === "accepted").length,
       rejected: results.filter((r) => r.status === "rejected").length,
+    },
+  });
+
+  scheduleIngestionAutoKick({
+    acceptedCount: results.filter((result) => result.status === "accepted").length,
+    cronSecret: env.CRON_SECRET,
+    region: process.env.VERCEL_REGION,
+    logger: console,
+    dependencies: {
+      schedule: after,
     },
   });
 

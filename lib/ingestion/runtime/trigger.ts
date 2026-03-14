@@ -26,6 +26,7 @@ export async function runIngestionTrigger(input: {
   cronSecret: string | undefined;
   bearerToken: string | null;
   region: string | null | undefined;
+  maxJobs?: number;
   dependencies?: Partial<IngestionTriggerDependencies>;
 }): Promise<
   | { statusCode: 401; body: { error: "Unauthorized" } }
@@ -53,13 +54,14 @@ export async function runIngestionTrigger(input: {
   const settings = resolveIngestionRuntimeSettings({
     workerName: `ingestion-trigger-${input.region?.trim() || "unknown"}`,
   });
+  const maxJobs = Math.max(1, Math.min(50, Math.floor(input.maxJobs ?? 1)));
 
   try {
     await dependencies.assertRuntimeContract();
     const metrics = await dependencies.runWorker({
       settings,
       logger: dependencies.logger,
-      maxJobs: 1,
+      maxJobs,
     });
 
     return {

@@ -82,6 +82,54 @@ test("runIngestionTrigger runs a single worker pass and returns processed status
   });
 });
 
+test("runIngestionTrigger forwards the requested maxJobs to the worker", async () => {
+  const workerCalls: Array<Record<string, unknown>> = [];
+
+  const result = await runIngestionTrigger({
+    cronSecret: "expected-secret",
+    bearerToken: "expected-secret",
+    region: "fra1",
+    maxJobs: 4,
+    dependencies: {
+      assertRuntimeContract: async () => undefined,
+      runWorker: async (input) => {
+        workerCalls.push({
+          workerName: input.settings?.workerName,
+          maxJobs: input.maxJobs,
+        });
+
+        return {
+          claimed: 2,
+          completed: 2,
+          failed: 0,
+          deadLettered: 0,
+          durationMs: 4,
+          jobs: [],
+        };
+      },
+      logger: {
+        info() {},
+        warn() {},
+        error() {},
+      },
+    },
+  });
+
+  assert.deepEqual(workerCalls, [
+    {
+      workerName: "ingestion-trigger-fra1",
+      maxJobs: 4,
+    },
+  ]);
+  assert.deepEqual(result, {
+    statusCode: 200,
+    body: {
+      status: "processed",
+      claimed: 2,
+    },
+  });
+});
+
 test("runIngestionTrigger returns idle when no jobs are claimed", async () => {
   const result = await runIngestionTrigger({
     cronSecret: "expected-secret",
