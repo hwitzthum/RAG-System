@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AuthUser } from "@/lib/auth/types";
 import type { Database, DocumentStatus } from "@/lib/supabase/database.types";
 
 export type DocumentEffectiveStatusRow = Database["public"]["Views"]["document_effective_statuses"]["Row"];
@@ -25,9 +26,11 @@ export type EffectiveDocumentDetailRow = Pick<
   | "latest_job_updated_at"
 >;
 
+type AccessibleDocumentIdRow = Pick<Database["public"]["Tables"]["documents"]["Row"], "id">;
+
 export async function listEffectiveDocuments(
   supabase: SupabaseClient<Database>,
-  input: { limit: number; offset: number },
+  input: { limit: number; offset: number; user: AuthUser },
 ): Promise<{
   documents: Array<{
     id: string;
@@ -43,7 +46,12 @@ export async function listEffectiveDocuments(
   }>;
   total: number;
 }> {
-  const { data, error, count } = await supabase
+  const accessibleDocumentIds = await listAccessibleDocumentIds(supabase, { user: input.user });
+  if (input.user.role !== "admin" && accessibleDocumentIds.length === 0) {
+    return { documents: [], total: 0 };
+  }
+
+  let query = supabase
     .from("document_effective_statuses")
     .select(
       [
@@ -60,8 +68,13 @@ export async function listEffectiveDocuments(
       ].join(","),
       { count: "planned" },
     )
-    .order("created_at", { ascending: false })
-    .range(input.offset, input.offset + input.limit - 1);
+    .order("created_at", { ascending: false });
+
+  if (input.user.role !== "admin") {
+    query = query.in("document_id", accessibleDocumentIds);
+  }
+
+  const { data, error, count } = await query.range(input.offset, input.offset + input.limit - 1);
 
   if (error) {
     throw new Error(`Failed to fetch effective documents: ${error.message}`);
@@ -102,9 +115,26 @@ export async function listEffectiveDocuments(
 
 export async function getEffectiveDocumentById(
   supabase: SupabaseClient<Database>,
-  documentId: string,
+  input: { user: AuthUser; documentId: string },
 ): Promise<EffectiveDocumentDetailRow | null> {
-  const { data, error } = await supabase
+  if (input.user.role !== "admin") {
+    const { data: accessRow, error: accessError } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("id", input.documentId)
+      .or(`user_id.eq.${input.user.id},user_id.is.null`)
+      .maybeSingle();
+
+    if (accessError) {
+      throw new Error(`Failed to verify effective document access for ${input.documentId}: ${accessError.message}`);
+    }
+
+    if (!accessRow) {
+      return null;
+    }
+  }
+
+  const query = supabase
     .from("document_effective_statuses")
     .select(
       [
@@ -129,14 +159,37 @@ export async function getEffectiveDocumentById(
         "latest_job_updated_at",
       ].join(","),
     )
-    .eq("document_id", documentId)
-    .maybeSingle();
+    .eq("document_id", input.documentId);
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
-    throw new Error(`Failed to fetch effective document ${documentId}: ${error.message}`);
+    throw new Error(`Failed to fetch effective document ${input.documentId}: ${error.message}`);
   }
 
   return data as EffectiveDocumentDetailRow | null;
+}
+
+export async function listAccessibleDocumentIds(
+  supabase: SupabaseClient<Database>,
+  input: { user: AuthUser },
+): Promise<string[]> {
+  if (input.user.role === "admin") {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("status", "ready")
+    .or(`user_id.eq.${input.user.id},user_id.is.null`)
+    .returns<AccessibleDocumentIdRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to list accessible documents for ${input.user.id}: ${error.message}`);
+  }
+
+  return [...new Set((data ?? []).map((row) => row.id))];
 }
 
 export async function countEffectiveDocumentsByStatus(

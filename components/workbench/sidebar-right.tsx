@@ -19,6 +19,7 @@ export function SidebarRight({
   uploading,
   uploadFile,
   canUpload,
+  canDeleteDocuments,
   userRole,
   batchFileInputRef,
   handleBatchUpload,
@@ -256,14 +257,16 @@ export function SidebarRight({
                   {uploadStatus.latestIngestionJob?.last_error ? (
                     <p><span className="font-medium">Error:</span> {uploadStatus.latestIngestionJob.last_error}</p>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={() => onDeleteDocument(uploadStatus.document.id)}
-                    className="mt-2 w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 active:scale-[0.98]"
-                    data-testid="delete-document-button"
-                  >
-                    Delete Document
-                  </button>
+                  {canDeleteDocuments ? (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDocument(uploadStatus.document.id)}
+                      className="mt-2 w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 active:scale-[0.98]"
+                      data-testid="delete-document-button"
+                    >
+                      Delete Document
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </section>

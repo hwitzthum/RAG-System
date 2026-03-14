@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function SidebarLeft({
   documents,
   documentsLoading,
+  canDeleteDocuments,
   queryDocumentScopeIds,
   toggleQueryDocumentScopeId,
   onDeleteDocument,
@@ -120,14 +121,16 @@ export function SidebarLeft({
                       >
                         {isScoped ? "Scoped" : "Scope"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteDocument(doc.id)}
-                        className="rounded p-1 text-rose-500 transition hover:bg-rose-50"
-                        title="Delete document"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canDeleteDocuments ? (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteDocument(doc.id)}
+                          className="rounded p-1 text-rose-500 transition hover:bg-rose-50"
+                          title="Delete document"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 );

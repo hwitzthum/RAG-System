@@ -137,9 +137,13 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [queryDocumentScopeIds, setQueryDocumentScopeIds] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const queryInFlightRef = useRef(false);
+  const uploadInFlightRef = useRef(false);
+  const deletingDocumentIdsRef = useRef(new Set<string>());
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
   const canUpload = Boolean(user);
+  const canDeleteDocuments = user?.role === "admin";
 
   const activeTurn = useMemo(() => {
     if (activeTurnId) {
@@ -458,12 +462,14 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
   async function uploadPdf(selectedFile?: File): Promise<void> {
     if (!user) { setWorkspaceMessage("Create a session before uploading documents."); return; }
+    if (uploadInFlightRef.current) { return; }
     const fileToUpload = selectedFile ?? uploadFile;
     if (!fileToUpload) { setWorkspaceMessage("Select a PDF file first."); return; }
     if (fileToUpload.type !== "application/pdf" && !fileToUpload.name.toLowerCase().endsWith(".pdf")) {
       setWorkspaceMessage("Only PDF files are supported.");
       return;
     }
+    uploadInFlightRef.current = true;
     setUploading(true);
     setWorkspaceMessage("Uploading and processing PDF...");
     const formData = new FormData();
@@ -488,6 +494,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";
       await fetchDocuments();
     } finally {
+      uploadInFlightRef.current = false;
       setUploading(false);
     }
   }
@@ -507,7 +514,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   function handleUploadButtonClick(): void {
-    if (uploading) return;
+    if (uploading || uploadInFlightRef.current) return;
     if (!uploadFile) { uploadFileInputRef.current?.click(); return; }
     void uploadPdf();
   }
@@ -540,18 +547,33 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }
 
   async function handleDeleteDocumentById(docId: string): Promise<void> {
-    const res = await fetch(`/api/documents/${docId}`, { method: "DELETE", headers: csrfHeaders() });
-    if (res.ok) {
-      if (uploadStatus?.document.id === docId) setUploadStatus(null);
-      if (queryDocumentScopeIds.includes(docId)) {
-        setQueryDocumentScopeIds((current) => current.filter((id) => id !== docId));
+    if (!canDeleteDocuments) {
+      setWorkspaceMessage("Only admins can delete documents.");
+      return;
+    }
+    if (deletingDocumentIdsRef.current.has(docId)) {
+      return;
+    }
+    deletingDocumentIdsRef.current.add(docId);
+    try {
+      const res = await fetch(`/api/documents/${docId}`, { method: "DELETE", headers: csrfHeaders() });
+      if (res.ok) {
+        if (uploadStatus?.document.id === docId) setUploadStatus(null);
+        if (queryDocumentScopeIds.includes(docId)) {
+          setQueryDocumentScopeIds((current) => current.filter((id) => id !== docId));
+        }
+        await fetchDocuments();
+        setWorkspaceMessage("Document deleted.");
+        toast.success("Document deleted.");
+      } else {
+        setWorkspaceMessage("Failed to delete document.");
+        toast.error("Failed to delete document.");
       }
-      await fetchDocuments();
-      setWorkspaceMessage("Document deleted.");
-      toast.success("Document deleted.");
-    } else {
+    } catch {
       setWorkspaceMessage("Failed to delete document.");
       toast.error("Failed to delete document.");
+    } finally {
+      deletingDocumentIdsRef.current.delete(docId);
     }
   }
 
@@ -585,9 +607,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }, []);
 
   async function executeQuery(): Promise<void> {
-    if (!canQuery || !query.trim() || isStreaming) return;
+    if (!canQuery || !query.trim() || isStreaming || queryInFlightRef.current) return;
 
     const question = query.trim();
+    queryInFlightRef.current = true;
     setQuery("");
     setWorkspaceMessage("Query in progress...");
     setIsStreaming(true);
@@ -684,6 +707,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       setWorkspaceMessage(msg);
       toast.error(msg);
     } finally {
+      queryInFlightRef.current = false;
       setIsStreaming(false);
     }
   }
@@ -838,6 +862,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         <SidebarLeft
           documents={documents}
           documentsLoading={documentsLoading}
+          canDeleteDocuments={canDeleteDocuments}
           queryDocumentScopeIds={queryDocumentScopeIds}
           toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
           onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
@@ -892,6 +917,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           uploading={uploading}
           uploadFile={uploadFile}
           canUpload={canUpload}
+          canDeleteDocuments={canDeleteDocuments}
           userRole={user?.role ?? null}
           batchFileInputRef={batchFileInputRef}
           handleBatchUpload={(e) => void handleBatchUpload(e)}

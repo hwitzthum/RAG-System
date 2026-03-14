@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { generateGroundedAnswer, generateWebAugmentedAnswer } from "@/lib/answering/service";
+import { INSUFFICIENT_EVIDENCE_MESSAGE } from "@/lib/answering/prompts";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
+import type { AuthUser } from "@/lib/auth/types";
 import { env } from "@/lib/config/env";
+import { listAccessibleDocumentIds } from "@/lib/ingestion/runtime/effective-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
 import { markUserCohereApiKeyUsed, resolveUserCohereApiKey } from "@/lib/providers/cohere-vault";
@@ -55,6 +58,36 @@ function normalizeDocumentScopeInput(input: { documentId?: string; documentIds?:
     scopeIds.add(documentId);
   }
   return [...scopeIds];
+}
+
+async function resolveAccessibleQueryScope(input: {
+  user: AuthUser;
+  requestedDocumentIds: string[];
+}): Promise<{ documentIds: string[] | undefined; unauthorizedDocumentIds: string[] }> {
+  if (input.user.role === "admin") {
+    return {
+      documentIds: input.requestedDocumentIds.length > 0 ? input.requestedDocumentIds : undefined,
+      unauthorizedDocumentIds: [],
+    };
+  }
+
+  const accessibleDocumentIds = await listAccessibleDocumentIds(getSupabaseAdminClient(), {
+    user: input.user,
+  });
+  const accessibleSet = new Set(accessibleDocumentIds);
+
+  if (input.requestedDocumentIds.length > 0) {
+    const unauthorizedDocumentIds = input.requestedDocumentIds.filter((documentId) => !accessibleSet.has(documentId));
+    return {
+      documentIds: unauthorizedDocumentIds.length === 0 ? input.requestedDocumentIds : undefined,
+      unauthorizedDocumentIds,
+    };
+  }
+
+  return {
+    documentIds: accessibleDocumentIds,
+    unauthorizedDocumentIds: [],
+  };
 }
 
 function buildQueryStreamResponse(input: {
@@ -216,11 +249,78 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid query payload" }, { status: 400 });
   }
   const requestBody = parsedRequestBody.data;
-  const scopedDocumentIds = normalizeDocumentScopeInput(requestBody);
+  const requestedDocumentIds = normalizeDocumentScopeInput(requestBody);
+  const { documentIds: scopedDocumentIds, unauthorizedDocumentIds } = await resolveAccessibleQueryScope({
+    user: authResult.user,
+    requestedDocumentIds,
+  });
   const normalizedQuery = normalizeQuery(requestBody.query);
   const requestLanguage = detectQueryLanguage(normalizedQuery, requestBody.languageHint);
   const queryId = randomUUID();
   const conversationId = requestBody.conversationId ?? queryId;
+
+  if (unauthorizedDocumentIds.length > 0) {
+    logAuditEvent({
+      action: "query.execute",
+      actorId: authResult.user.id,
+      actorRole: authResult.user.role,
+      outcome: "failure",
+      resource: "query",
+      ipAddress,
+      metadata: {
+        reason: "document_scope_forbidden",
+        documentIds: requestedDocumentIds,
+        unauthorizedDocumentIds,
+      },
+    });
+
+    return NextResponse.json({ error: "One or more scoped documents are not accessible." }, { status: 403 });
+  }
+
+  if (authResult.user.role !== "admin" && (!scopedDocumentIds || scopedDocumentIds.length === 0)) {
+    const retrievalMeta = {
+      cacheHit: false,
+      latencyMs: 0,
+      selectedChunkIds: [],
+      selectedDocumentIds: [],
+      insufficientEvidence: true,
+      conversationId,
+      documentScopeId: null,
+      documentScopeIds: [],
+      rateLimit: {
+        remaining: rate.remaining,
+        retryAfterSeconds: rate.retryAfterSeconds,
+      },
+      promptInjection: {
+        blockedUserQuery: false,
+        suspiciousChunkCount: 0,
+        blockedChunkCount: 0,
+        suspiciousWebSourceCount: 0,
+        blockedWebSourceCount: 0,
+      },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: [],
+        redactionCount: 0,
+      },
+      queryExpansion: {
+        requested: Boolean(requestBody.enableQueryExpansion),
+        applied: false,
+        strategy: "standard" as const,
+        variationCount: 0,
+        hydeUsed: false,
+        branchCount: 1,
+      },
+    };
+
+    return buildQueryStreamResponse({
+      queryId,
+      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: [],
+      retrievalMeta,
+    });
+  }
 
   if (shouldBlockUserPrompt(requestBody.query)) {
     const answer = buildPromptInjectionRefusal(requestLanguage);
@@ -228,11 +328,11 @@ export async function POST(request: NextRequest) {
       cacheHit: false,
       latencyMs: 0,
       selectedChunkIds: [],
-      selectedDocumentIds: scopedDocumentIds,
+      selectedDocumentIds: scopedDocumentIds ?? [],
       insufficientEvidence: true,
       conversationId,
-      documentScopeId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
-      documentScopeIds: scopedDocumentIds,
+      documentScopeId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+      documentScopeIds: scopedDocumentIds ?? [],
       rateLimit: {
         remaining: rate.remaining,
         retryAfterSeconds: rate.retryAfterSeconds,
@@ -269,8 +369,8 @@ export async function POST(request: NextRequest) {
       ipAddress,
       metadata: {
         reason: "prompt_injection_blocked",
-        documentId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
-        documentIds: scopedDocumentIds,
+        documentId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+        documentIds: scopedDocumentIds ?? [],
       },
     });
 
@@ -319,8 +419,8 @@ export async function POST(request: NextRequest) {
           query: requestBody.query,
           topK,
           languageHint: requestBody.languageHint,
-          documentIds: scopedDocumentIds.length > 0 ? scopedDocumentIds : undefined,
-          cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
+          documentIds: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds : undefined,
+          cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
           enableQueryExpansion: requestBody.enableQueryExpansion,
         });
 
@@ -342,7 +442,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
+              documentScopeId: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
               webSources,
             })
           : await generateGroundedAnswer({
@@ -352,7 +452,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
+              documentScopeId: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
             });
         const latencyMs = Date.now() - startedAt;
 
@@ -367,8 +467,8 @@ export async function POST(request: NextRequest) {
           retrievalTrace: retrievalResult.trace,
           insufficientEvidence: answerResult.insufficientEvidence,
           conversationId,
-          documentScopeId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
-          documentScopeIds: scopedDocumentIds,
+          documentScopeId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+          documentScopeIds: scopedDocumentIds ?? [],
           rateLimit: {
             remaining: rate.remaining,
             retryAfterSeconds: rate.retryAfterSeconds,
@@ -457,8 +557,8 @@ export async function POST(request: NextRequest) {
             conversationId: requestBody.conversationId ?? null,
             languageHint: requestBody.languageHint ?? null,
             topK,
-            documentId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
-            documentIds: scopedDocumentIds,
+            documentId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+            documentIds: scopedDocumentIds ?? [],
             selectedChunkCount: retrievalResult.chunks.length,
             selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
             cacheHit: retrievalResult.trace.cacheHit,

@@ -33,7 +33,10 @@ export async function GET(
 
   let documentRecord;
   try {
-    documentRecord = await getEffectiveDocumentById(supabase, documentId);
+    documentRecord = await getEffectiveDocumentById(supabase, {
+      user: authResult.user,
+      documentId,
+    });
   } catch {
     logAuditEvent({
       action: "upload.status.read",

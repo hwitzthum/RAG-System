@@ -74,6 +74,7 @@ export type ChatInputProps = {
 export type SidebarLeftProps = {
   documents: DocumentListItem[];
   documentsLoading: boolean;
+  canDeleteDocuments: boolean;
   queryDocumentScopeIds: string[];
   toggleQueryDocumentScopeId: (id: string) => void;
   onDeleteDocument: (docId: string) => void;
@@ -97,6 +98,7 @@ export type SidebarRightProps = {
   uploading: boolean;
   uploadFile: File | null;
   canUpload: boolean;
+  canDeleteDocuments: boolean;
   userRole: string | null;
   batchFileInputRef: RefObject<HTMLInputElement | null>;
   handleBatchUpload: (event: ChangeEvent<HTMLInputElement>) => void;

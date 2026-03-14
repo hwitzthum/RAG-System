@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdminClient();
   try {
-    const result = await listEffectiveDocuments(supabase, { limit, offset });
+    const result = await listEffectiveDocuments(supabase, {
+      limit,
+      offset,
+      user: authResult.user,
+    });
     return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
