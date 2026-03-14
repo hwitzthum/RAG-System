@@ -62,13 +62,19 @@ export default function PendingApprovalForm() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-zinc-900">Pending Approval</h1>
-      <p className="mt-4 text-sm leading-relaxed text-zinc-700">
+      <h1 className="fg-primary text-3xl font-bold">Pending Approval</h1>
+      <p className="fg-secondary mt-4 text-sm leading-relaxed">
         Your account is pending approval by an administrator. You&apos;ll be able to access the workspace once your account is approved.
       </p>
 
       {message && (
-        <p className={`mt-4 text-sm font-medium ${message.includes("approved") ? "text-emerald-700" : message.includes("suspended") ? "text-rose-700" : "text-amber-700"}`}>
+        <p className={`mt-4 text-sm font-medium ${
+          message.includes("approved")
+            ? "tone-success"
+            : message.includes("suspended")
+              ? "tone-danger"
+              : "tone-warning"
+        }`}>
           {message}
         </p>
       )}
@@ -77,14 +83,14 @@ export default function PendingApprovalForm() {
         <button
           onClick={handleCheckStatus}
           disabled={checking}
-          className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {checking ? "Checking..." : "Check Status"}
         </button>
 
         <button
           onClick={handleSignOut}
-          className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-all duration-150 hover:bg-zinc-50 active:scale-[0.98]"
+          className="btn-secondary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98]"
         >
           Sign Out
         </button>

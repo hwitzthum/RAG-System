@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { getThemeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -25,8 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="text-zinc-900 antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="antialiased">
+        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
+        {children}
+      </body>
     </html>
   );
 }

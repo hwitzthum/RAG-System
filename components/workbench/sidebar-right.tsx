@@ -44,9 +44,9 @@ export function SidebarRight({
   ];
 
   return (
-    <aside className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l border-zinc-200 bg-white lg:flex">
+    <aside className="nav-surface hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l lg:flex">
       {/* Tab Bar */}
-      <div className="flex border-b border-zinc-200">
+      <div className="flex border-b border-[var(--border)]">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -54,8 +54,8 @@ export function SidebarRight({
             onClick={() => setActiveTab(tab.key)}
             className={`flex-1 px-3 py-2.5 text-xs font-medium transition ${
               activeTab === tab.key
-                ? "border-b-2 border-indigo-600 text-indigo-600"
-                : "text-zinc-500 hover:text-zinc-700"
+                ? "border-b-2 border-[var(--accent)] text-[var(--accent-strong)]"
+                : "fg-muted hover:text-[var(--text-primary)]"
             }`}
           >
             {tab.label}
@@ -67,8 +67,8 @@ export function SidebarRight({
         {/* Evidence Tab */}
         {activeTab === "evidence" && (
           <section>
-            <h3 className="text-xs font-medium text-zinc-500">Evidence Navigator</h3>
-            <p className="mt-0.5 text-xs text-zinc-400">Citations for the selected answer.</p>
+            <h3 className="fg-secondary text-xs font-medium">Evidence Navigator</h3>
+            <p className="fg-muted mt-0.5 text-xs">Citations for the selected answer.</p>
             <div className="mt-2 space-y-1.5">
               {activeTurn?.citations.length ? (
                 activeTurn.citations.map((citation) => {
@@ -77,19 +77,19 @@ export function SidebarRight({
                   return (
                     <a
                       key={`${citation.documentId}:${citation.pageNumber}:${citation.chunkId}`}
-                      className="block rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 transition hover:bg-zinc-100"
+                      className="surface-muted fg-secondary block rounded-2xl px-3 py-2 text-xs hover:border-[var(--accent-border)]"
                       href={`/api/upload/${citation.documentId}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <p><span className="font-medium text-zinc-700">Doc:</span> {docName}</p>
-                      <p><span className="font-medium text-zinc-700">Page:</span> {citation.pageNumber}</p>
-                      <p><span className="font-medium text-zinc-700">Chunk:</span> {citation.chunkId.slice(0, 12)}</p>
+                      <p><span className="fg-primary font-medium">Doc:</span> {docName}</p>
+                      <p><span className="fg-primary font-medium">Page:</span> {citation.pageNumber}</p>
+                      <p><span className="fg-primary font-medium">Chunk:</span> {citation.chunkId.slice(0, 12)}</p>
                     </a>
                   );
                 })
               ) : (
-                <p className="rounded-lg border border-dashed border-zinc-200 px-3 py-4 text-xs text-zinc-400">
+                <p className="fg-muted rounded-2xl border border-dashed border-[var(--border)] px-3 py-4 text-xs">
                   No citations for this turn yet.
                 </p>
               )}
@@ -102,17 +102,17 @@ export function SidebarRight({
           <div className="space-y-4">
             {/* Ingestion Desk */}
             <section>
-              <h3 className="text-xs font-medium text-zinc-500">Ingestion Desk</h3>
+              <h3 className="fg-secondary text-xs font-medium">Ingestion Desk</h3>
               <div className="mt-2 space-y-2">
                 <input
                   ref={uploadFileInputRef}
                   type="file"
                   accept=".pdf,application/pdf"
-                  className="block w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border file:border-zinc-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-50"
+                  className="file-input-surface block w-full text-xs"
                   onChange={handleUploadFileChange}
                   data-testid="single-upload-input"
                 />
-                <label htmlFor="upload-title-input" className="text-xs font-medium text-zinc-500">
+                <label htmlFor="upload-title-input" className="fg-secondary text-xs font-medium">
                   Document Title
                 </label>
                 <input
@@ -121,7 +121,7 @@ export function SidebarRight({
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   placeholder="Optional title"
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400"
+                  className="input-surface w-full rounded-2xl px-3 py-2 text-sm"
                   autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="none"
@@ -131,7 +131,7 @@ export function SidebarRight({
                 <select
                   value={uploadLanguageHint}
                   onChange={(e) => setUploadLanguageHint(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+                  className="input-surface w-full rounded-2xl px-3 py-2 text-sm"
                 >
                   <option value="">Language hint (optional)</option>
                   <option value="EN">EN</option>
@@ -144,46 +144,46 @@ export function SidebarRight({
                   type="button"
                   onClick={handleUploadButtonClick}
                   disabled={uploading}
-                  className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+                  className="btn-primary w-full rounded-2xl px-3 py-2 text-sm font-medium disabled:cursor-not-allowed active:scale-[0.98]"
                   data-testid="upload-submit-button"
                 >
                   {uploading ? "Uploading..." : uploadFile ? "Upload PDF" : "Select PDF"}
                 </button>
                 {!canUpload ? (
-                  <p className="text-xs text-zinc-400">Create a session first. Current role: {userRole ?? "none"}.</p>
+                  <p className="fg-muted text-xs">Create a session first. Current role: {userRole ?? "none"}.</p>
                 ) : !uploadFile ? (
-                  <p className="text-xs text-zinc-400">Select a PDF file to enable upload.</p>
+                  <p className="fg-muted text-xs">Select a PDF file to enable upload.</p>
                 ) : (
-                  <p className="text-xs text-zinc-500">Selected: {uploadFile.name}</p>
+                  <p className="fg-secondary text-xs">Selected: {uploadFile.name}</p>
                 )}
                 {/* Document Scope Selector */}
                 <div className="mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-500">
+                    <label className="fg-secondary text-xs font-medium">
                       Query Scope
                     </label>
                     {queryDocumentScopeIds.length > 0 ? (
                       <button
                         type="button"
                         onClick={clearQueryDocumentScope}
-                        className="rounded px-1.5 py-0.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+                        className="btn-ghost rounded px-1.5 py-0.5 text-xs font-medium"
                       >
                         Clear
                       </button>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 text-xs text-zinc-400">
+                  <p className="fg-muted mt-0.5 text-xs">
                     {queryDocumentScopeIds.length > 0
                       ? `${queryDocumentScopeIds.length} document${queryDocumentScopeIds.length === 1 ? "" : "s"} selected`
                       : "All documents"}
                   </p>
-                  <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2">
-                    <label className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-600">
+                  <div className="surface-muted mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-2xl p-2">
+                    <label className="fg-secondary flex items-center gap-2 rounded px-2 py-1 text-xs">
                       <input
                         type="checkbox"
                         checked={queryDocumentScopeIds.length === 0}
                         onChange={() => clearQueryDocumentScope()}
-                        className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
+                        className="check-accent h-3.5 w-3.5 rounded"
                         disabled={documentsLoading}
                       />
                       <span>All documents</span>
@@ -193,13 +193,13 @@ export function SidebarRight({
                       return (
                         <label
                           key={doc.id}
-                          className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-600 transition hover:bg-white"
+                          className="fg-secondary flex items-center gap-2 rounded px-2 py-1 text-xs transition hover:bg-[var(--bg-elevated)]"
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleQueryDocumentScopeId(doc.id)}
-                            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
+                            className="check-accent h-3.5 w-3.5 rounded"
                             disabled={documentsLoading}
                           />
                           <span className="truncate">
@@ -214,13 +214,13 @@ export function SidebarRight({
 
               {/* Batch Upload */}
               <div className="mt-3 space-y-2">
-                <p className="text-xs font-medium text-zinc-500">Batch Upload</p>
+                <p className="fg-secondary text-xs font-medium">Batch Upload</p>
                 <input
                   ref={batchFileInputRef}
                   type="file"
                   accept=".pdf,application/pdf"
                   multiple
-                  className="block w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border file:border-zinc-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-50"
+                  className="file-input-surface block w-full text-xs"
                   onChange={handleBatchUpload}
                   data-testid="batch-upload-input"
                 />
@@ -228,16 +228,16 @@ export function SidebarRight({
                   <div className="space-y-1">
                     {batchFiles.map((entry, index) => (
                       <div key={index} className="flex items-center gap-2 text-xs">
-                        <span className="truncate text-zinc-600">{entry.file.name}</span>
+                        <span className="fg-secondary truncate">{entry.file.name}</span>
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          className={`badge ${
                             entry.status === "failed"
-                              ? "border border-rose-200 bg-rose-50 text-rose-700"
+                              ? "badge-danger"
                               : entry.status === "queued"
-                                ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                ? "badge-success"
                                 : entry.status === "uploading"
-                                  ? "border border-amber-200 bg-amber-50 text-amber-700"
-                                  : "border border-zinc-200 bg-zinc-50 text-zinc-500"
+                                  ? "badge-warning"
+                                  : "badge-muted"
                           }`}
                         >
                           {entry.status}
@@ -250,18 +250,18 @@ export function SidebarRight({
 
               {/* Upload Status */}
               {uploadStatus ? (
-                <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600" data-testid="upload-status-panel">
-                  <p><span className="font-medium">Document:</span> {getDocumentDisplayName(uploadStatus.document)}</p>
-                  <p><span className="font-medium">Status:</span> {uploadStatus.document.status}</p>
-                  <p><span className="font-medium">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}</p>
+                <div className="surface-muted fg-secondary mt-3 rounded-2xl p-3 text-xs" data-testid="upload-status-panel">
+                  <p><span className="fg-primary font-medium">Document:</span> {getDocumentDisplayName(uploadStatus.document)}</p>
+                  <p><span className="fg-primary font-medium">Status:</span> {uploadStatus.document.status}</p>
+                  <p><span className="fg-primary font-medium">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}</p>
                   {uploadStatus.latestIngestionJob?.last_error ? (
-                    <p><span className="font-medium">Error:</span> {uploadStatus.latestIngestionJob.last_error}</p>
+                    <p><span className="fg-primary font-medium">Error:</span> {uploadStatus.latestIngestionJob.last_error}</p>
                   ) : null}
                   {canDeleteDocuments ? (
                     <button
                       type="button"
                       onClick={() => onDeleteDocument(uploadStatus.document.id)}
-                      className="mt-2 w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 active:scale-[0.98]"
+                      className="btn-danger mt-2 w-full rounded-2xl px-3 py-1.5 text-xs font-medium active:scale-[0.98]"
                       data-testid="delete-document-button"
                     >
                       Delete Document
@@ -281,7 +281,7 @@ export function SidebarRight({
         {/* Status Tab */}
         {activeTab === "status" && (
           <section>
-            <h3 className="text-xs font-medium text-zinc-500">Status</h3>
+            <h3 className="fg-secondary text-xs font-medium">Status</h3>
             <p aria-live="polite" className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`} data-testid="workspace-status-message">
               {workspaceMessage}
             </p>

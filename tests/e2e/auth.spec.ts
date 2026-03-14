@@ -37,6 +37,45 @@ test.describe("Phase 1: Supabase Auth", () => {
     await expect(page.locator('a[href="/login"]')).toBeVisible();
   });
 
+  test("theme selector offers five themes and persists across auth pages", async ({ page }) => {
+    const themeSelector = page.getByTestId("theme-selector");
+    const expectedThemes = ["light", "dark", "ocean", "forest", "sunset"] as const;
+    const expectedAccents: Record<(typeof expectedThemes)[number], string> = {
+      light: "#4f46e5",
+      dark: "#60a5fa",
+      ocean: "#14b8a6",
+      forest: "#22c55e",
+      sunset: "#ea580c",
+    };
+
+    await page.goto("/login");
+    await expect(themeSelector).toBeVisible();
+    await expect(themeSelector.locator("option")).toHaveCount(5);
+
+    for (const theme of expectedThemes) {
+      await themeSelector.selectOption(theme);
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+        .toBe(theme);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+          ),
+        )
+        .toBe(expectedAccents[theme]);
+    }
+
+    await page.goto("/signup", { waitUntil: "domcontentloaded" }).catch(async () => {
+      await page.goto("/signup", { waitUntil: "domcontentloaded" });
+    });
+    await expect(page.locator("h1")).toHaveText("Create Account");
+    await expect(page.getByTestId("theme-selector")).toHaveValue("sunset");
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rag.workspace.theme")))
+      .toBe("sunset");
+  });
+
   test("login with invalid credentials shows error", async ({ page }) => {
     await page.goto("/login");
 

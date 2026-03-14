@@ -21,21 +21,21 @@ export function ProviderKeyVault({
     : "Vault disabled";
 
   return (
-    <div className="border-t border-zinc-200 bg-zinc-50 p-3">
+    <div className="border-t border-[var(--border)] p-3">
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-zinc-500 group-open:mb-3">
+        <summary className="fg-secondary cursor-pointer text-xs font-medium group-open:mb-3">
           {providerLabel} API Key
         </summary>
 
-        <div className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+        <div className="surface-muted mt-3 space-y-2 rounded-2xl p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-zinc-600">BYOK Vault</p>
+            <p className="fg-secondary text-xs font-medium">BYOK Vault</p>
             <div className="flex gap-1.5">
               <button
                 type="button"
                 onClick={loadStatus}
                 disabled={!user || loading}
-                className="rounded px-2 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:opacity-40"
+                className="btn-ghost rounded px-2 py-1 text-xs font-medium disabled:opacity-40"
               >
                 Refresh
               </button>
@@ -43,7 +43,7 @@ export function ProviderKeyVault({
                 type="button"
                 onClick={deleteKey}
                 disabled={!status?.configured || loading}
-                className="rounded px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
+                className="btn-danger rounded px-2 py-1 text-xs font-medium disabled:opacity-40"
               >
                 Delete Key
               </button>
@@ -56,7 +56,7 @@ export function ProviderKeyVault({
             placeholder={placeholder}
             disabled={!user}
             autoComplete="off"
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="input-surface w-full rounded-2xl px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
             data-testid={`${providerSlug}-byok-input`}
           />
           <div className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export function ProviderKeyVault({
               type="button"
               onClick={saveKey}
               disabled={loading || !user}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-800 disabled:bg-zinc-300 active:scale-[0.98]"
+              className="btn-primary rounded-2xl px-3 py-1.5 text-xs font-medium active:scale-[0.98]"
             >
               {loading ? "Saving..." : "Save Key"}
             </button>
@@ -72,12 +72,12 @@ export function ProviderKeyVault({
               type="button"
               onClick={() => setInputValue("")}
               disabled={!user}
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50 active:scale-[0.98]"
+              className="btn-secondary rounded-2xl px-3 py-1.5 text-xs font-medium disabled:opacity-50 active:scale-[0.98]"
             >
               Clear Input
             </button>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="fg-muted text-xs">
             {vaultStatusText}
             {status?.updatedAt ? ` | Updated ${formatTime(status.updatedAt)}` : ""}
           </p>

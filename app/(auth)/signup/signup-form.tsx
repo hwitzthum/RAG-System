@@ -39,16 +39,16 @@ export default function SignUpForm() {
   if (success) {
     return (
       <>
-        <h1 className="text-3xl font-bold text-zinc-900">Account Created</h1>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-700">
+        <h1 className="fg-primary text-3xl font-bold">Account Created</h1>
+        <p className="fg-secondary mt-4 text-sm leading-relaxed">
           Your account has been created. An administrator will review your request and approve your access.
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-700">
+        <p className="fg-secondary mt-2 text-sm leading-relaxed">
           You&apos;ll be able to sign in once your account is approved.
         </p>
         <Link
           href="/login"
-          className="mt-6 block w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98]"
+          className="btn-primary mt-6 block w-full rounded-2xl px-4 py-2.5 text-center text-sm font-semibold active:scale-[0.98]"
         >
           Go to Sign In
         </Link>
@@ -58,12 +58,12 @@ export default function SignUpForm() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-zinc-900">Create Account</h1>
-      <p className="mt-2 text-sm text-zinc-600">Sign up to request access to the retrieval workspace.</p>
+      <h1 className="fg-primary text-3xl font-bold">Create Account</h1>
+      <p className="fg-secondary mt-2 text-sm">Sign up to request access to the retrieval workspace.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-medium text-zinc-500">
+          <label htmlFor="email" className="fg-secondary block text-xs font-medium">
             Email
           </label>
           <input
@@ -73,12 +73,12 @@ export default function SignUpForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400"
+            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-xs font-medium text-zinc-500">
+          <label htmlFor="password" className="fg-secondary block text-xs font-medium">
             Password
           </label>
           <input
@@ -89,25 +89,25 @@ export default function SignUpForm() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400"
+            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
             placeholder="At least 6 characters"
           />
         </div>
 
-        {error && <p className="text-sm text-rose-700" role="alert" aria-live="assertive">{error}</p>}
+        {error && <p className="tone-danger text-sm" role="alert" aria-live="assertive">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Creating account..." : "Sign Up"}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-zinc-600">
+      <p className="fg-secondary mt-6 text-center text-sm">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+        <Link href="/login" className="link-accent font-semibold">
           Sign in
         </Link>
       </p>

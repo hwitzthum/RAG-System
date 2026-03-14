@@ -6,6 +6,7 @@ import { PanelLeft, PanelRight } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getCsrfToken } from "@/lib/security/csrf-client";
 import type { AuthUser } from "@/lib/auth/types";
+import { ThemeSelector } from "@/components/theme/theme-selector";
 
 type AppNavProps = {
   user: AuthUser | null;
@@ -32,47 +33,48 @@ export function AppNav({ user, onSignOut, onToggleLeftPanel, onToggleRightPanel 
       {/* Skip to content link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-indigo-600 focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--bg-elevated)] focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-[var(--accent-strong)] focus:shadow-lg"
       >
         Skip to content
       </a>
-      <nav className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6">
+      <nav className="nav-surface flex h-14 items-center justify-between border-b px-4 md:px-6">
         <div className="flex items-center gap-4">
           {/* Mobile sidebar toggles */}
           {onToggleLeftPanel && (
             <button
               type="button"
               onClick={onToggleLeftPanel}
-              className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-zinc-100 lg:hidden"
+              className="btn-ghost rounded-lg p-1.5 lg:hidden"
               aria-label="Toggle left panel"
             >
               <PanelLeft className="h-5 w-5" />
             </button>
           )}
-          <Link href="/" className="text-sm font-semibold text-zinc-900">
+          <Link href="/" className="fg-primary text-sm font-semibold">
             RAG Workspace
           </Link>
           {user?.role === "admin" && (
             <Link
               href="/admin"
-              className="text-sm text-zinc-500 transition hover:text-zinc-900"
+              className="fg-muted text-sm transition hover:text-[var(--text-primary)]"
               data-testid="admin-link"
             >
               Admin
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <ThemeSelector className="hidden sm:inline-flex" />
           {user && (
             <>
-              <span className="text-xs text-zinc-500">
+              <span className="fg-secondary text-xs">
                 Signed in as {user.role}
               </span>
-              <span className="hidden text-xs text-zinc-400 sm:inline">{user.email}</span>
+              <span className="fg-muted hidden text-xs xl:inline">{user.email}</span>
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98]"
+                className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium active:scale-[0.98]"
                 data-testid="sign-out-button"
               >
                 Sign Out
@@ -84,7 +86,7 @@ export function AppNav({ user, onSignOut, onToggleLeftPanel, onToggleRightPanel 
             <button
               type="button"
               onClick={onToggleRightPanel}
-              className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-zinc-100 lg:hidden"
+              className="btn-ghost rounded-lg p-1.5 lg:hidden"
               aria-label="Toggle right panel"
             >
               <PanelRight className="h-5 w-5" />

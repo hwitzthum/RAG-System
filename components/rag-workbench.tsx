@@ -836,7 +836,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       {/* Mobile overlay backdrop */}
       {mobilePanel !== "none" && (
         <div
-          className="fixed inset-0 z-30 bg-black/20 lg:hidden"
+          className="fixed inset-0 z-30 lg:hidden"
+          style={{ background: "var(--bg-overlay)" }}
           onClick={() => setMobilePanel("none")}
         />
       )}
@@ -844,17 +845,17 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Left sidebar - mobile overlay */}
         {mobilePanel === "left" && (
-          <div className="fixed inset-y-14 left-0 z-40 w-[280px] border-r border-zinc-200 bg-white lg:hidden">
+          <div className="nav-surface fixed inset-y-14 left-0 z-40 w-[280px] border-r lg:hidden">
             <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
               <button
                 type="button"
                 onClick={handleNewConversation}
-                className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.98]"
+                className="btn-primary w-full rounded-2xl px-3 py-2 text-sm font-medium active:scale-[0.98]"
               >
                 + New Chat
               </button>
               {/* Simplified mobile sidebar content */}
-              <p className="text-xs text-zinc-400">Use desktop view for full sidebar.</p>
+              <p className="fg-muted text-xs">Use desktop view for full sidebar.</p>
             </div>
           </div>
         )}

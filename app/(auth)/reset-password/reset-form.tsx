@@ -96,13 +96,13 @@ export default function ResetForm() {
   if (mode === "success-request") {
     return (
       <>
-        <h1 className="text-3xl font-bold text-zinc-900">Check Your Email</h1>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-700">
+        <h1 className="fg-primary text-3xl font-bold">Check Your Email</h1>
+        <p className="fg-secondary mt-4 text-sm leading-relaxed">
           If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link.
         </p>
         <Link
           href="/login"
-          className="mt-6 block w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98]"
+          className="btn-primary mt-6 block w-full rounded-2xl px-4 py-2.5 text-center text-sm font-semibold active:scale-[0.98]"
         >
           Back to Sign In
         </Link>
@@ -113,8 +113,8 @@ export default function ResetForm() {
   if (mode === "success-set") {
     return (
       <>
-        <h1 className="text-3xl font-bold text-zinc-900">Password Updated</h1>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-700">
+        <h1 className="fg-primary text-3xl font-bold">Password Updated</h1>
+        <p className="fg-secondary mt-4 text-sm leading-relaxed">
           Your password has been set. Redirecting to sign in…
         </p>
       </>
@@ -124,12 +124,12 @@ export default function ResetForm() {
   if (mode === "set-password") {
     return (
       <>
-        <h1 className="text-3xl font-bold text-zinc-900">Set New Password</h1>
-        <p className="mt-2 text-sm text-zinc-600">Choose a new password for your account.</p>
+        <h1 className="fg-primary text-3xl font-bold">Set New Password</h1>
+        <p className="fg-secondary mt-2 text-sm">Choose a new password for your account.</p>
 
         <form onSubmit={handleSetPassword} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="password" className="block text-xs font-medium text-zinc-500">
+            <label htmlFor="password" className="fg-secondary block text-xs font-medium">
               New Password
             </label>
             <input
@@ -140,11 +140,11 @@ export default function ResetForm() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800"
+              className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
             />
           </div>
           <div>
-            <label htmlFor="confirm" className="block text-xs font-medium text-zinc-500">
+            <label htmlFor="confirm" className="fg-secondary block text-xs font-medium">
               Confirm Password
             </label>
             <input
@@ -155,16 +155,16 @@ export default function ResetForm() {
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800"
+              className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
             />
           </div>
 
-          {error && <p className="text-sm text-rose-700" role="alert" aria-live="assertive">{error}</p>}
+          {error && <p className="tone-danger text-sm" role="alert" aria-live="assertive">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Updating…" : "Set Password"}
           </button>
@@ -176,12 +176,12 @@ export default function ResetForm() {
   // Default: request reset email
   return (
     <>
-      <h1 className="text-3xl font-bold text-zinc-900">Reset Password</h1>
-      <p className="mt-2 text-sm text-zinc-600">Enter your email to receive a password reset link.</p>
+      <h1 className="fg-primary text-3xl font-bold">Reset Password</h1>
+      <p className="fg-secondary mt-2 text-sm">Enter your email to receive a password reset link.</p>
 
       <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-medium text-zinc-500">
+          <label htmlFor="email" className="fg-secondary block text-xs font-medium">
             Email
           </label>
           <input
@@ -191,24 +191,24 @@ export default function ResetForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400"
+            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
             placeholder="you@example.com"
           />
         </div>
 
-        {error && <p className="text-sm text-rose-700" role="alert" aria-live="assertive">{error}</p>}
+        {error && <p className="tone-danger text-sm" role="alert" aria-live="assertive">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg border border-zinc-900 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-zinc-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Sending…" : "Send Reset Link"}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-zinc-600">
-        <Link href="/login" className="text-indigo-600 hover:text-indigo-700 hover:underline">
+      <p className="fg-secondary mt-6 text-center text-sm">
+        <Link href="/login" className="link-accent">
           Back to Sign In
         </Link>
       </p>

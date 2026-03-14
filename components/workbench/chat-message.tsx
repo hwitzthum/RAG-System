@@ -17,9 +17,9 @@ type ChatMessageProps = {
 function StreamingDots() {
   return (
     <span className="inline-flex gap-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:300ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:0ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:300ms]" />
     </span>
   );
 }
@@ -39,10 +39,10 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 active:scale-[0.98]"
+      className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium active:scale-[0.98]"
       title="Copy answer"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <Check className="tone-success h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -50,35 +50,33 @@ function CopyButton({ text }: { text: string }) {
 export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMessageProps) {
   return (
     <article
-      className={`cursor-pointer rounded-xl border p-4 transition ${
+      className={`cursor-pointer rounded-2xl border p-4 transition ${
         isActive
-          ? "border-indigo-300 bg-indigo-50/60 shadow-sm"
-          : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm"
+          ? "surface-accent shadow-sm"
+          : "surface-card hover:border-[var(--accent-border)] hover:shadow-sm"
       }`}
       onClick={onClick}
       data-testid="chat-turn"
     >
       {/* Query */}
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">You</span>
-        <p className="text-xs text-zinc-400">{formatTime(turn.createdAt)}</p>
+        <span className="badge badge-muted">You</span>
+        <p className="fg-muted text-xs">{formatTime(turn.createdAt)}</p>
       </div>
-      <p className="mt-2 text-sm font-medium text-zinc-900">{turn.query}</p>
+      <p className="fg-primary mt-2 text-sm font-medium">{turn.query}</p>
 
       {/* Separator */}
-      <div className="mt-3 border-t border-zinc-100 pt-3">
+      <div className="mt-3 border-t border-[var(--border)] pt-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">AI</span>
+          <span className="badge badge-accent">AI</span>
           <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-500">
+            <span className="badge badge-muted">
               {turn.citations.length} citations
             </span>
             {turn.retrievalMeta ? (
               <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  turn.retrievalMeta.cacheHit
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
+                className={`badge ${
+                  turn.retrievalMeta.cacheHit ? "badge-success" : "badge-warning"
                 }`}
               >
                 cache {turn.retrievalMeta.cacheHit ? "hit" : "miss"}
@@ -86,7 +84,7 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
             ) : null}
             {turn.pending ? <StreamingDots /> : null}
             {turn.failed ? (
-              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+              <span className="badge badge-danger">
                 failed
               </span>
             ) : null}
@@ -96,25 +94,25 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
 
       {/* Answer with Markdown */}
       {turn.answer ? (
-        <div className="prose prose-sm prose-zinc mt-2 max-w-none">
+        <div className="prose prose-sm prose-themed mt-2 max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {turn.answer}
           </ReactMarkdown>
         </div>
       ) : turn.pending ? null : (
-        <p className="mt-2 text-sm text-zinc-400">...</p>
+        <p className="fg-muted mt-2 text-sm">...</p>
       )}
 
       {turn.webSources && turn.webSources.length > 0 ? (
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-medium text-blue-700">Web Sources</p>
+          <p className="tone-info text-xs font-medium">Web Sources</p>
           {turn.webSources.map((source) => (
             <a
               key={source.url}
               href={source.url}
               target="_blank"
               rel="noreferrer"
-              className="block rounded-lg border border-blue-100 bg-blue-50/50 px-2.5 py-1.5 text-xs text-blue-800 hover:bg-blue-100"
+              className="badge-info block rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-90"
             >
               {source.title}
             </a>
@@ -126,14 +124,14 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); downloadReport(turn.queryHistoryId!, "docx"); }}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 active:scale-[0.98]"
+            className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
           >
             DOCX
           </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); downloadReport(turn.queryHistoryId!, "pdf"); }}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 active:scale-[0.98]"
+            className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
           >
             PDF
           </button>

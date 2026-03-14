@@ -120,11 +120,11 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900">User Management</h1>
+          <h1 className="fg-primary text-3xl font-bold">User Management</h1>
         </div>
         <Link
           href="/"
-          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+          className="btn-secondary rounded-2xl px-4 py-2 text-sm font-semibold"
         >
           Back to Workbench
         </Link>
@@ -142,7 +142,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
       />
 
       {error && (
-        <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-rose-800">
+        <div className="surface-muted tone-danger mb-4 rounded-2xl px-4 py-3 text-sm">
           {error}
           <button onClick={() => setError(null)} className="ml-2 font-semibold underline">
             Dismiss
@@ -174,7 +174,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
             void fetchRuntimeStatus();
           }}
           disabled={loading || runtimeLoading}
-          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50"
+          className="btn-secondary rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
         >
           Refresh All
         </button>

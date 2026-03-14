@@ -27,7 +27,7 @@ export function ChatInput({
   }, []);
 
   return (
-    <div className="border-t border-zinc-200 bg-white p-4">
+    <div className="nav-surface border-t p-4">
       <div className="flex gap-2">
         <textarea
           ref={textareaRef}
@@ -41,41 +41,41 @@ export function ChatInput({
           }}
           placeholder="Ask about indexed documents..."
           rows={1}
-          className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-indigo-400"
+          className="input-surface flex-1 resize-none rounded-2xl px-3 py-2.5 text-sm"
           data-testid="chat-query-input"
         />
         <button
           type="button"
           disabled={!canQuery || isStreaming || query.trim().length === 0}
           onClick={executeQuery}
-          className="self-end rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-zinc-300 active:scale-[0.98]"
+          className="btn-primary self-end rounded-2xl px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed active:scale-[0.98]"
           data-testid="chat-send-button"
         >
           {isStreaming ? "Streaming..." : "Send"}
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+        <label className="fg-secondary flex items-center gap-1.5 text-xs">
           <input
             type="checkbox"
             checked={enableWebResearch}
             onChange={(e) => setEnableWebResearch(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
+            className="check-accent h-3.5 w-3.5 rounded"
             data-testid="web-research-toggle"
           />
           Web Research
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+        <label className="fg-secondary flex items-center gap-1.5 text-xs">
           <input
             type="checkbox"
             checked={enableQueryExpansion}
             onChange={(e) => setEnableQueryExpansion(e.target.checked)}
             disabled={effectiveQueryScopeIds.length <= 1}
-            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="check-accent h-3.5 w-3.5 rounded disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="query-expansion-toggle"
           />
           Broaden search
-          <span className="text-zinc-400">
+          <span className="fg-muted">
             {effectiveQueryScopeIds.length > 1 ? "(multi-document)" : "(select 2+ scoped docs)"}
           </span>
         </label>
@@ -83,13 +83,13 @@ export function ChatInput({
           <button
             type="button"
             onClick={onClearScope}
-            className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
+            className="badge badge-accent"
           >
             Scope: {scopeSummary ?? `${effectiveQueryScopeIds.length} documents`} (clear)
           </button>
         ) : null}
         {!canQuery ? (
-          <span className="text-xs text-zinc-400">
+          <span className="fg-muted text-xs">
             Requires reader/admin role
           </span>
         ) : null}

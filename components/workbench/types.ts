@@ -150,7 +150,7 @@ export function getDocumentDisplayName(doc: { title: string | null; id: string }
 
 export function getMessageToneClass(message: string): string {
   const lower = message.toLowerCase();
-  if (lower.includes("failed")) return "text-rose-600";
-  if (lower.includes("ready") || lower.includes("complete")) return "text-indigo-600";
-  return "text-zinc-500";
+  if (lower.includes("failed")) return "tone-danger";
+  if (lower.includes("ready") || lower.includes("complete")) return "tone-success";
+  return "tone-muted";
 }

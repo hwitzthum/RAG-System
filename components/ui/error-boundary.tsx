@@ -29,14 +29,14 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-zinc-200 bg-white p-8">
+        <div className="surface-card flex min-h-[200px] items-center justify-center rounded-2xl p-8">
           <div className="text-center">
-            <p className="text-sm font-medium text-zinc-900">Something went wrong</p>
-            <p className="mt-1 text-xs text-zinc-500">An unexpected error occurred.</p>
+            <p className="fg-primary text-sm font-medium">Something went wrong</p>
+            <p className="fg-muted mt-1 text-xs">An unexpected error occurred.</p>
             <button
               type="button"
               onClick={() => this.setState({ hasError: false })}
-              className="mt-3 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-800 active:scale-[0.98]"
+              className="btn-primary mt-3 rounded-2xl px-3 py-1.5 text-xs font-medium active:scale-[0.98]"
             >
               Try again
             </button>

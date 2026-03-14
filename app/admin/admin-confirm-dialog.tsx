@@ -21,29 +21,29 @@ export function AdminConfirmDialog(props: {
   return (
     <dialog
       ref={dialogRef}
-      className="rounded-xl border border-zinc-200 bg-white p-6 shadow-xl backdrop:bg-black/40"
+      className="themed-dialog surface-card rounded-2xl p-6 shadow-xl"
       onClose={props.onCancel}
     >
       {props.confirmAction ? (
         <div className="min-w-[320px]">
-          <p className="text-sm text-zinc-900">
+          <p className="fg-primary text-sm">
             Are you sure you want to <strong>{props.confirmAction.label}</strong>?
           </p>
           {props.confirmAction.action === "delete" ? (
-            <p className="mt-2 text-sm font-semibold text-rose-700">This action cannot be undone.</p>
+            <p className="tone-danger mt-2 text-sm font-semibold">This action cannot be undone.</p>
           ) : null}
           <div className="mt-4 flex gap-2">
             <button
               onClick={props.onConfirm}
-              className={`active:scale-[0.98] transition-all duration-150 rounded-lg px-3 py-1 text-xs font-semibold text-white ${
-                props.confirmAction.action === "delete" ? "bg-rose-700 hover:bg-rose-800" : "bg-amber-700 hover:bg-amber-800"
+              className={`active:scale-[0.98] rounded-2xl px-3 py-1 text-xs font-semibold ${
+                props.confirmAction.action === "delete" ? "btn-danger" : "btn-primary"
               }`}
             >
               Confirm
             </button>
             <button
               onClick={props.onCancel}
-              className="active:scale-[0.98] transition-all duration-150 rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="btn-secondary active:scale-[0.98] rounded-2xl px-3 py-1 text-xs font-semibold"
             >
               Cancel
             </button>
