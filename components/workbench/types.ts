@@ -64,16 +64,16 @@ export type ChatInputProps = {
   enableWebResearch: boolean;
   setEnableWebResearch: (v: boolean) => void;
   canQuery: boolean;
-  effectiveQueryScopeId: string | null;
-  scopeDocumentTitle: string | null;
+  effectiveQueryScopeIds: string[];
+  scopeSummary: string | null;
   onClearScope: () => void;
 };
 
 export type SidebarLeftProps = {
   documents: DocumentListItem[];
   documentsLoading: boolean;
-  queryDocumentScopeId: string | null;
-  setQueryDocumentScopeId: (id: string | null) => void;
+  queryDocumentScopeIds: string[];
+  toggleQueryDocumentScopeId: (id: string) => void;
   onDeleteDocument: (docId: string) => void;
   onRefreshDocuments: () => void;
   queryHistory: QueryHistoryItem[];
@@ -96,7 +96,6 @@ export type SidebarRightProps = {
   uploadFile: File | null;
   canUpload: boolean;
   userRole: string | null;
-  effectiveQueryScopeId: string | null;
   batchFileInputRef: RefObject<HTMLInputElement | null>;
   handleBatchUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   batchFiles: Array<{ file: File; status: string; error?: string; documentId?: string }>;
@@ -105,8 +104,9 @@ export type SidebarRightProps = {
   workspaceMessage: string;
   documents: DocumentListItem[];
   documentsLoading: boolean;
-  queryDocumentScopeId: string | null;
-  setQueryDocumentScopeId: (id: string | null) => void;
+  queryDocumentScopeIds: string[];
+  toggleQueryDocumentScopeId: (id: string) => void;
+  clearQueryDocumentScope: () => void;
   providerVaults: ProviderKeyVaultProps[];
 };
 

@@ -41,7 +41,28 @@ type ParsedSseEvent =
   | { event: "done"; payload: { queryId: string } }
   | null;
 
-const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeId";
+const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeIds";
+
+function normalizeScopedDocumentIds(input: string[]): string[] {
+  return [...new Set(input.map((value) => value.trim()).filter((value) => value.length > 0))];
+}
+
+function parsePersistedScopeIds(rawValue: string | null): string[] {
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+    if (Array.isArray(parsed)) {
+      return normalizeScopedDocumentIds(parsed.filter((value): value is string => typeof value === "string"));
+    }
+  } catch {
+    return normalizeScopedDocumentIds([rawValue]);
+  }
+
+  return [];
+}
 
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -112,7 +133,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(null);
   const [uploading, setUploading] = useState(false);
   const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [queryDocumentScopeId, setQueryDocumentScopeId] = useState<string | null>(null);
+  const [queryDocumentScopeIds, setQueryDocumentScopeIds] = useState<string[]>([]);
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
 
@@ -127,13 +148,30 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     return turns[turns.length - 1] ?? null;
   }, [activeTurnId, turns]);
 
-  const effectiveQueryScopeId = queryDocumentScopeId;
+  const effectiveQueryScopeIds = queryDocumentScopeIds;
 
-  const scopeDocumentTitle = useMemo(() => {
-    if (!effectiveQueryScopeId) return null;
-    const doc = documents.find((d) => d.id === effectiveQueryScopeId);
-    return doc ? getDocumentDisplayName(doc) : null;
-  }, [effectiveQueryScopeId, documents]);
+  const scopeSummary = useMemo(() => {
+    if (effectiveQueryScopeIds.length === 0) {
+      return null;
+    }
+
+    const labels = effectiveQueryScopeIds
+      .map((documentId) => {
+        const doc = documents.find((item) => item.id === documentId);
+        return doc ? getDocumentDisplayName(doc) : documentId.slice(0, 8);
+      })
+      .slice(0, 3);
+
+    if (effectiveQueryScopeIds.length === 1) {
+      return labels[0] ?? "1 document";
+    }
+
+    if (effectiveQueryScopeIds.length <= 3) {
+      return labels.join(", ");
+    }
+
+    return `${labels.join(", ")} +${effectiveQueryScopeIds.length - labels.length}`;
+  }, [effectiveQueryScopeIds, documents]);
 
   // --- Data loading ---
 
@@ -155,17 +193,17 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const persisted = window.localStorage.getItem(QUERY_SCOPE_STORAGE_KEY);
-    if (persisted) setQueryDocumentScopeId(persisted);
+    setQueryDocumentScopeIds(parsePersistedScopeIds(persisted));
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (queryDocumentScopeId) {
-      window.localStorage.setItem(QUERY_SCOPE_STORAGE_KEY, queryDocumentScopeId);
+    if (queryDocumentScopeIds.length > 0) {
+      window.localStorage.setItem(QUERY_SCOPE_STORAGE_KEY, JSON.stringify(queryDocumentScopeIds));
     } else {
       window.localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
     }
-  }, [queryDocumentScopeId]);
+  }, [queryDocumentScopeIds]);
 
   async function fetchDocuments(): Promise<void> {
     setDocumentsLoading(true);
@@ -184,6 +222,18 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     else setDocuments([]);
   }, [user]);
 
+  const toggleQueryDocumentScopeId = useCallback((documentId: string): void => {
+    setQueryDocumentScopeIds((current) =>
+      current.includes(documentId)
+        ? current.filter((id) => id !== documentId)
+        : [...current, documentId],
+    );
+  }, []);
+
+  const clearQueryDocumentScope = useCallback((): void => {
+    setQueryDocumentScopeIds([]);
+  }, []);
+
   const clearSession = useCallback(async (): Promise<void> => {
     await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
     await getSupabaseBrowserClient().auth.signOut().catch(() => null);
@@ -196,7 +246,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setAnthropicByokStatus(null);
     setTurns([]);
     setQueryHistory([]);
-    setQueryDocumentScopeId(null);
+    setQueryDocumentScopeIds([]);
     router.push("/login");
   }, [router]);
 
@@ -422,7 +472,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       }
       setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
       toast.success("Upload accepted. Indexing started...");
-      setQueryDocumentScopeId(payload.documentId);
+      setQueryDocumentScopeIds([payload.documentId]);
       await waitForUploadTerminalStatus(payload.documentId);
       setUploadFile(null);
       setUploadTitle("");
@@ -485,9 +535,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     const res = await fetch(`/api/documents/${docId}`, { method: "DELETE", headers: csrfHeaders() });
     if (res.ok) {
       if (uploadStatus?.document.id === docId) setUploadStatus(null);
-      if (queryDocumentScopeId === docId) {
-        setQueryDocumentScopeId(null);
-        localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
+      if (queryDocumentScopeIds.includes(docId)) {
+        setQueryDocumentScopeIds((current) => current.filter((id) => id !== docId));
       }
       await fetchDocuments();
       setWorkspaceMessage("Document deleted.");
@@ -557,7 +606,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         body: JSON.stringify({
           query: question,
           conversationId,
-          documentId: (queryDocumentScopeId ?? uploadStatus?.document.id) ?? undefined,
+          documentIds:
+            (queryDocumentScopeIds.length > 0
+              ? queryDocumentScopeIds
+              : uploadStatus?.document.id
+                ? [uploadStatus.document.id]
+                : undefined),
           enableWebResearch: enableWebResearch || undefined,
         }),
       });
@@ -628,8 +682,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   function handleRestoreHistory(item: QueryHistoryItem): void {
     setConversationId(item.conversationId ?? newUuid());
     setQuery(item.query);
-    const scopedDocumentId = item.citations[0]?.documentId ?? null;
-    setQueryDocumentScopeId(scopedDocumentId);
+    const scopedDocumentIds = normalizeScopedDocumentIds(item.citations.map((citation) => citation.documentId));
+    setQueryDocumentScopeIds(scopedDocumentIds);
   }
 
   function handleNewConversation(): void {
@@ -775,8 +829,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         <SidebarLeft
           documents={documents}
           documentsLoading={documentsLoading}
-          queryDocumentScopeId={queryDocumentScopeId}
-          setQueryDocumentScopeId={setQueryDocumentScopeId}
+          queryDocumentScopeIds={queryDocumentScopeIds}
+          toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
           onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
           onRefreshDocuments={() => void fetchDocuments()}
           queryHistory={queryHistory}
@@ -801,9 +855,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             enableWebResearch={enableWebResearch}
             setEnableWebResearch={setEnableWebResearch}
             canQuery={canQuery}
-            effectiveQueryScopeId={effectiveQueryScopeId}
-            scopeDocumentTitle={scopeDocumentTitle}
-            onClearScope={() => setQueryDocumentScopeId(null)}
+            effectiveQueryScopeIds={effectiveQueryScopeIds}
+            scopeSummary={scopeSummary}
+            onClearScope={clearQueryDocumentScope}
           />
           {process.env.NODE_ENV === "development" && (
             <DevSessionControls
@@ -828,7 +882,6 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           uploadFile={uploadFile}
           canUpload={canUpload}
           userRole={user?.role ?? null}
-          effectiveQueryScopeId={effectiveQueryScopeId}
           batchFileInputRef={batchFileInputRef}
           handleBatchUpload={(e) => void handleBatchUpload(e)}
           batchFiles={batchFiles}
@@ -837,8 +890,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           workspaceMessage={workspaceMessage}
           documents={documents}
           documentsLoading={documentsLoading}
-          queryDocumentScopeId={queryDocumentScopeId}
-          setQueryDocumentScopeId={setQueryDocumentScopeId}
+          queryDocumentScopeIds={queryDocumentScopeIds}
+          toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
+          clearQueryDocumentScope={clearQueryDocumentScope}
           providerVaults={providerVaults}
         />
       </div>

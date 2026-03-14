@@ -145,6 +145,25 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).not.toBe(403);
   });
 
+  test("POST /api/query accepts multi-document scope ids", async ({ request }) => {
+    const response = await request.post("/api/query", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: {
+        query: "What is covered in these documents?",
+        documentIds: [
+          "11111111-1111-4111-8111-111111111111",
+          "22222222-2222-4222-8222-222222222222",
+        ],
+        topK: 3,
+      },
+    });
+
+    expect([200, 500]).toContain(response.status());
+    expect(response.status()).not.toBe(401);
+    expect(response.status()).not.toBe(403);
+    expect(response.status()).not.toBe(400);
+  });
+
   test("GET /api/query-history with valid auth returns items array", async ({ request }) => {
     const response = await request.get("/api/query-history?limit=5", {
       headers: { Authorization: `Bearer ${accessToken}` },

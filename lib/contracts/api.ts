@@ -45,6 +45,7 @@ export type QueryRequest = {
   query: string;
   conversationId?: string;
   documentId?: string;
+  documentIds?: string[];
   languageHint?: SupportedLanguage;
   topK?: number;
 };
@@ -55,6 +56,7 @@ export type QueryResponseMeta = {
   selectedChunkIds: string[];
   selectedDocumentIds?: string[];
   documentScopeId?: string | null;
+  documentScopeIds?: string[];
   retrievalTrace?: RetrievalTrace;
   promptInjection?: {
     blockedUserQuery: boolean;

@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function SidebarLeft({
   documents,
   documentsLoading,
-  queryDocumentScopeId,
-  setQueryDocumentScopeId,
+  queryDocumentScopeIds,
+  toggleQueryDocumentScopeId,
   onDeleteDocument,
   onRefreshDocuments,
   queryHistory,
@@ -89,7 +89,7 @@ export function SidebarLeft({
             <ul className="max-h-60 space-y-1.5 overflow-y-auto">
               {documents.map((doc) => {
                 const displayName = getDocumentDisplayName(doc);
-                const isScoped = queryDocumentScopeId === doc.id;
+                const isScoped = queryDocumentScopeIds.includes(doc.id);
                 const statusColor: Record<string, string> = {
                   ready: "text-emerald-600",
                   processing: "text-amber-600",
@@ -110,13 +110,13 @@ export function SidebarLeft({
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
-                        onClick={() => setQueryDocumentScopeId(isScoped ? null : doc.id)}
+                        onClick={() => toggleQueryDocumentScopeId(doc.id)}
                         className={`rounded px-1.5 py-0.5 text-xs font-medium transition ${
                           isScoped
                             ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
                             : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                         }`}
-                        title={isScoped ? "Remove scope" : "Scope queries to this document"}
+                        title={isScoped ? "Remove from scope" : "Add this document to scope"}
                       >
                         {isScoped ? "Scoped" : "Scope"}
                       </button>

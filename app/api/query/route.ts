@@ -25,6 +25,7 @@ const querySchema = z.object({
   query: z.string().min(1).max(2000),
   conversationId: z.string().uuid().optional(),
   documentId: z.string().uuid().optional(),
+  documentIds: z.array(z.string().uuid()).max(50).optional(),
   languageHint: z.enum(["EN", "DE", "FR", "IT", "ES"]).optional(),
   topK: z.number().int().positive().max(20).optional(),
   enableWebResearch: z.boolean().optional(),
@@ -44,6 +45,17 @@ function chunkAnswerText(answer: string): string[] {
   return tokens.map((token, index) => (index === tokens.length - 1 ? token : `${token} `));
 }
 
+function normalizeDocumentScopeInput(input: { documentId?: string; documentIds?: string[] }): string[] {
+  const scopeIds = new Set<string>();
+  if (input.documentId) {
+    scopeIds.add(input.documentId);
+  }
+  for (const documentId of input.documentIds ?? []) {
+    scopeIds.add(documentId);
+  }
+  return [...scopeIds];
+}
+
 function buildQueryStreamResponse(input: {
   queryId: string;
   answer: string;
@@ -61,6 +73,7 @@ function buildQueryStreamResponse(input: {
     insufficientEvidence: boolean;
     conversationId: string;
     documentScopeId: string | null;
+    documentScopeIds: string[];
     rateLimit: {
       remaining: number;
       retryAfterSeconds: number;
@@ -194,6 +207,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid query payload" }, { status: 400 });
   }
   const requestBody = parsedRequestBody.data;
+  const scopedDocumentIds = normalizeDocumentScopeInput(requestBody);
   const normalizedQuery = normalizeQuery(requestBody.query);
   const requestLanguage = detectQueryLanguage(normalizedQuery, requestBody.languageHint);
   const queryId = randomUUID();
@@ -205,10 +219,11 @@ export async function POST(request: NextRequest) {
       cacheHit: false,
       latencyMs: 0,
       selectedChunkIds: [],
-      selectedDocumentIds: requestBody.documentId ? [requestBody.documentId] : [],
+      selectedDocumentIds: scopedDocumentIds,
       insufficientEvidence: true,
       conversationId,
-      documentScopeId: requestBody.documentId ?? null,
+      documentScopeId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
+      documentScopeIds: scopedDocumentIds,
       rateLimit: {
         remaining: rate.remaining,
         retryAfterSeconds: rate.retryAfterSeconds,
@@ -237,7 +252,8 @@ export async function POST(request: NextRequest) {
       ipAddress,
       metadata: {
         reason: "prompt_injection_blocked",
-        documentId: requestBody.documentId ?? null,
+        documentId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
+        documentIds: scopedDocumentIds,
       },
     });
 
@@ -286,8 +302,8 @@ export async function POST(request: NextRequest) {
           query: requestBody.query,
           topK,
           languageHint: requestBody.languageHint,
-          documentIds: requestBody.documentId ? [requestBody.documentId] : undefined,
-          cacheNamespace: `user:${authResult.user.id}::doc:${requestBody.documentId ?? "all"}`,
+          documentIds: scopedDocumentIds.length > 0 ? scopedDocumentIds : undefined,
+          cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
         });
 
 
@@ -308,7 +324,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: requestBody.documentId ?? null,
+              documentScopeId: scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
               webSources,
             })
           : await generateGroundedAnswer({
@@ -318,7 +334,7 @@ export async function POST(request: NextRequest) {
               minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
               minRerankScore: env.RAG_MIN_RERANK_SCORE,
               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: requestBody.documentId ?? null,
+              documentScopeId: scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
             });
         const latencyMs = Date.now() - startedAt;
 
@@ -333,7 +349,8 @@ export async function POST(request: NextRequest) {
           retrievalTrace: retrievalResult.trace,
           insufficientEvidence: answerResult.insufficientEvidence,
           conversationId,
-          documentScopeId: requestBody.documentId ?? null,
+          documentScopeId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
+          documentScopeIds: scopedDocumentIds,
           rateLimit: {
             remaining: rate.remaining,
             retryAfterSeconds: rate.retryAfterSeconds,
@@ -421,7 +438,8 @@ export async function POST(request: NextRequest) {
             conversationId: requestBody.conversationId ?? null,
             languageHint: requestBody.languageHint ?? null,
             topK,
-            documentId: requestBody.documentId ?? null,
+            documentId: scopedDocumentIds.length === 1 ? scopedDocumentIds[0]! : null,
+            documentIds: scopedDocumentIds,
             selectedChunkCount: retrievalResult.chunks.length,
             selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
             cacheHit: retrievalResult.trace.cacheHit,

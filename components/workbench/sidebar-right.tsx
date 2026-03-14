@@ -28,8 +28,9 @@ export function SidebarRight({
   workspaceMessage,
   documents,
   documentsLoading,
-  queryDocumentScopeId,
-  setQueryDocumentScopeId,
+  queryDocumentScopeIds,
+  toggleQueryDocumentScopeId,
+  clearQueryDocumentScope,
   providerVaults,
 }: SidebarRightProps) {
   const [activeTab, setActiveTab] = useState<Tab>("evidence");
@@ -156,23 +157,57 @@ export function SidebarRight({
                 )}
                 {/* Document Scope Selector */}
                 <div className="mt-1">
-                  <label htmlFor="doc-scope-select" className="text-xs font-medium text-zinc-500">
-                    Query Scope
-                  </label>
-                  <select
-                    id="doc-scope-select"
-                    value={queryDocumentScopeId ?? ""}
-                    onChange={(e) => setQueryDocumentScopeId(e.target.value || null)}
-                    className="mt-0.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
-                    disabled={documentsLoading}
-                  >
-                    <option value="">All documents</option>
-                    {documents.map((doc) => (
-                      <option key={doc.id} value={doc.id}>
-                        {getDocumentDisplayName(doc)} ({doc.status})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-zinc-500">
+                      Query Scope
+                    </label>
+                    {queryDocumentScopeIds.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={clearQueryDocumentScope}
+                        className="rounded px-1.5 py-0.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs text-zinc-400">
+                    {queryDocumentScopeIds.length > 0
+                      ? `${queryDocumentScopeIds.length} document${queryDocumentScopeIds.length === 1 ? "" : "s"} selected`
+                      : "All documents"}
+                  </p>
+                  <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                    <label className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-600">
+                      <input
+                        type="checkbox"
+                        checked={queryDocumentScopeIds.length === 0}
+                        onChange={() => clearQueryDocumentScope()}
+                        className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
+                        disabled={documentsLoading}
+                      />
+                      <span>All documents</span>
+                    </label>
+                    {documents.map((doc) => {
+                      const checked = queryDocumentScopeIds.includes(doc.id);
+                      return (
+                        <label
+                          key={doc.id}
+                          className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-600 transition hover:bg-white"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleQueryDocumentScopeId(doc.id)}
+                            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600"
+                            disabled={documentsLoading}
+                          />
+                          <span className="truncate">
+                            {getDocumentDisplayName(doc)} ({doc.status})
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
