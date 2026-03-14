@@ -11,11 +11,16 @@ import {
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { extractQueryTokens, normalizeQuery } from "@/lib/retrieval/query";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
-import { searchKeywordCandidates, searchVectorCandidates } from "@/lib/retrieval/repository";
+import {
+  loadDocumentOverviewCandidates,
+  searchKeywordCandidates,
+  searchVectorCandidates,
+} from "@/lib/retrieval/repository";
 import { buildRetrievalCacheKey } from "@/lib/retrieval/trace";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
+import { isDocumentOverviewQuery } from "@/lib/retrieval/intent";
 
 const MIN_CANDIDATE_LIMIT = 20;
 
@@ -48,6 +53,7 @@ export type RetrievalServiceDependencies = {
   }) => Promise<RetrievedChunk[]>;
   searchVector: typeof searchVectorCandidates;
   searchKeyword: typeof searchKeywordCandidates;
+  loadDocumentOverview: typeof loadDocumentOverviewCandidates;
 };
 
 function getDefaultDependencies(): RetrievalServiceDependencies {
@@ -60,6 +66,7 @@ function getDefaultDependencies(): RetrievalServiceDependencies {
     rerankCandidates: providers.reranker.rerank,
     searchVector: searchVectorCandidates,
     searchKeyword: searchKeywordCandidates,
+    loadDocumentOverview: loadDocumentOverviewCandidates,
   };
 }
 
@@ -106,17 +113,19 @@ export async function retrieveRankedCandidates(
   const topK = Math.max(1, input.topK);
   const retrievalVersion = env.RAG_RETRIEVAL_VERSION;
   const scopedDocumentIds = normalizeDocumentScope(input.documentIds);
+  const documentOverviewQuery = isDocumentOverviewQuery(normalizedQuery, scopedDocumentIds);
   const scopeKey = input.cacheNamespace?.trim()
     ? input.cacheNamespace.trim()
     : scopedDocumentIds.length > 0
       ? `docs:${scopedDocumentIds.join(",")}`
       : "scope:all";
+  const strategyScopeKey = documentOverviewQuery ? `overview-v2:${scopeKey}` : scopeKey;
   const cacheKey = buildRetrievalCacheKey({
     normalizedQuery,
     language,
     retrievalVersion,
     topK,
-    scopeKey,
+    scopeKey: strategyScopeKey,
   });
 
   // Best-effort, fire-and-forget cache hygiene — avoids blocking the query path.
@@ -147,6 +156,48 @@ export async function retrieveRankedCandidates(
         retrievalVersion,
         topK,
         candidateCounts: cached.candidateCounts,
+      },
+    };
+  }
+
+  if (documentOverviewQuery) {
+    const overviewCandidates = await deps.loadDocumentOverview({
+      documentId: scopedDocumentIds[0]!,
+      limit: Math.max(topK, env.RAG_MIN_EVIDENCE_CHUNKS, 6),
+    });
+
+    const candidateCounts: RetrievalTrace["candidateCounts"] = {
+      vector: 0,
+      keyword: 0,
+      fused: overviewCandidates.length,
+      reranked: overviewCandidates.length,
+    };
+
+    try {
+      await deps.writeCache({
+        cacheKey,
+        normalizedQuery,
+        language,
+        retrievalVersion,
+        topK,
+        chunks: overviewCandidates,
+        candidateCounts,
+        ttlSeconds: env.RAG_CACHE_TTL_SECONDS,
+      });
+    } catch (error) {
+      console.warn("retrieval_cache_write_failed", error instanceof Error ? error.message : String(error));
+    }
+
+    return {
+      chunks: overviewCandidates,
+      trace: {
+        normalizedQuery,
+        language,
+        cacheKey,
+        cacheHit: false,
+        retrievalVersion,
+        topK,
+        candidateCounts,
       },
     };
   }

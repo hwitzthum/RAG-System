@@ -280,3 +280,121 @@ test("retrieveRankedCandidates forwards document scope to vector and keyword ret
   assert.deepEqual(vectorDocumentScopes, [["doc-scope-1", "doc-scope-2"], ["doc-scope-1", "doc-scope-2"]]);
   assert.deepEqual(keywordDocumentScopes, [["doc-scope-1", "doc-scope-2"], ["doc-scope-1", "doc-scope-2"]]);
 });
+
+test("retrieveRankedCandidates uses overview retrieval for generic single-document summary queries", async () => {
+  ensureRetrievalTestEnv();
+  const { retrieveRankedCandidates } = await import("../lib/retrieval/service");
+
+  let overviewCalls = 0;
+  let vectorCalls = 0;
+  let keywordCalls = 0;
+
+  const deps: Partial<RetrievalServiceDependencies> = {
+    pruneCache: async () => undefined,
+    readCache: async () => null,
+    writeCache: async () => undefined,
+    createEmbedding: async () => {
+      throw new Error("Embedding retrieval should not run for overview queries");
+    },
+    searchVector: async () => {
+      vectorCalls += 1;
+      return [];
+    },
+    searchKeyword: async () => {
+      keywordCalls += 1;
+      return [];
+    },
+    loadDocumentOverview: async ({ documentId, limit }) => {
+      overviewCalls += 1;
+      assert.equal(documentId, "doc-scope-1");
+      assert.equal(limit >= 6, true);
+      return [
+        buildChunk({
+          chunkId: "overview-1",
+          documentId: "doc-scope-1",
+          source: "hybrid",
+          retrievalScore: 1,
+          content: "This handbook explains the operating checklist and process overview.",
+        }),
+        buildChunk({
+          chunkId: "overview-2",
+          documentId: "doc-scope-1",
+          source: "hybrid",
+          retrievalScore: 0.99,
+          content: "It covers responsibilities, controls, and documentation requirements.",
+        }),
+      ];
+    },
+  };
+
+  const result = await retrieveRankedCandidates(
+    {
+      query: "Please summarize the document for me",
+      topK: 3,
+      languageHint: "EN",
+      documentIds: ["doc-scope-1"],
+    },
+    deps,
+  );
+
+  assert.equal(result.trace.cacheHit, false);
+  assert.equal(result.chunks.length, 2);
+  assert.equal(result.trace.candidateCounts.vector, 0);
+  assert.equal(result.trace.candidateCounts.keyword, 0);
+  assert.equal(overviewCalls, 1);
+  assert.equal(vectorCalls, 0);
+  assert.equal(keywordCalls, 0);
+});
+
+test("retrieveRankedCandidates keeps standard retrieval for specific single-document questions", async () => {
+  ensureRetrievalTestEnv();
+  const { retrieveRankedCandidates } = await import("../lib/retrieval/service");
+
+  let overviewCalls = 0;
+  let vectorCalls = 0;
+  let keywordCalls = 0;
+
+  const deps: Partial<RetrievalServiceDependencies> = {
+    pruneCache: async () => undefined,
+    readCache: async () => null,
+    writeCache: async () => undefined,
+    createEmbedding: async () => [0.1, 0.2, 0.3],
+    searchVector: async () => {
+      vectorCalls += 1;
+      return [
+        buildChunk({
+          chunkId: "specific-1",
+          documentId: "doc-scope-1",
+          source: "vector",
+          retrievalScore: 0.88,
+          content: "Section 4 defines the approval workflow.",
+        }),
+      ];
+    },
+    searchKeyword: async () => {
+      keywordCalls += 1;
+      return [];
+    },
+    loadDocumentOverview: async () => {
+      overviewCalls += 1;
+      return [];
+    },
+    rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+  };
+
+  const result = await retrieveRankedCandidates(
+    {
+      query: "What does the document say about the approval workflow?",
+      topK: 3,
+      languageHint: "EN",
+      documentIds: ["doc-scope-1"],
+    },
+    deps,
+  );
+
+  assert.equal(result.trace.cacheHit, false);
+  assert.equal(result.chunks[0]?.chunkId, "specific-1");
+  assert.equal(overviewCalls, 0);
+  assert.equal(vectorCalls > 0, true);
+  assert.equal(keywordCalls > 0, true);
+});
