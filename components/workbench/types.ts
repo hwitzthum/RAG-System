@@ -63,6 +63,8 @@ export type ChatInputProps = {
   isStreaming: boolean;
   enableWebResearch: boolean;
   setEnableWebResearch: (v: boolean) => void;
+  enableQueryExpansion: boolean;
+  setEnableQueryExpansion: (v: boolean) => void;
   canQuery: boolean;
   effectiveQueryScopeIds: string[];
   scopeSummary: string | null;

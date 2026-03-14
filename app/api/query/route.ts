@@ -10,7 +10,7 @@ import { markUserCohereApiKeyUsed, resolveUserCohereApiKey } from "@/lib/provide
 import { markUserOpenAiApiKeyUsed, resolveUserOpenAiApiKey } from "@/lib/providers/openai-vault";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
-import { retrieveRankedCandidates } from "@/lib/retrieval/service";
+import { retrieveRankedCandidatesWithRouting } from "@/lib/retrieval/router";
 import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
 import { buildPromptInjectionRefusal, shouldBlockUserPrompt } from "@/lib/security/prompt-injection";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
@@ -26,6 +26,7 @@ const querySchema = z.object({
   conversationId: z.string().uuid().optional(),
   documentId: z.string().uuid().optional(),
   documentIds: z.array(z.string().uuid()).max(50).optional(),
+  enableQueryExpansion: z.boolean().optional(),
   languageHint: z.enum(["EN", "DE", "FR", "IT", "ES"]).optional(),
   topK: z.number().int().positive().max(20).optional(),
   enableWebResearch: z.boolean().optional(),
@@ -90,6 +91,14 @@ function buildQueryStreamResponse(input: {
       filtered: boolean;
       reasons: string[];
       redactionCount: number;
+    };
+    queryExpansion: {
+      requested: boolean;
+      applied: boolean;
+      strategy: "standard" | "multi_document_expansion";
+      variationCount: number;
+      hydeUsed: boolean;
+      branchCount: number;
     };
   };
   webSources?: WebSource[];
@@ -241,6 +250,14 @@ export async function POST(request: NextRequest) {
         reasons: [],
         redactionCount: 0,
       },
+      queryExpansion: {
+        requested: Boolean(requestBody.enableQueryExpansion),
+        applied: false,
+        strategy: "standard" as const,
+        variationCount: 0,
+        hydeUsed: false,
+        branchCount: 1,
+      },
     };
 
     logAuditEvent({
@@ -298,12 +315,13 @@ export async function POST(request: NextRequest) {
       const topK = requestBody.topK ?? env.RAG_DEFAULT_TOP_K;
 
       try {
-        const retrievalResult = await retrieveRankedCandidates({
+        const retrievalResult = await retrieveRankedCandidatesWithRouting({
           query: requestBody.query,
           topK,
           languageHint: requestBody.languageHint,
           documentIds: scopedDocumentIds.length > 0 ? scopedDocumentIds : undefined,
           cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
+          enableQueryExpansion: requestBody.enableQueryExpansion,
         });
 
 
@@ -357,6 +375,7 @@ export async function POST(request: NextRequest) {
           },
           promptInjection: answerResult.promptInjection,
           outputFilter: answerResult.outputFilter,
+          queryExpansion: retrievalResult.queryExpansion,
         };
 
         const supabase = getSupabaseAdminClient();
@@ -447,6 +466,7 @@ export async function POST(request: NextRequest) {
             insufficientEvidence: answerResult.insufficientEvidence,
             promptInjection: answerResult.promptInjection,
             outputFilter: answerResult.outputFilter,
+            queryExpansion: retrievalResult.queryExpansion,
             resolvedConversationId: conversationId,
             openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
             cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",

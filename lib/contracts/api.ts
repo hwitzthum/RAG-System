@@ -46,6 +46,7 @@ export type QueryRequest = {
   conversationId?: string;
   documentId?: string;
   documentIds?: string[];
+  enableQueryExpansion?: boolean;
   languageHint?: SupportedLanguage;
   topK?: number;
 };
@@ -57,6 +58,14 @@ export type QueryResponseMeta = {
   selectedDocumentIds?: string[];
   documentScopeId?: string | null;
   documentScopeIds?: string[];
+  queryExpansion?: {
+    requested: boolean;
+    applied: boolean;
+    strategy: "standard" | "multi_document_expansion";
+    variationCount: number;
+    hydeUsed: boolean;
+    branchCount: number;
+  };
   retrievalTrace?: RetrievalTrace;
   promptInjection?: {
     blockedUserQuery: boolean;

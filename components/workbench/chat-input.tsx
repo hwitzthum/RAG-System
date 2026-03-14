@@ -10,6 +10,8 @@ export function ChatInput({
   isStreaming,
   enableWebResearch,
   setEnableWebResearch,
+  enableQueryExpansion,
+  setEnableQueryExpansion,
   canQuery,
   effectiveQueryScopeIds,
   scopeSummary,
@@ -62,6 +64,20 @@ export function ChatInput({
             data-testid="web-research-toggle"
           />
           Web Research
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <input
+            type="checkbox"
+            checked={enableQueryExpansion}
+            onChange={(e) => setEnableQueryExpansion(e.target.checked)}
+            disabled={effectiveQueryScopeIds.length <= 1}
+            className="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="query-expansion-toggle"
+          />
+          Broaden search
+          <span className="text-zinc-400">
+            {effectiveQueryScopeIds.length > 1 ? "(multi-document)" : "(select 2+ scoped docs)"}
+          </span>
         </label>
         {effectiveQueryScopeIds.length > 0 ? (
           <button

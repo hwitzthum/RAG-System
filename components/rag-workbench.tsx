@@ -122,6 +122,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [workspaceMessage, setWorkspaceMessage] = useState("Ready.");
   const [enableWebResearch, setEnableWebResearch] = useState(false);
+  const [enableQueryExpansion, setEnableQueryExpansion] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"none" | "left" | "right">("none");
 
   const [batchFiles, setBatchFiles] = useState<Array<{ file: File; status: string; error?: string; documentId?: string }>>([]);
@@ -149,6 +150,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }, [activeTurnId, turns]);
 
   const effectiveQueryScopeIds = queryDocumentScopeIds;
+  const canUseQueryExpansion = effectiveQueryScopeIds.length > 1;
 
   const scopeSummary = useMemo(() => {
     if (effectiveQueryScopeIds.length === 0) {
@@ -204,6 +206,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       window.localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
     }
   }, [queryDocumentScopeIds]);
+
+  useEffect(() => {
+    if (!canUseQueryExpansion && enableQueryExpansion) {
+      setEnableQueryExpansion(false);
+    }
+  }, [canUseQueryExpansion, enableQueryExpansion]);
 
   async function fetchDocuments(): Promise<void> {
     setDocumentsLoading(true);
@@ -613,6 +621,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                 ? [uploadStatus.document.id]
                 : undefined),
           enableWebResearch: enableWebResearch || undefined,
+          enableQueryExpansion: canUseQueryExpansion && enableQueryExpansion ? true : undefined,
         }),
       });
 
@@ -854,6 +863,8 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             isStreaming={isStreaming}
             enableWebResearch={enableWebResearch}
             setEnableWebResearch={setEnableWebResearch}
+            enableQueryExpansion={enableQueryExpansion}
+            setEnableQueryExpansion={setEnableQueryExpansion}
             canQuery={canQuery}
             effectiveQueryScopeIds={effectiveQueryScopeIds}
             scopeSummary={scopeSummary}
