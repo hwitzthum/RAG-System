@@ -1,20 +1,79 @@
 # RAG System
 
-A production-ready multilingual Retrieval-Augmented Generation platform built with Next.js, Supabase, and OpenAI. Upload PDF documents, ask questions, and get grounded answers with citations — optionally augmented with live web research.
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-43%20E2E%20%7C%2032%20Unit-brightgreen?logo=playwright&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
+---
+
+## Introduction
+
+RAG System is a production-ready Retrieval-Augmented Generation platform for teams that need to query and reason over their own document collections — contracts, technical specifications, policy documents, or any corpus of PDFs. It is built for knowledge workers and engineering teams who require both precision and security: a multi-stage retrieval pipeline (vector search → cross-encoder reranking → LLM synthesis) delivers high-fidelity answers, while enterprise-grade hardening (CSRF protection, role-based access control, rate limiting, prompt injection defence) makes it safe to deploy without additional infrastructure. Multilingual support across English, German, French, Italian, and Spanish lets global teams query documents in any combination of languages. Whether you are a solo developer exploring your notes or an organisation onboarding dozens of users to a shared knowledge base, RAG System gives you a battle-tested foundation that does not require re-engineering before going live.
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Architecture & Pipeline](#architecture--pipeline)
-3. [Authentication](#authentication)
+1. [Key Features](#key-features)
+2. [Quick Start](#quick-start)
+3. [Environment Variables Reference](#environment-variables-reference)
 4. [User Guide](#user-guide)
-5. [API Reference](#api-reference)
-6. [Project Structure](#project-structure)
-7. [Environment Variables](#environment-variables)
+5. [Architecture](#architecture)
+6. [Security Architecture](#security-architecture)
+7. [API Reference](#api-reference)
 8. [Testing](#testing)
-9. [Production Deployment](#production-deployment)
+9. [Deployment](#deployment)
+10. [Contributing](#contributing)
+11. [License](#license)
+
+---
+
+## Key Features
+
+<table>
+<tr>
+<th>Retrieval & Reasoning</th>
+<th>Security & Access</th>
+</tr>
+<tr>
+<td>
+
+**Hybrid Retrieval** — Dense vector search (pgvector) combined with full-text keyword search (PostgreSQL tsvector), fused via Reciprocal Rank Fusion.
+
+**Cross-Encoder Reranking** — Optional Cohere rerank-v3.5 scores every candidate chunk against your query for precision-first use cases.
+
+**Query Expansion + HyDE** — Rewrites your query into multiple sub-queries or generates a hypothetical ideal document to improve semantic match on short or ambiguous inputs.
+
+**Web Research** — Blends live Tavily web results with document retrieval so answers stay current beyond your upload date.
+
+**Multi-language Support** — Auto-detects and supports EN / DE / FR / IT / ES. Ask in one language, source in another.
+
+**Report Export** — Download any answer as a formatted DOCX or PDF report, generated server-side on demand.
+
+**Batch Upload** — Upload up to 10 PDFs in one operation with real-time per-file ingestion status.
+
+</td>
+<td>
+
+**Role-Based Access Control** — Four roles: `admin`, `reader`, `pending`, `suspended`. New signups queue for admin approval unless their email matches `ADMIN_EMAIL`.
+
+**Bring-Your-Own-Key Vault** — Store your own OpenAI, Cohere, or Anthropic API keys, AES-encrypted at rest, used per-request instead of the platform default.
+
+**CSRF Protection** — Double-submit cookie pattern on all state-changing endpoints; Bearer token routes are correctly exempted.
+
+**Rate Limiting** — Supabase-backed shared rate limiter (in-memory fallback for dev) with fail-closed behaviour and configurable windows.
+
+**Prompt Injection Defence** — 8-category input scanner applied to queries, document chunks, and web results. Suspicious content redacted; blocked content triggers immediate refusal.
+
+**Output Filtering** — Post-generation scan for PII, API keys, and system prompt leakage; detected content replaced with `[REDACTED]`.
+
+**Audit Logging** — Structured JSON logs for every auth, upload, query, report, and admin action with actor, IP, and outcome.
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -22,368 +81,188 @@ A production-ready multilingual Retrieval-Augmented Generation platform built wi
 
 ### Prerequisites
 
-- Node.js 20+
-- A [Supabase](https://supabase.com) project (free tier works)
-- An [OpenAI API key](https://platform.openai.com/api-keys)
-- (Optional) A [Tavily API key](https://tavily.com) for web research
+- **Node.js 18+** (LTS recommended)
+- A **[Supabase](https://supabase.com)** project (free tier works for development)
+- An **[OpenAI API key](https://platform.openai.com/api-keys)** with access to `text-embedding-3-large` and your chosen chat model
 
-### 1. Install dependencies
+### 1. Clone and Install
 
 ```bash
+git clone https://github.com/your-org/rag-system.git
+cd rag-system
 npm install
 ```
 
-> If your shell has `NODE_ENV=production`, run `NODE_ENV=development npm install` to include dev dependencies.
+> If your shell sets `NODE_ENV=production`, run `NODE_ENV=development npm install` to include dev dependencies.
 
-### 2. Configure environment
+### 2. Configure Environment Variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your credentials:
+At minimum you need:
 
 ```env
-# Required — Supabase
+# Supabase
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-# Required — OpenAI
+# OpenAI
 OPENAI_API_KEY=sk-...
 
-# Optional — Web research
-RAG_WEB_SEARCH_ENABLED=true
-RAG_WEB_SEARCH_API_KEY=tvly-...
+# Auth
+ADMIN_EMAIL=you@yourorg.com
+SUPABASE_JWT_SECRET=your-jwt-secret
 ```
 
-### 3. Set up the database
+See the full [Environment Variables Reference](#environment-variables-reference) below for all options.
 
-Apply the migrations to your Supabase project using the [Supabase CLI](https://supabase.com/docs/guides/cli):
+### 3. Run Database Migrations
 
 ```bash
+# With the Supabase CLI
 supabase link --project-ref your-project-ref
 supabase db push
 ```
 
-This creates all required tables (`documents`, `document_chunks`, `query_history`, `ingestion_jobs`, `rate_limit_buckets`, `metric_events`, etc.), stored procedures, and RLS policies.
+Or run each `.sql` file in `database/migrations/` manually in ascending filename order via the Supabase SQL editor.
 
-### 4. Start the dev server
+This creates all required tables (`documents`, `document_chunks`, `retrieval_cache`, `ingestion_jobs`, `query_history`, `rate_limit_buckets`, `user_*_keys`, `metric_events`), indexes, stored procedures, and RLS policies.
+
+### 4. Start the Development Server
 
 ```bash
 npm run dev
 ```
 
-The app runs at [http://localhost:3000](http://localhost:3000) (or port 3001 if 3000 is in use).
-
-### 5. Verify it works
+This starts Next.js **and** the background document ingestion worker concurrently. The application is available at **http://localhost:3001**.
 
 ```bash
-curl http://localhost:3000/api/health
+# Verify it is running
+curl http://localhost:3001/api/health
+# → {"status":"ok", ...}
 ```
 
-You should see `{"status":"ok", ...}` with current configuration values.
+### 5. Sign Up
+
+Visit **http://localhost:3001** and create an account.
+
+- If your email **matches `ADMIN_EMAIL`**, your account is immediately promoted to `admin`.
+- Otherwise your account enters `pending` state. An admin must approve it at `/admin` before you can access the workbench.
 
 ---
 
-## Architecture & Pipeline
+## Environment Variables Reference
 
-This section explains the concrete technical approaches used in the ingestion, retrieval, and answer generation pipelines, and why each design decision was made.
+All variables are validated at startup via Zod. Missing required variables throw a descriptive error before the server accepts any traffic.
 
-### Overview
+### Core — Supabase
 
-```
-┌─────────────┐    ┌──────────────────────────────────────────────┐
-│  PDF Upload  │───▶│            Ingestion Pipeline                │
-└─────────────┘    │  Extract → Chunk → Embed → Store             │
-                   └──────────────────────────────────────────────┘
-                                        │ document_chunks (pgvector)
-                                        ▼
-┌─────────────┐    ┌──────────────────────────────────────────────┐
-│  User Query  │───▶│            Retrieval Pipeline                │
-└─────────────┘    │  Embed → Hybrid Search → RRF → Rerank        │
-                   │  → (Cross-Encoder) → (Contextual Grouping)   │
-                   └──────────────────────────────────────────────┘
-                                        │ ranked chunks
-                                        ▼
-                   ┌──────────────────────────────────────────────┐
-                   │          Answer Generation                    │
-                   │  Evidence Check → Prompt → LLM → SSE Stream  │
-                   └──────────────────────────────────────────────┘
-```
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SUPABASE_URL` | Yes | — | Supabase project REST URL |
+| `SUPABASE_ANON_KEY` | Yes | — | Supabase public anon key (safe for client use) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | — | Service role key — **never expose to the browser** |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | — | Browser-accessible copy of `SUPABASE_URL` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | — | Browser-accessible copy of `SUPABASE_ANON_KEY` |
 
----
+### Core — OpenAI
 
-### 1. Ingestion Pipeline
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENAI_API_KEY` | Yes | — | OpenAI secret key used for embeddings and LLM calls |
 
-When a PDF is uploaded it goes through a five-stage pipeline before it is queryable.
+### Auth
 
-#### Stage 1 — Validation & Deduplication
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `ADMIN_EMAIL` | Yes | — | Email address auto-promoted to `admin` on first signup |
+| `SUPABASE_JWT_SECRET` | Yes\* | — | Validates Supabase-issued JWTs server-side. Provide this **or** `AUTH_JWKS_URL` |
+| `AUTH_JWKS_URL` | Yes\* | — | JWKS endpoint for JWT validation. Alternative to `SUPABASE_JWT_SECRET` |
+| `OPENAI_BYOK_VAULT_KEY` | Prod required | — | 32-byte base64 AES key for encrypting user-supplied API keys at rest |
+| `CRON_SECRET` | Prod required | — | Bearer token that authorises the `/api/internal/ingestion/run` endpoint |
+| `AUTH_DEV_INSECURE_BYPASS` | No | `false` | Skip auth checks in development — **must be `false` in production** |
 
-Before any processing, the upload route validates the file:
+### RAG Tuning
 
-- **PDF magic bytes check**: Confirms the file starts with `%PDF-` to reject non-PDF files even if they have a `.pdf` extension.
-- **SHA-256 deduplication**: A checksum of the full file is computed. If an identical document was already uploaded, the upload is rejected with a clear message rather than creating a duplicate knowledge base entry.
-- **Size limit**: Configurable maximum file size (default 50 MB) enforced server-side.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `RAG_QUERY_EMBEDDING_MODEL` | No | `text-embedding-3-large` | OpenAI embedding model used at query time |
+| `RAG_LLM_MODEL` | No | `gpt-4o-mini` | Chat model used for answer synthesis |
+| `RAG_LLM_MAX_OUTPUT_TOKENS` | No | `700` | Maximum tokens in the LLM response |
+| `RAG_DEFAULT_TOP_K` | No | `8` | Number of chunks to retrieve before reranking |
+| `RAG_RRF_K` | No | `60` | RRF dampening constant |
+| `RAG_RERANK_POOL_SIZE` | No | `20` | Minimum candidate pool size before reranking |
+| `RAG_MIN_EVIDENCE_CHUNKS` | No | `2` | Minimum chunks required before generating an answer |
+| `RAG_MIN_RERANK_SCORE` | No | `0.25` | Minimum rerank score for evidence sufficiency |
+| `RAG_CACHE_TTL_SECONDS` | No | `86400` | TTL for cached retrieval results (24 hours) |
+| `RAG_RETRIEVAL_VERSION` | No | `1` | Increment to invalidate the entire retrieval cache |
+| `RAG_MAX_UPLOAD_BYTES` | No | `52428800` | Maximum file size per upload (50 MB) |
+| `RAG_CONTEXTUAL_GROUPING_ENABLED` | No | `true` | Boost adjacent chunks from the same document section |
 
-#### Stage 2 — Text Extraction
+### Optional Features
 
-The background worker uses `pdfjs-dist` to extract text page-by-page, preserving page number metadata. Pages are then segmented into sections using heading-detection heuristics (regex patterns for common heading formats). This section boundary information flows into the chunker so that chunks do not silently straddle unrelated sections.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `RAG_CROSS_ENCODER_ENABLED` | No | `false` | Enable Cohere cross-encoder reranking globally |
+| `COHERE_API_KEY` | No | — | Required if `RAG_CROSS_ENCODER_ENABLED=true` |
+| `COHERE_BYOK_VAULT_KEY` | No | — | AES vault key for per-user Cohere key encryption |
+| `RAG_MULTI_QUERY_ENABLED` | No | `false` | Enable query expansion (multi-query + HyDE) globally |
+| `RAG_MULTI_QUERY_VARIATIONS` | No | `3` | Number of expanded query variations to generate |
+| `RAG_WEB_SEARCH_ENABLED` | No | `false` | Enable Tavily web-augmented retrieval globally |
+| `RAG_WEB_SEARCH_API_KEY` | No | — | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true` |
+| `RAG_WEB_SEARCH_MAX_RESULTS` | No | `5` | Maximum web results per query |
+| `ANTHROPIC_API_KEY` | No | — | Enables Anthropic Claude as an alternative LLM backend |
+| `ANTHROPIC_BYOK_VAULT_KEY` | No | — | AES vault key for per-user Anthropic key encryption |
 
-#### Stage 3 — Chunking with Overlap
+### Observability
 
-Sections are split into overlapping chunks:
-
-- **Target token size** (default ~512 tokens): Keeps chunks short enough to stay within embedding model context limits and avoids diluting embedding signal with off-topic content.
-- **Overlap** (default ~100 tokens): Adjacent chunks share a window of text so that retrieval can find the full context for a sentence that sits at a chunk boundary.
-- **Sentence-boundary respect**: The chunker avoids cutting mid-sentence, preserving linguistic coherence.
-
-The combination of overlap and sentence-boundary awareness prevents information loss at chunk seams — a common failure mode in naive fixed-size chunking.
-
-#### Stage 4 — Context Generation
-
-Each chunk is augmented with a short context string stored separately from the raw content:
-
-- **LLM-generated** (optional): OpenAI summarises what the surrounding section is about, producing a rich semantic label for the chunk.
-- **Heuristic fallback**: `"{section_title} | page {n}: {first 200 chars}"` is used when LLM context generation is disabled.
-
-This context field is prepended to the chunk text when building the retrieval prompt, helping the model understand a chunk even when it appears out of document context.
-
-#### Stage 5 — Embedding & Storage
-
-Each chunk is embedded with OpenAI `text-embedding-3-small` and stored in the `document_chunks` table alongside:
-
-- The `embedding` column (pgvector, 1536 dimensions) for vector similarity search.
-- A `tsv` column (PostgreSQL `tsvector`, auto-maintained) for full-text keyword search.
-- `language`, `page_number`, `section_title`, and `chunk_index` for filtering and citation generation.
-
-Storing both representations enables the hybrid retrieval approach described below.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No | — | Bearer token for the metrics sink endpoint. Omit to disable the endpoint. |
+| `INGESTION_BATCH_SIZE` | No | `50` | Chunks processed per ingestion worker batch |
+| `INGESTION_LOCK_TIMEOUT_SECONDS` | No | `900` | Distributed lock timeout for ingestion jobs |
 
 ---
 
-### 2. Retrieval Pipeline
+## User Guide
 
-The retrieval pipeline is the heart of the system. Its goal is to return the most relevant chunks for a given query while maximising recall (finding everything relevant) and precision (ranking the best material first).
+### Authentication & User Roles
 
-```
-Query
-  │
-  ├─▶ Query Normalisation + Language Detection
-  │
-  ├─▶ Cache Lookup (SHA-256 key over query + language + topK + scope)
-  │       └─ Hit: return cached result immediately
-  │
-  └─▶ (Cache Miss)
-          │
-          ├─▶ OpenAI Embedding (text-embedding-3-small)
-          │
-          ├─▶ Token Extraction
-          │
-          ├─▶ Parallel Search
-          │       ├─ Vector Search   (pgvector cosine similarity)
-          │       └─ Keyword Search  (PostgreSQL full-text search)
-          │
-          ├─▶ Cross-Language Fallback (if results < threshold)
-          │
-          ├─▶ Reciprocal Rank Fusion (RRF)
-          │
-          ├─▶ Lexical Reranking
-          │
-          ├─▶ Cross-Encoder Reranking  [opt-in]
-          │
-          ├─▶ Contextual Grouping      [opt-in]
-          │
-          └─▶ Cache Write → Return top-K chunks
-```
+The system uses Supabase Auth with a **pending-approval workflow** — new accounts require an administrator to grant access before the workbench is accessible.
 
-#### Hybrid Search: Vector + Keyword
+| Role | Permissions |
+|---|---|
+| **`pending`** | Default for all new signups. Redirected to `/pending-approval`; no API access. |
+| **`reader`** | Upload documents, issue queries, download reports, manage own BYOK keys. |
+| **`admin`** | Everything a reader can do, plus user management at `/admin`. |
+| **`suspended`** | Revoked access. Session cleared on next request; redirected to `/login`. |
 
-**Why hybrid?** Vector search captures semantic similarity (paraphrases, synonyms, conceptual relationships) but can miss exact terms — especially proper nouns, codes, or domain-specific abbreviations. Keyword search does the opposite: it excels at exact-match retrieval but fails on paraphrase. Running both in parallel and fusing results gives the best of both worlds.
+#### Signing up
 
-- **Vector search** uses pgvector's cosine similarity index. The query embedding is compared against all chunk embeddings. The pool size is `max(topK × 4, RAG_RERANK_POOL_SIZE, 20)` — deliberately larger than the final `topK` to give the downstream rerankers enough candidates to work with.
-- **Keyword search** uses PostgreSQL's built-in full-text search engine (`tsvector`/`tsquery`) with the `simple` dictionary. Query tokens are matched against the pre-computed `tsv` column.
-- **Language filtering**: Both searches respect a detected or hinted language to avoid surfacing chunks in the wrong language. If a language-filtered search returns too few results, an automatic cross-language fallback repeats both searches without the language constraint and merges the combined pool.
+1. Visit the app — you are redirected to `/login`
+2. Click **Sign up** and enter your email and a password
+3. If your email matches `ADMIN_EMAIL`, you are immediately promoted to `admin`
+4. Otherwise, your account enters `pending` state
 
-#### Reciprocal Rank Fusion (RRF)
+#### Admin approval
 
-RRF is a rank-combination technique that is robust to score scale differences between retrieval systems. Each candidate chunk receives a score from both the vector and keyword result lists:
-
-```
-RRF score = 1 / (K + vector_rank) + 1 / (K + keyword_rank)
-```
-
-`K` (default 60) dampens the influence of top-ranked results and promotes candidates that appear in both lists. A chunk that ranks 3rd in vector search and 5th in keyword search will outscore a chunk that ranks 1st in only one source. This penalises single-source flukes and rewards consistent evidence.
-
-#### Lexical Reranking
-
-After RRF fusion, each chunk is scored with a weighted blend of three signals:
-
-| Signal | Default weight | What it measures |
-|--------|---------------|-----------------|
-| Retrieval score | 0.60 | Normalised RRF / vector similarity |
-| Lexical overlap | 0.35 | Fraction of query tokens present in chunk |
-| Exact match | 0.05 | Boolean: chunk contains the full query string |
-
-The lexical overlap signal provides a fast, interpretable cross-check against the embedding-based score. A chunk that semantically matches the query but contains none of its words is demoted; one that contains all query words but with weak embedding similarity is promoted slightly.
-
-#### Cross-Encoder Reranking (optional, `RAG_CROSS_ENCODER_ENABLED`)
-
-For the highest quality at higher cost, an LLM-based cross-encoder can re-evaluate the top-20 candidates. Unlike embedding similarity (which scores query and chunk independently), a cross-encoder sees the query and chunk together and returns a fine-grained relevance score (0.0–1.0). This late-stage reranking corrects cases where embedding vectors agree superficially but the content is not actually answerable.
-
-A 3-second timeout with fallback to the previous rank ensures latency is bounded. Enabling this adds one LLM call per query (typically ~0.5–1.0 seconds).
-
-#### Contextual Grouping (default enabled, `RAG_CONTEXTUAL_GROUPING_ENABLED`)
-
-Documents often contain answers spread across adjacent chunks. Contextual grouping gives a score boost (+0.05 per neighbouring chunk, up to ±2 positions) to chunks that sit next to another high-ranking chunk from the same document. This promotes dense, coherent document sections over isolated snippets.
-
-The intuition: if chunk 7 from document A is in the top-5, chunk 6 or 8 from the same document is likely to provide useful surrounding context, so they deserve a slight promotion over an equally-scored chunk from an unrelated document.
-
-#### Result Caching
-
-Retrieval results are cached in the `retrieval_cache` table using a SHA-256 key over:
-
-- Normalised query text
-- Detected language
-- `RAG_RETRIEVAL_VERSION` (increment to invalidate the entire cache after re-ingestion)
-- `topK`
-- Document scope (specific document IDs or global)
-
-Cache TTL defaults to 24 hours. A cache hit returns results immediately without any embedding or database search, making repeated or near-identical queries essentially free.
-
----
-
-### 3. Answer Generation
-
-#### Evidence Sufficiency Check
-
-Before calling the LLM, the system checks whether the retrieved evidence is sufficient:
-
-- At least `RAG_MIN_EVIDENCE_CHUNKS` chunks (default 2) must be present.
-- At least one chunk must have a rerank score ≥ `RAG_MIN_RERANK_SCORE` (default 0.25).
-
-If the evidence threshold is not met, the system returns a calibrated "insufficient evidence" response rather than hallucinating an answer. This is a deliberate design choice: it is better to say "I don't know" than to fabricate a confident but wrong answer.
-
-#### Prompt Construction
-
-Chunks are concatenated into the user prompt, each prefixed with a citation marker (`[Source N]`) and their context string. The system prompt instructs the model to answer only from the provided sources and to include citation markers in its response. These markers are parsed from the final answer to produce structured `citations` objects (documentId, page number, chunkId) returned to the client.
-
-#### Web-Augmented Answers
-
-When web research is enabled and the user activates it per-query, the system performs a Tavily web search in parallel with retrieval. Web sources with relevance ≥ 0.5 are appended to the prompt after the document chunks with their own citation markers. The model is instructed to prefer document sources but may draw on web content when document coverage is insufficient. Web sources are surfaced separately in the response so users can distinguish document-grounded from web-grounded claims.
-
-#### Streaming (SSE)
-
-The LLM response is streamed token-by-token via Server-Sent Events so the user sees output immediately. The stream emits four event types:
-
-| Event | Content |
-|-------|---------|
-| `meta` | Retrieval metadata (cache hit, latency, chunk counts) |
-| `token` | Individual answer tokens |
-| `final` | Complete answer, citations, web sources, queryHistoryId |
-| `done` | Stream complete signal |
-
----
-
-## Authentication
-
-The system uses **Supabase Auth** for all user management with a **pending-approval workflow** — new accounts require an administrator to grant access before they can use the app. Every page and API route is protected.
-
-### User roles
-
-| Role | Description | Permissions |
-|------|-------------|-------------|
-| **pending** | Default for new sign-ups | Can only see the pending-approval page; no API access |
-| **reader** | Approved by an admin | Upload PDFs, query documents, download reports, manage BYOK keys |
-| **admin** | Elevated access | Everything a reader can do, plus manage users at `/admin` |
-| **suspended** | Revoked access | Redirected to login; all API calls return 403 |
-
-Roles are stored in `app_metadata.role` on the Supabase user object and are enforced on every API request via JWT claims.
-
----
-
-### Step 1 — Sign up
-
-1. Open the app — you'll be redirected to `/login`
-2. Click **Sign up** to go to `/signup`
-3. Enter your email and a password (minimum 6 characters)
-4. Click **Sign Up** — you'll see: *"Account created. An administrator will review your request."*
-5. Check your email for a confirmation link and click it
-
-> **First admin:** Set `ADMIN_EMAIL` in `.env.local` before the first sign-up. When a user registers with that email they are automatically promoted to `admin` instead of `pending`.
-
----
-
-### Step 2 — Wait for approval (pending users)
-
-After signing up, you land on the `/pending-approval` page:
-
-```
-Your account is pending approval by an administrator.
-```
-
-Two actions are available:
-
-- **Check Status** — refreshes your session JWT. If an admin has approved your account, you are redirected to the workbench automatically.
-- **Sign Out** — clears your session and returns to `/login`.
-
-While `pending`, all API calls return `403 Forbidden`. You cannot access any workbench page.
-
----
-
-### Step 3 — Admin approves the account
-
-An administrator visits `/admin` and sees the user management table:
-
-| Email | Role | Created | Actions |
-|-------|------|---------|---------|
-| user@example.com | pending | 2026-03-09 | **Approve** |
-
-Clicking **Approve** changes the role from `pending` → `reader` via `PATCH /api/admin/users/:id`. The user's next **Check Status** click (or page reload after a new login) picks up the updated role from the refreshed JWT.
-
-Available admin actions per user:
+An admin visits `/admin` and sees all pending users. Clicking **Approve** promotes the user from `pending` → `reader`. Changes take effect on the user's next page load or **Check Status** click.
 
 | Current role | Available actions |
 |---|---|
-| pending | Approve (→ reader) |
-| reader | Promote to Admin / Suspend |
-| admin | Demote to Reader *(disabled for self)* |
-| suspended | Reactivate (→ reader) |
+| pending | **Approve** → reader |
+| reader | **Promote to Admin** or **Suspend** |
+| admin | **Demote to Reader** *(disabled for your own account — last-admin guard)* |
+| suspended | **Reactivate** → reader |
 
----
+#### Promoting the first admin (CLI fallback)
 
-### Step 4 — Sign in
-
-1. Go to `/login`
-2. Enter your email and password
-3. Click **Sign In**
-
-The login flow:
-1. The form calls `POST /api/auth/login` (rate-limited: 20 attempts per 5 min per IP + email)
-2. If the account is `pending` → redirected to `/pending-approval`
-3. If the account is `suspended` → error shown, no session created
-4. If `reader` or `admin` → Supabase session cookies are set, redirected to `/`
-
-Session cookies expire after **1 hour** and are transparently refreshed by the middleware on every request while you are active.
-
----
-
-### Step 5 — Sign out
-
-Click **Clear** in the Session Identity panel on the workbench, or call the API:
-
-```bash
-curl -X DELETE http://localhost:3000/api/auth/session \
-  -H "Cookie: rag_access_token=<your-token>" \
-  -H "X-CSRF-Token: <csrf-token>"
-```
-
----
-
-### Promoting the first admin (CLI)
-
-If you did not set `ADMIN_EMAIL` before signing up, promote a user via the Supabase admin API:
+If you did not set `ADMIN_EMAIL` before signing up, promote a user via the Supabase Admin API:
 
 ```bash
 curl -X PATCH https://your-project.supabase.co/auth/v1/admin/users/<user-id> \
@@ -393,210 +272,396 @@ curl -X PATCH https://your-project.supabase.co/auth/v1/admin/users/<user-id> \
   -d '{"app_metadata": {"role": "admin"}}'
 ```
 
----
+#### API authentication (programmatic access)
 
-### API authentication
-
-API routes accept two authentication methods:
-
-#### 1. Session cookie (browser)
-
-After signing in via the browser, Supabase sets session cookies automatically. All `fetch` calls from the workbench include a `X-CSRF-Token` header to prevent CSRF attacks. State-changing routes (`POST`, `PUT`, `DELETE`) require this header when using cookie auth.
-
-#### 2. Bearer token (programmatic access)
-
-Get a token from Supabase Auth:
+Get a bearer token from Supabase Auth and use it directly — no cookies or CSRF headers required:
 
 ```bash
+# Get a token
 curl -X POST https://your-project.supabase.co/auth/v1/token?grant_type=password \
   -H "apikey: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"your-password"}'
-# Returns: {"access_token":"eyJ...", "expires_in":3600, ...}
-```
+# → {"access_token":"eyJ...", "expires_in":3600}
 
-Use the `access_token` in API calls. Bearer token auth is **exempt from CSRF** (not a browser session):
-
-```bash
-# Query the knowledge base
-curl -X POST http://localhost:3000/api/query \
+# Use the token
+curl -X POST http://localhost:3001/api/query \
   -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '{"query": "What does the document say about X?"}'
 
 # Upload a document
-curl -X POST http://localhost:3000/api/upload \
+curl -X POST http://localhost:3001/api/upload \
   -H "Authorization: Bearer eyJ..." \
   -F "file=@/path/to/document.pdf"
-
-# Batch upload
-curl -X POST http://localhost:3000/api/upload/batch \
-  -H "Authorization: Bearer eyJ..." \
-  -F "files=@/path/to/doc1.pdf" \
-  -F "files=@/path/to/doc2.pdf"
 ```
 
-#### Rate limits
-
-| Endpoint | Limit |
-|---|---|
-| `POST /api/auth/login` | 20 attempts per 5 min per IP + email |
-| `POST /api/auth/signup` | 3 sign-ups per hour per IP |
-
-Exceeding the limit returns `429 Too Many Requests`.
-
 ---
 
-## User Guide
-
-This section walks through every feature of the application as an approved user.
-
-### Accessing the workbench
-
-After signing in with an approved account, you land on the **RAG Workbench** — a single-page interface divided into panels. All interactions happen here without page reloads.
-
----
-
-### Uploading documents
-
-Before you can query anything, you need to upload at least one PDF document.
+### Uploading Documents
 
 #### Single upload
 
-1. Find the **Ingestion Desk** panel on the workbench.
-2. Click **Choose File** and select a PDF from your computer.
-3. Optionally enter a title for the document (defaults to the filename).
-4. Click **Upload**.
-5. The document appears in the document list with a status badge:
-   - **queued** — received, waiting for the background worker
-   - **processing** — worker is extracting, chunking, and embedding
-   - **ready** — fully ingested and queryable
-   - **failed** — ingestion error (a **Retry** button appears)
-
-Status updates automatically while the page is open.
+1. In the **Ingestion Desk** panel, click **Choose File** and select a PDF
+2. Optionally enter a title (defaults to the filename)
+3. Click **Upload**
+4. The document appears with a status badge: `queued` → `processing` → `ready` (or `failed` with a **Retry** button)
 
 #### Batch upload
 
-1. Use the **Batch Upload** file input to select up to 10 PDFs at once.
-2. Click **Upload All**.
-3. Each file gets its own row with individual status tracking. Files are uploaded sequentially and processed in the background.
+Select up to 10 PDFs at once. Each file gets its own row with individual status tracking. Files are uploaded and processed independently in the background — you can start querying completed files while others are still processing.
 
-**Tips:**
-- Only PDF files are accepted. Non-PDF files are rejected at upload time.
-- Uploading the same PDF twice is detected by checksum and rejected with a helpful message.
-- File size limit: 50 MB per file.
-- If ingestion fails, click **Retry** to re-queue the document without re-uploading it.
+**Notes:**
+- Only PDF files are accepted; magic bytes are verified server-side
+- Uploading a duplicate file is detected by SHA-256 checksum and rejected with a clear message
+- File size limit: 50 MB per file (configurable via `RAG_MAX_UPLOAD_BYTES`)
 
 ---
 
-### Asking questions
+### Asking Questions
 
-Once at least one document is in **ready** state, you can query the knowledge base.
-
-1. Type your question in the query text area at the top of the workbench.
-2. Configure optional parameters (see below).
-3. Click **Send Query** or press `Enter`.
-4. The answer streams in word-by-word, followed by numbered citations.
+1. Type your question in the query text area
+2. Configure optional parameters (see below)
+3. Click **Send Query**
+4. The answer streams in token-by-token, followed by numbered source citations
 
 #### Query options
 
-| Option | Description |
-|--------|-------------|
-| **Document scope** | Restrict the search to a single document, or query all documents at once (default). |
-| **Web Research** | When checked, the system also searches the web via Tavily and incorporates relevant results alongside document evidence. |
-| **Language hint** | Manually specify the language of your query (EN/DE/FR/IT/ES) to override automatic detection. |
-| **Top K** | How many source chunks the retrieval pipeline should include (1–20, default 8). Higher values may improve recall on complex questions but increase LLM cost. |
+| Option | When to use | Example |
+|---|---|---|
+| **Document scope** | Focus on a single contract to prevent cross-document bleed | Select "Acme Corp MSA v3.pdf" before asking "What are the liability caps?" |
+| **Cross-Encoder Reranking** | Precision-first questions where exact clause matters | "What are the exact termination conditions in Section 4.2?" |
+| **Multi-Query Expansion** | Broad questions that can be expressed multiple ways | "Tell me about the company's leave policy" → generates 3 targeted sub-queries |
+| **HyDE** | Short keyword queries that don't match verbose document language | "termination" → LLM expands to a hypothetical passage about notice periods |
+| **Web Research** | Questions requiring up-to-date real-world data | "What is the current ECB rate and how does it compare to our loan cap?" |
+| **Language hint** | Override auto-detection on very short queries | Force `DE` for a German document query |
+| **Top K** | More context for complex synthesis questions | Increase from 8 to 15 for a broad "summarise all obligations" question |
 
 #### Reading the answer
 
-- **Answer text**: Grounded in your uploaded documents. Citation markers like `[Source 1]` appear inline.
-- **Citations panel**: Lists the exact page numbers and document names for each cited source. Click a citation to inspect the raw chunk text.
-- **Web sources** (if web research was enabled): Displayed below the answer with URLs and relevance snippets.
-- **Cache indicator**: A small badge shows whether this query result was served from cache (instant) or freshly computed.
-- **Retrieval metadata**: Expandable panel showing counts of vector/keyword/fused/reranked candidates and latency.
+- **Answer text** — grounded in your documents; `[Source N]` citation markers appear inline
+- **Citations panel** — exact page numbers and document names for each cited source; click to inspect raw chunk text
+- **Web sources** — shown separately below the answer (only when web research was enabled)
+- **Cache indicator** — badge showing whether the result was served from cache (instant) or freshly computed
+- **Retrieval metadata** — expandable panel with vector/keyword/fused/reranked candidate counts and per-stage latency
 
-If the system cannot find sufficient evidence in your documents to answer the question, it will say so rather than guessing. This is intentional — add more relevant documents or refine your query.
+If the system cannot find sufficient evidence, it says so rather than fabricating an answer. Add more relevant documents or refine the query.
 
----
+The SSE stream emits four event types:
 
-### Downloading reports
-
-After any query completes, two report buttons appear on that query turn:
-
-- **Download DOCX** — a formatted Word document containing the query, answer, citations, and raw chunk text.
-- **Download PDF** — the same content as a PDF.
-
-Reports are generated on-demand server-side and downloaded directly to your browser. They are useful for sharing results with colleagues who do not have access to the application.
-
----
-
-### Using query history
-
-Previous queries are saved and accessible from the **Query History** panel:
-
-1. Open the history panel.
-2. Click any past query to reload it into the current turn view.
-3. Report buttons are available for historical queries as well.
-
----
-
-### Bring Your Own OpenAI Key (BYOK)
-
-If you have your own OpenAI API key, you can store it in the encrypted vault so your queries use your key rather than the shared server key:
-
-1. Open the **OpenAI Key** panel on the workbench.
-2. Paste your key (starts with `sk-`).
-3. Click **Save**.
-4. A status indicator confirms whether the key is valid.
-5. To remove it, click **Delete**.
-
-Your key is encrypted server-side before storage and is never accessible from the browser after saving.
-
----
-
-### Admin — managing users
-
-If your account has the `admin` role, an **Admin** link appears in the navigation.
-
-The admin panel shows a table of all registered users with their current roles. Available actions per user:
-
-| Current role | What you can do |
+| Event | Content |
 |---|---|
-| pending | **Approve** → promotes to reader |
-| reader | **Promote to Admin** or **Suspend** |
-| admin | **Demote to Reader** (not available for your own account) |
-| suspended | **Reactivate** → restores reader access |
+| `meta` | Retrieval metadata (cache hit, latency, chunk counts) |
+| `token` | Individual answer tokens for streaming display |
+| `final` | Complete answer, citations, web sources, queryHistoryId |
+| `done` | Stream complete signal |
 
-Changes take effect immediately. The affected user will see the updated role on their next page load or **Check Status** action.
+---
+
+### Downloading Reports
+
+After any query completes, two download buttons appear on that turn:
+
+- **Download DOCX** — formatted Word document with query, answer, citations, and raw source chunks
+- **Download PDF** — same content as a PDF
+
+Reports are generated server-side and streamed directly to the browser, suitable for sharing with colleagues who do not have app access.
+
+---
+
+### Bring-Your-Own-Key (BYOK)
+
+Store your own API keys for OpenAI, Cohere, and Anthropic in the **Key Vault** panel. Keys are AES-encrypted before storage and are never accessible from the browser after saving. Your keys are used in place of platform defaults so usage appears on your own billing account.
+
+1. Open the **Key Vault** panel on the workbench
+2. Paste your key (e.g., `sk-...` for OpenAI)
+3. Click **Save** — a status indicator confirms the key is stored
+4. To remove it, click **Delete**
+
+---
+
+### Admin Panel (`/admin`)
+
+Admins see an **Admin** link in the navigation. The panel shows a paginated table of all users with current roles. Role changes take effect immediately without requiring a user sign-out.
+
+> **Example:** A new analyst signs up. Visit `/admin`, find their entry under **Pending**, click **Approve**. They are immediately redirected from `/pending-approval` into the workbench on their next page load.
+
+---
+
+## Architecture
+
+### System Overview
+
+Requests enter through Next.js 15 App Router middleware, which refreshes Supabase sessions, enforces role-based redirects, and syncs session cookies on every request. API routes handle authentication, ingestion, retrieval, answer generation, and administration. All stateful operations flow into a core library layer that manages the pipelines, security enforcement, and observability — persisting to Supabase PostgreSQL with pgvector, and delegating inference to external model APIs.
+
+```
+Browser / API Client
+        │
+        ▼
+  Next.js 15 (App Router)
+  ├── Middleware (auth refresh, role redirect, cookie sync)
+  ├── API Routes (auth, query, upload, reports, admin, BYOK)
+  └── React UI (workbench, theme, admin panel)
+        │
+        ▼
+  Core Libraries (lib/)
+  ├── Ingestion Pipeline     ─── PDF → Chunks → Embeddings → pgvector
+  ├── Retrieval Pipeline     ─── Query → Hybrid Search → RRF → Reranking → Cache
+  ├── Answer Generation      ─── LLM + Web Sources → Streamed SSE Answer
+  ├── Security Layer         ─── CSRF / Rate Limit / Prompt Injection / Output Filter
+  └── Observability          ─── Audit Logs + Fire-and-Forget Metrics
+        │
+        ▼
+  Supabase (PostgreSQL + pgvector + Auth)
+  ├── documents, document_chunks (pgvector + tsvector)
+  ├── retrieval_cache, ingestion_jobs, query_history
+  ├── rate_limit_buckets, user_*_keys (BYOK vaults)
+  └── Auth (JWT + RLS policies)
+
+  External APIs
+  ├── OpenAI   (Embeddings + LLM)
+  ├── Cohere   (Cross-Encoder Reranking)
+  ├── Tavily   (Web Research)
+  └── Anthropic (Optional LLM)
+```
+
+---
+
+### Ingestion Pipeline
+
+Each stage is designed with a specific failure mode in mind.
+
+**1. PDF Validation**
+
+Incoming files are checked for the `%PDF-` magic byte signature before any parsing occurs, and a SHA-256 hash of the raw bytes is compared against stored hashes. This prevents disguised file uploads (e.g., an executable renamed `.pdf`) and avoids re-processing identical documents, which would waste embedding API budget and produce duplicate chunks.
+
+**2. Text Extraction**
+
+Text is extracted page-by-page using `pdfjs-dist`, with page numbers recorded alongside each text segment. Preserving page numbers at this stage is essential: they propagate through chunking and embedding to surface as citation metadata in the final answer, allowing users to locate source passages in the original document.
+
+**3. Chunking with Overlap**
+
+Extracted text is split into approximately 512-token chunks with roughly 100 tokens of overlap, respecting sentence boundaries. The overlap prevents answer truncation at chunk boundaries — a hard cut would render the chunk's final thought unreadable in isolation. Sentence-boundary awareness avoids mid-sentence cuts that confuse both the embedding model and the reader.
+
+**4. Context Generation**
+
+Each chunk is prepended with a short contextual header, either generated by an LLM or produced via the heuristic `"{section} | page N: {first 200 chars}"`. Short chunks lose their surrounding context when retrieved out of order. The prepended header bridges this gap, giving the embedding model and the LLM enough signal to understand what the chunk is about without fetching adjacent chunks.
+
+**5. Embedding & Storage**
+
+Each contextualised chunk is embedded with OpenAI `text-embedding-3-small` and stored in pgvector alongside a PostgreSQL `tsvector` column. The dual representation is intentional: vector embeddings capture semantic similarity while `tsvector` enables exact-term retrieval — the two modalities have complementary failure modes.
+
+**6. Background Worker**
+
+Ingestion runs in a background worker that polls for pending jobs at 15-second intervals using a distributed database lock, with exponential backoff on retries. This decouples upload request latency from ingestion work — a user uploading a 200-page PDF does not wait for all embeddings to be generated before receiving an HTTP response.
+
+---
+
+### Retrieval Pipeline (Multi-Stage)
+
+```
+Query
+  │
+  ├─▶ Language Detection
+  │
+  ├─▶ Cache Lookup (SHA-256: query + language + topK + scope + version)
+  │       └─ Hit: return immediately
+  │
+  └─▶ (Cache Miss)
+          │
+          ├─▶ [Optional] Query Expansion — LLM generates 3 query variants, 4s timeout
+          │
+          ├─▶ [Optional] HyDE — LLM writes hypothetical answer passage, embed it
+          │
+          ├─▶ Parallel Hybrid Search
+          │       ├─ Vector Search   (pgvector cosine similarity)
+          │       └─ Keyword Search  (PostgreSQL tsvector)
+          │
+          ├─▶ Cross-Language Fallback (if recall < threshold)
+          │
+          ├─▶ Reciprocal Rank Fusion (RRF, K=60)
+          │
+          ├─▶ Lexical Reranking (retrieval 0.60 + overlap 0.35 + exact 0.05)
+          │
+          ├─▶ [Optional] Cross-Encoder Reranking (Cohere, top-20, 3s timeout)
+          │
+          ├─▶ Contextual Grouping (+0.05 per adjacent chunk, ±2 positions)
+          │
+          └─▶ Cache Write (async, non-blocking) → Return top-K
+```
+
+**Cache Lookup** — A SHA-256 digest over the normalised query, language code, retrieval version, `topK`, and document scope filter. Identical queries from multiple users pay zero latency or API cost on repeated execution.
+
+**Language Detection** — Keyword-frequency heuristics identify the query language before any database call, ensuring `tsvector` search uses the correct dictionary (stemming, stop-word removal).
+
+**Query Expansion (opt-in)** — The LLM generates three semantically distinct query variations with a 4-second timeout and fallback to the original. Improves recall on vague or domain-specific queries where the user's phrasing does not overlap with document vocabulary.
+
+**HyDE (opt-in)** — The LLM writes a short hypothetical answer passage, which is then embedded instead of the query. The embedding of a verbose answer occupies a geometrically closer position to relevant document chunks than the embedding of a short question, improving cosine similarity matching.
+
+**Parallel Hybrid Search** — Vector search (pgvector cosine) and keyword search (tsvector) execute concurrently. Vector search captures paraphrases and synonyms; keyword search captures exact terms, product codes, and identifiers that vector similarity dilutes.
+
+**Reciprocal Rank Fusion** — `score = 1/(K + vector_rank) + 1/(K + keyword_rank)` with K=60. Penalises rank inflation from a single list and rewards documents that rank highly in both — a more robust fusion strategy than averaging raw similarity scores on incomparable scales.
+
+**Lexical Reranking** — A fast weighted blend: retrieval score (0.60) + lexical overlap with the query (0.35) + exact phrase match bonus (0.05). Catches cases where strong keyword overlap is underweighted by the vector-dominant RRF output.
+
+**Cross-Encoder Reranking (opt-in)** — Cohere `rerank-v3.5` reads the query and each of the top-20 candidates together in a single forward pass, producing relevance judgments significantly more accurate than vector similarity alone. 3-second timeout with fallback to lexical scores.
+
+**Contextual Grouping** — Chunks adjacent in the original document to a high-scoring candidate receive a +0.05 boost per neighbouring position (±2). Dense document sections are more likely to contain complete answers than isolated high-scoring chunks.
+
+**Cache Write** — Written asynchronously after the response is dispatched. Zero critical-path overhead for cache misses.
+
+---
+
+### Answer Generation
+
+**1. Evidence Sufficiency Gate** — Checks minimum chunk count and minimum rerank score before calling the LLM. Falls below thresholds → calibrated "insufficient evidence" response rather than hallucination.
+
+**2. Prompt Construction** — Each chunk is prefixed with a `[Source N]` citation marker and injected into the system prompt context. After generation, `[Source N]` patterns are parsed to resolve `documentId` and `pageNumber` metadata, producing exact document-and-page references without requiring structured JSON from the model.
+
+**3. LLM Inference** — Default model `gpt-4o-mini`, streamed via SSE. Users see token-by-token output rather than a blank wait. Model is configurable per-deployment or per-user BYOK.
+
+**4. Web Augmentation (opt-in)** — Tavily results with relevance ≥ 0.5 are appended as `[Web N]` markers before the prompt is finalised. The model is instructed to prefer document sources; web sources are surfaced separately in the response.
+
+---
+
+## Security Architecture
+
+### Defence-in-Depth
+
+Each security control assumes the layer above it may have already failed. Rate limiting does not rely on authentication being correct; CSRF protection does not rely on the input validator catching every payload; the output filter does not rely on the injection scanner having blocked every attack. A failure in any single layer does not cascade into an exploitable vulnerability.
+
+```
+Request → [Rate Limiter] → [Auth Gate] → [CSRF Check] → [Input Validation]
+                                                               │
+                                           [Prompt Injection Scanner]
+                                                               │
+                                             [LLM Inference / Retrieval]
+                                                               │
+                                               [Output Filter / Redaction]
+                                                               │
+                                              [Audit Log] → Response
+```
+
+---
+
+### Authentication & RBAC
+
+Two authentication methods are supported.
+
+**Session cookies** (browser) — After login, an `HttpOnly` cookie (`__Host-rag_access_token` in production, `rag_access_token` in development) is set. Middleware validates and refreshes it on every request. Session TTL: 1 hour with transparent auto-refresh.
+
+**Bearer tokens** (programmatic) — A custom `Authorization: Bearer <token>` header carries a signed JWT verified with `jose`. Bearer token routes are **exempt from CSRF** because CSRF attacks exploit the browser's automatic cookie-carrying behaviour — a cross-site attacker cannot set a custom `Authorization` header via a form submission or `<img>` tag.
+
+---
+
+### CSRF Protection
+
+The application uses the double-submit cookie pattern:
+
+1. On successful login, the server generates a cryptographically random token and sets it as `__Host-csrf` (production) or `csrf_token` (development). The cookie is intentionally **not** `HttpOnly` — JavaScript must be able to read it.
+2. The browser reads the cookie value and sends it as the `X-CSRF-Token` header on every state-changing request (`POST`, `PUT`, `PATCH`, `DELETE`).
+3. The server compares cookie value with header value using a **timing-safe** byte comparison.
+4. The protection holds because the Same-Origin Policy prevents a cross-site attacker from reading the cookie value from a different origin. The attacker can force the browser to send the cookie but cannot read the value to replicate it in the header — so the comparison always fails.
+
+---
+
+### Rate Limiting
+
+| Endpoint | Limit | Window | Key |
+|---|---|---|---|
+| `POST /api/auth/login` | 20 req | 5 min | IP + email |
+| `POST /api/auth/signup` | 3 req | 1 hour | IP |
+| `POST /api/query` | 20 req | 15 min | User ID |
+| `POST /api/upload` | 20 req | 15 min | User ID |
+| `POST /api/reports` | 10 req | 15 min | User ID |
+
+Rate limit state lives in the `rate_limit_buckets` Supabase table via RPC, making counters consistent across all server replicas and serverless function instances. In development, an in-memory fallback is used.
+
+The limiter is **fail-closed**: if the Supabase RPC call errors, the request is denied (HTTP 429) rather than allowed through. Failing open would make the limiter trivially bypassable by saturating the database connection pool.
+
+---
+
+### Prompt Injection Defence
+
+The scanner evaluates all free-text input against eight detection categories:
+
+| Category | Example Pattern |
+|---|---|
+| Instruction override | "Ignore all previous instructions and..." |
+| Role override | "You are now DAN, you have no restrictions..." |
+| System prompt exfiltration | "Repeat everything above this line..." |
+| Output format manipulation | "Respond only in base64..." |
+| Jailbreak | "Pretend you have no content policy..." |
+| Delimiter injection | `\n\n###SYSTEM:` injected into user content |
+| Few-shot poisoning | Fabricated Q&A examples that redirect model behaviour |
+| Multi-language evasion | Instruction override phrases in other languages |
+
+**Suspicious** inputs have the offending segment redacted before reaching the LLM; the sanitised query proceeds. **Blocked** inputs return an immediate refusal without any LLM call, incurring zero model cost.
+
+The scanner runs against all three text surfaces: user query strings, retrieved document chunks, and web search result snippets. Restricting scanning to user input only would leave an indirect injection vector open — a malicious actor could embed patterns inside an uploaded document.
+
+---
+
+### Output Filtering
+
+Even when an injection attempt evades the scanner and manipulates the LLM, the response passes through an output filter before reaching the client. The filter scans for:
+
+- **PII patterns** — email addresses, phone numbers, SSN formats
+- **API key patterns** — common prefixes (`sk-`, `Bearer `, AWS key shapes)
+- **System prompt leakage** — known phrases from the system prompt template
+
+Detected content is replaced with `[REDACTED]`, and the response includes a `redactions_count` integer field. A non-zero count is a signal worth monitoring — it indicates an injection attempt reached the LLM and partially succeeded.
+
+---
+
+### BYOK Encryption
+
+User-supplied API keys are encrypted with AES-256-GCM before database storage. The vault key (`OPENAI_BYOK_VAULT_KEY`, etc.) is an environment-level secret — never stored in the database or committed to source control. Per-user tables are protected by RLS policies that permit access only to the owning user ID. Decryption happens server-side only at the moment an API call is made, and the plaintext key is never written to logs, cache, or any persistent store.
+
+---
+
+### HTTP Security Headers
+
+| Header | Value | Purpose |
+|---|---|---|
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Enforces HTTPS for 2 years; eligible for browser preload lists |
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-sniffing attacks |
+| `X-Frame-Options` | `DENY` | Prevents clickjacking via iframe embedding |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limits referrer header leakage on cross-origin requests |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | Explicitly disables device API access |
 
 ---
 
 ## API Reference
 
-All endpoints require authentication unless noted.
+| Method | Path | Auth | CSRF | Rate Limit | Description |
+|---|---|---|---|---|---|
+| `GET` | `/api/health` | No | No | — | Health check with config summary |
+| `POST` | `/api/auth/login` | No | No | 20/5 min per IP+email | Rate-limited server-side login |
+| `POST` | `/api/auth/signup` | No | No | 3/hour per IP | Rate-limited signup with role assignment |
+| `POST` | `/api/auth/session` | No | No | — | Create session cookie from access token |
+| `GET` | `/api/auth/session` | Cookie | No | — | Return current session user |
+| `DELETE` | `/api/auth/session` | Cookie | Yes | — | Logout and clear session cookie |
+| `POST` | `/api/query` | Yes | Yes | 20/15 min per user | RAG query; response streamed as SSE |
+| `GET` | `/api/query-history` | Yes | No | — | List past queries for the current user |
+| `DELETE` | `/api/query-history/:id` | Yes | Yes | — | Delete a single query history entry |
+| `POST` | `/api/upload` | Yes | Yes | 20/15 min per user | Upload and enqueue a single PDF |
+| `GET` | `/api/upload/:documentId` | Yes | No | — | Poll ingestion job status |
+| `POST` | `/api/upload/batch` | Yes | Yes | 20/15 min per user | Batch upload up to 10 PDFs |
+| `POST` | `/api/reports` | Yes | Yes | 10/15 min per user | Generate DOCX or PDF report for a query turn |
+| `GET` | `/api/byok/openai` | Yes | No | — | Check whether an OpenAI BYOK key is stored |
+| `PUT` | `/api/byok/openai` | Yes | Yes | — | Encrypt and store an OpenAI API key |
+| `DELETE` | `/api/byok/openai` | Yes | Yes | — | Remove stored OpenAI API key |
+| `GET` | `/api/documents` | Yes | No | — | List all accessible documents |
+| `DELETE` | `/api/documents/:id` | Yes | Yes | — | Delete a document and its chunks |
+| `GET` | `/api/admin/users` | Admin | No | — | List all users with roles |
+| `PATCH` | `/api/admin/users/:id` | Admin | Yes | — | Update a user's role |
+| `GET` | `/api/admin/runtime-status` | Admin | No | — | Ingestion worker health and queue depth |
+| `POST` | `/api/internal/ingestion/run` | CRON | No | — | Trigger the ingestion worker (cron use only) |
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/health` | No | Health check with config summary |
-| `POST` | `/api/auth/login` | No | Rate-limited login; checks pending/suspended |
-| `POST` | `/api/auth/signup` | No | Rate-limited sign-up; auto-promotes admin email |
-| `POST` | `/api/auth/session` | No | Create session from access token |
-| `GET` | `/api/auth/session` | Cookie | Get current session user |
-| `DELETE` | `/api/auth/session` | Cookie + CSRF | Clear session |
-| `POST` | `/api/query` | Yes + CSRF | Execute RAG query (SSE stream) |
-| `GET` | `/api/query-history` | Yes | List past queries |
-| `POST` | `/api/upload` | Yes + CSRF | Upload a PDF document |
-| `GET` | `/api/upload/:id` | Yes | Get upload/ingestion status |
-| `POST` | `/api/upload/batch` | Yes + CSRF | Batch upload PDFs |
-| `POST` | `/api/reports` | Yes + CSRF | Generate DOCX/PDF report |
-| `GET/PUT/DELETE` | `/api/byok/openai` | Yes + CSRF | Manage OpenAI BYOK key |
-| `GET` | `/api/admin/users` | Admin | List all users |
-| `PATCH` | `/api/admin/users/:id` | Admin + CSRF | Update user role |
-| `POST` | `/api/internal/observability/metrics` | Bearer | Ingest metric events |
+> BYOK routes follow the same shape for `cohere` and `anthropic` providers — substitute the provider name in the path.
 
-> **CSRF note:** Routes marked `+ CSRF` require an `X-CSRF-Token` header when called with cookie-based auth. Bearer token auth skips CSRF validation. The CSRF token is set as a cookie (`csrf_token`) on login and must be read client-side and sent as a header.
-
-### Query request
+### Query request body
 
 ```json
 {
@@ -608,107 +673,94 @@ All endpoints require authentication unless noted.
 }
 ```
 
-### Query response (SSE)
-
-The response is a stream of Server-Sent Events:
-
-- `meta` — retrieval metadata (cache hit, latency, chunk IDs)
-- `token` — individual answer tokens (for streaming display)
-- `final` — complete answer, citations, web sources, queryHistoryId
-- `done` — stream complete
-
----
-
-## Project Structure
-
-```
-app/                  Next.js App Router pages and API routes
-  (auth)/             Login, signup, reset-password pages
-  api/                API route handlers
-components/           React components (workbench UI)
-lib/
-  answering/          Answer generation (grounded + web-augmented)
-  auth/               Authentication (JWT verification, session, RBAC)
-  config/             Environment variable validation (Zod)
-  contracts/          TypeScript types for API and retrieval
-  ingestion/          PDF upload and ingestion pipeline
-  observability/      Audit logging and metrics emission
-  providers/          OpenAI provider abstraction and BYOK vault
-  reports/            DOCX and PDF report generation
-  retrieval/          Hybrid retrieval, reranking, cross-encoder, caching
-  runtime/            Runtime secrets management
-  security/           Rate limiting (shared + in-memory) and IP extraction
-  supabase/           Supabase clients (admin, browser, server)
-  web-research/       Tavily web search integration
-supabase/migrations/  Database schema migrations
-tests/                Unit and E2E tests
-```
-
----
-
-## Environment Variables
-
-See `.env.example` for the full list. Key variables:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SUPABASE_URL` | Yes | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Yes | Supabase anonymous/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Same as SUPABASE_URL (client-side) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Same as SUPABASE_ANON_KEY (client-side) |
-| `OPENAI_API_KEY` | Yes | OpenAI API key for embeddings and LLM |
-| `RAG_CROSS_ENCODER_ENABLED` | No | Enable LLM-based cross-encoder reranking (default: false) |
-| `RAG_CONTEXTUAL_GROUPING_ENABLED` | No | Boost adjacent chunks from same document (default: true) |
-| `RAG_WEB_SEARCH_ENABLED` | No | Enable web research via Tavily (default: false) |
-| `RAG_WEB_SEARCH_API_KEY` | No | Tavily API key (required if web search enabled) |
-| `ADMIN_EMAIL` | No | Email auto-promoted to admin on first sign-up |
-| `AUTH_DEV_INSECURE_BYPASS` | No | Skip auth in development (default: false) |
-| `OPENAI_BYOK_VAULT_KEY` | Prod | Base64-encoded 32-byte key for BYOK encryption |
-| `CRON_SECRET` | Prod* | Required for protected ingestion trigger endpoints |
-
 ---
 
 ## Testing
 
+### Unit Tests (32 tests)
+
 ```bash
-# Type checking
-npm run typecheck
-
-# Unit tests (32 tests)
 npx tsx --test tests/*.test.ts
+```
 
-# E2E tests (43 tests — requires dev server running)
-npm run dev &
+Covers: retrieval cache key generation and TTL behaviour, RRF score computation, lexical reranking weight blending, chunking pipeline boundary conditions, CSRF token generation and timing-safe comparison, rate limit bucket arithmetic, and the full prompt injection scanner category suite.
+
+### End-to-End Tests (43 tests)
+
+```bash
+# The dev server must be running before Playwright executes
+npm run dev:next &
+curl --retry 5 --retry-delay 2 http://localhost:3001/api/health
+
 npx playwright test
+```
 
-# Lint
-npm run lint
+Runs against a live Next.js dev server on port 3001 with `workers: 1`. Covers: full auth flows (login, logout, signup, pending redirect, suspended redirect), single and batch document upload, end-to-end query with citation rendering, report download (DOCX and PDF), admin user management, BYOK key storage and removal, and query history deletion.
 
-# All checks
-npm run check
+**Test users** — must exist in Supabase before running E2E:
+
+| Role | Email | Password |
+|---|---|---|
+| `reader` | `e2e-test@ragsystem.test` | `E2eTestPass789` |
+| `admin` | `e2e-admin@ragsystem.test` | `E2eAdminPass789` |
+| `pending` | `e2e-pending@ragsystem.test` | `E2ePendingPass789` |
+
+### TypeScript Check
+
+```bash
+npx tsc --noEmit
+```
+
+Must report 0 errors. This is a hard gate — do not merge if type errors are present.
+
+---
+
+## Deployment
+
+### Vercel + Supabase (Recommended)
+
+1. Connect the repository to a new Vercel project
+2. Set all environment variables from `.env.example` in the Vercel dashboard under **Settings → Environment Variables**. Use separate values for Preview and Production.
+3. Set `OPENAI_BYOK_VAULT_KEY` to a securely generated 32-byte base64 string — required in production
+4. Set `CRON_SECRET` to a securely generated random string
+5. Configure a scheduled trigger — either a **Vercel Cron Job** or a **Supabase Edge Function schedule** — to call `POST /api/internal/ingestion/run` with the header `Authorization: Bearer <CRON_SECRET>` at a 60-second interval
+
+> **Node.js packages:** `pdfkit` and `pdfjs-dist` are listed as `serverExternalPackages` in `next.config.ts`. They require the Node.js serverless runtime and are incompatible with Vercel's Edge runtime. Do not add `export const runtime = 'edge'` to any route that depends on these packages.
+
+### Session Cookie Requirements
+
+Production uses `__Host-` prefixed cookies. The `__Host-` prefix is enforced by browsers only when:
+
+- The connection is over **HTTPS** — cookies will not be set or sent over plain HTTP
+- The `Domain` attribute is **not set**
+- The `Path` attribute is exactly `/`
+
+All three conditions are satisfied automatically by the application's cookie-setting logic. Deploying behind a reverse proxy that strips HTTPS or rewrites cookie attributes will break authentication.
+
+### Pre-deployment Checks
+
+```bash
+npm run release:readiness:precutover    # Dry-run all checks
+npm run release:matrix:precutover       # Full pre-deployment validation matrix
 ```
 
 ---
 
-## Production Deployment
+## Contributing
 
-### Build
-
-```bash
-npm run build
-npm start
-```
-
-### Production requirements
-
-- `AUTH_DEV_INSECURE_BYPASS` must be `false`
-- `OPENAI_BYOK_VAULT_KEY` must be set (32-byte base64 encryption key)
-- `CRON_SECRET` must be set in deployment environments that expose `/api/internal/ingestion/run`
-
-### Validation
+Fork the repository, create a branch from `main`, and open a pull request with a clear description of the change and the motivation behind it. All of the following must pass before a PR will be merged:
 
 ```bash
-npm run release:readiness:precutover    # Dry-run all checks
-npm run release:matrix:precutover       # Full pre-deployment matrix
+npx tsc --noEmit                        # 0 TypeScript errors
+npx tsx --test tests/*.test.ts          # 32/32 unit tests pass
+npx playwright test                     # 43/43 E2E tests pass (dev server must be running)
+npm run lint                            # 0 lint errors
 ```
+
+New features must include corresponding unit tests and, where user-facing, E2E test coverage. Security-relevant changes (auth, rate limiting, injection scanning) require both unit tests covering the new logic and a reviewer with security context on the PR.
+
+---
+
+## License
+
+MIT
