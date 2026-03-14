@@ -64,6 +64,15 @@ function parsePersistedScopeIds(rawValue: string | null): string[] {
   return [];
 }
 
+function restoreQueryHistoryItem(
+  history: QueryHistoryItem[],
+  item: QueryHistoryItem,
+): QueryHistoryItem[] {
+  const next = [...history.filter((entry) => entry.id !== item.id), item];
+  next.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  return next;
+}
+
 function newUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -119,6 +128,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [queryHistory, setQueryHistory] = useState<QueryHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [deletingHistoryIds, setDeletingHistoryIds] = useState<string[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [workspaceMessage, setWorkspaceMessage] = useState("Ready.");
   const [enableWebResearch, setEnableWebResearch] = useState(false);
@@ -719,6 +729,43 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setQueryDocumentScopeIds(scopedDocumentIds);
   }
 
+  function handleDeleteHistoryById(historyId: string): void {
+    const itemToDelete = queryHistory.find((item) => item.id === historyId);
+    if (!itemToDelete) {
+      return;
+    }
+    if (deletingHistoryIds.includes(historyId)) {
+      return;
+    }
+
+    setDeletingHistoryIds((current) => [...current, historyId]);
+    setQueryHistory((current) => current.filter((item) => item.id !== historyId));
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/query-history/${historyId}`, {
+          method: "DELETE",
+          headers: csrfHeaders(),
+        });
+
+        if (!response.ok && response.status !== 404) {
+          const payload = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(payload.error ?? "Failed to delete chat.");
+        }
+
+        setWorkspaceMessage("Chat deleted.");
+        toast.success("Chat deleted.");
+      } catch (error) {
+        setQueryHistory((current) => restoreQueryHistoryItem(current, itemToDelete));
+        const message = error instanceof Error ? error.message : "Failed to delete chat.";
+        setWorkspaceMessage(message);
+        toast.error(message);
+      } finally {
+        setDeletingHistoryIds((current) => current.filter((itemId) => itemId !== historyId));
+      }
+    })();
+  }
+
   function handleNewConversation(): void {
     setConversationId(newUuid());
     setTurns([]);
@@ -864,9 +911,11 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           documents={documents}
           documentsLoading={documentsLoading}
           canDeleteDocuments={canDeleteDocuments}
+          deletingHistoryIds={deletingHistoryIds}
           queryDocumentScopeIds={queryDocumentScopeIds}
           toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
           onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
+          onDeleteHistory={handleDeleteHistoryById}
           onRefreshDocuments={() => void fetchDocuments()}
           queryHistory={queryHistory}
           historyLoading={historyLoading}

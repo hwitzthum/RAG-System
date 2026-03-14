@@ -7,9 +7,11 @@ export function SidebarLeft({
   documents,
   documentsLoading,
   canDeleteDocuments,
+  deletingHistoryIds,
   queryDocumentScopeIds,
   toggleQueryDocumentScopeId,
   onDeleteDocument,
+  onDeleteHistory,
   onRefreshDocuments,
   queryHistory,
   historyLoading,
@@ -50,17 +52,28 @@ export function SidebarLeft({
             <p className="fg-muted text-xs">No history yet.</p>
           ) : (
             queryHistory.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() => onRestoreHistory(item)}
-                className="surface-muted w-full rounded-2xl px-3 py-2 text-left hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)]"
-              >
-                <p className="fg-secondary truncate text-xs font-medium">{item.query}</p>
-                <p className="fg-muted mt-0.5 text-xs">
-                  {formatTime(item.createdAt)} | {formatLatency(item.latencyMs)}
-                </p>
-              </button>
+              <div key={item.id} className="surface-muted flex items-start gap-1 rounded-2xl pr-1">
+                <button
+                  type="button"
+                  onClick={() => onRestoreHistory(item)}
+                  className="w-full rounded-2xl px-3 py-2 text-left hover:border-[var(--accent-border)] hover:bg-[var(--bg-elevated)]"
+                >
+                  <p className="fg-secondary truncate text-xs font-medium">{item.query}</p>
+                  <p className="fg-muted mt-0.5 text-xs">
+                    {formatTime(item.createdAt)} | {formatLatency(item.latencyMs)}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteHistory(item.id)}
+                  disabled={deletingHistoryIds.includes(item.id)}
+                  className="btn-danger mt-2 rounded p-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Delete chat"
+                  aria-label={`Delete chat: ${item.query}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))
           )}
         </div>

@@ -75,9 +75,11 @@ export type SidebarLeftProps = {
   documents: DocumentListItem[];
   documentsLoading: boolean;
   canDeleteDocuments: boolean;
+  deletingHistoryIds: string[];
   queryDocumentScopeIds: string[];
   toggleQueryDocumentScopeId: (id: string) => void;
   onDeleteDocument: (docId: string) => void;
+  onDeleteHistory: (historyId: string) => void;
   onRefreshDocuments: () => void;
   queryHistory: QueryHistoryItem[];
   historyLoading: boolean;
