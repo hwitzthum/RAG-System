@@ -422,7 +422,7 @@ async function extractPagesWithPdfJs(pdfBytes: Uint8Array, logger: RuntimeLogger
       const content = await page.getTextContent();
       pages.push({
         pageNumber,
-        text: assemblePageText(content.items),
+        text: assemblePageText(content.items ?? []),
       });
     }
 

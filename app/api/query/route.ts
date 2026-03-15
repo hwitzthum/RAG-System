@@ -23,6 +23,7 @@ import { performWebResearch } from "@/lib/web-research/service";
 import type { WebSource } from "@/lib/web-research/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const querySchema = z.object({
   query: z.string().min(1).max(2000),

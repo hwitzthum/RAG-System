@@ -83,8 +83,8 @@ test.describe("Phase 1: Supabase Auth", () => {
     await page.fill('input[type="password"]', "wrongpassword");
     await page.click('button[type="submit"]');
 
-    // Should show error message
-    await expect(page.locator("text=Invalid login credentials").or(page.locator(".text-rose-700"))).toBeVisible({
+    // Should show error message (rendered with .tone-danger class)
+    await expect(page.locator("text=Invalid login credentials").or(page.locator(".tone-danger"))).toBeVisible({
       timeout: 10_000,
     });
   });

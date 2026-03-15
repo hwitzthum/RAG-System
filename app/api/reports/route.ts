@@ -10,6 +10,7 @@ import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const reportRequestSchema = z.object({
   queryHistoryId: z.string().uuid(),
