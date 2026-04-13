@@ -9,7 +9,7 @@ type MetricEvent = {
 
 const METRICS_ENDPOINT = "/api/internal/observability/metrics";
 
-export async function emitMetric(event: MetricEvent): Promise<void> {
+async function emitMetric(event: MetricEvent): Promise<void> {
   if (!env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN) {
     return;
   }

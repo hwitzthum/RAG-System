@@ -8,6 +8,7 @@ import { env } from "@/lib/config/env";
 import { scheduleIngestionAutoKick } from "@/lib/ingestion/runtime/auto-kick";
 import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { emitUploadCount } from "@/lib/observability/metrics";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
@@ -131,6 +132,8 @@ export async function POST(request: NextRequest) {
         logAuditEvent,
       },
     });
+
+    emitUploadCount({ userId: authResult.user.id, fileName: file.name });
 
     scheduleIngestionAutoKick({
       acceptedCount: 1,

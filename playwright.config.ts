@@ -10,7 +10,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   use: {
-    baseURL: "http://localhost:3001",
+    baseURL: process.env.TEST_BASE_URL ?? "http://localhost:3001",
     headless: true,
   },
   projects: [

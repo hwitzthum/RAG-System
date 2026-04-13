@@ -7,6 +7,8 @@ import { extractBearerTokenString } from "@/lib/security/token";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
+// Auth: bearer-token only (CRON_SECRET), validated inside runIngestionTrigger.
+// CSRF protection is not applicable — this endpoint does not use cookie-based auth.
 async function executeRun(request: NextRequest) {
   const ipAddress = getClientIp(request);
   const result = await runIngestionTrigger({

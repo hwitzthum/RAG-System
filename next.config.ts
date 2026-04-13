@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
+            // unsafe-inline (styles): required by Next.js for injected <style> tags
+            // unsafe-inline (scripts): required by Next.js for inline script hydration
+            // unsafe-eval (scripts): required by Next.js webpack/turbopack in dev and production builds
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
