@@ -4,14 +4,20 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Validates that a redirect target is a safe relative path on this origin.
+ * Rejects absolute URLs, protocol-relative URLs (//evil.com), and any value
+ * that contains a URL scheme (open-redirect vector).
+ */
 function isSafeRedirectPath(next: string | null): next is string {
   if (!next) return false;
-  try {
-    const parsed = new URL(next, "http://localhost");
-    return parsed.hostname === "localhost" && parsed.pathname.startsWith("/");
-  } catch {
-    return false;
-  }
+  // Must start with a single slash (relative path)
+  if (!next.startsWith("/")) return false;
+  // Reject protocol-relative URLs (//evil.com treated as absolute by browsers)
+  if (next.startsWith("//")) return false;
+  // Reject paths that look like they contain a scheme after the slash
+  if (/^\/[a-z][a-z0-9+\-.]*:/i.test(next)) return false;
+  return true;
 }
 
 /**

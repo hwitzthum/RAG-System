@@ -5,7 +5,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
   INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(900),
-  CRON_SECRET: z.string().min(16).optional(),
+  // CRON_SECRET must be at least 32 chars to provide adequate entropy.
+  CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),

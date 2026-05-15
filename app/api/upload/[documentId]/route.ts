@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/request-auth";
 import { getEffectiveDocumentById } from "@/lib/ingestion/runtime/effective-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -16,8 +17,18 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ documentId: string }> },
 ) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
+
+  // Rate limit: 120 requests per 15 minutes per IP
+  const rl = await consumeSharedRateLimit(`upload:status:${ipAddress}`, 120, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
+  const authResult = await requireAuth(request, ["reader", "admin"]);
 
   if (!authResult.ok) {
     return authResult.response;
@@ -69,6 +80,8 @@ export async function GET(
     },
   });
 
+  const isAdmin = authResult.user.role === "admin";
+
   return NextResponse.json({
     document: {
       id: documentRecord.document_id,
@@ -83,9 +96,12 @@ export async function GET(
           id: documentRecord.latest_job_id,
           status: documentRecord.latest_job_status,
           attempt: documentRecord.latest_job_attempt,
-          last_error: documentRecord.latest_job_last_error,
-          locked_at: documentRecord.latest_job_locked_at,
-          locked_by: documentRecord.latest_job_locked_by,
+          // Redact internal details from non-admin users to avoid leaking
+          // implementation-sensitive information (e.g., worker hostnames,
+          // error stack traces, internal storage paths).
+          last_error: isAdmin ? documentRecord.latest_job_last_error : null,
+          locked_at: isAdmin ? documentRecord.latest_job_locked_at : null,
+          locked_by: isAdmin ? documentRecord.latest_job_locked_by : null,
           current_stage: documentRecord.latest_job_current_stage,
           stage_updated_at: documentRecord.latest_job_stage_updated_at,
           chunks_processed: documentRecord.latest_job_chunks_processed,
