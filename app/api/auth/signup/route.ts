@@ -9,7 +9,9 @@ export const runtime = "nodejs";
 
 const signupSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  // Enforce a minimum of 12 characters to reduce brute-force risk.
+  // Supabase's own minimum (configured in the dashboard) should match.
+  password: z.string().min(12),
 });
 
 export async function POST(request: NextRequest) {

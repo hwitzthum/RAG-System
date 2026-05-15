@@ -7,6 +7,20 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname);
 }
 
+/**
+ * Validates that a `next` redirect target is a safe relative path on this
+ * origin.  Rejects anything that starts with `//` (protocol-relative URLs
+ * that browsers treat as absolute) or contains a scheme (open-redirect
+ * attempt via `http://`, `javascript:`, etc.).
+ */
+function isSafeNextPath(value: string): boolean {
+  if (!value || !value.startsWith("/")) return false;
+  // Reject protocol-relative URLs (//evil.com) and scheme-containing values
+  if (value.startsWith("//")) return false;
+  if (/^\/[a-z][a-z0-9+\-.]*:/i.test(value)) return false;
+  return true;
+}
+
 function isApiPath(pathname: string): boolean {
   return pathname.startsWith("/api/");
 }
@@ -72,7 +86,10 @@ export async function middleware(request: NextRequest) {
 
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
+    // Only forward paths that are safe relative paths on this origin.
+    if (isSafeNextPath(pathname)) {
+      loginUrl.searchParams.set("next", pathname);
+    }
     return NextResponse.redirect(loginUrl);
   }
 

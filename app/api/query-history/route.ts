@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth/request-auth";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -50,8 +51,18 @@ function normalizeCitations(value: unknown): CitationRecord[] {
 }
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
+
+  // Rate limit: 120 requests per 15 minutes per IP
+  const rl = await consumeSharedRateLimit(`query-history:list:${ipAddress}`, 120, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
+  const authResult = await requireAuth(request, ["reader", "admin"]);
 
   if (!authResult.ok) {
     return authResult.response;
