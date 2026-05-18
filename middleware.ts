@@ -152,7 +152,7 @@ export async function middleware(request: NextRequest) {
         name: cookieName,
         value: sessionData.session.access_token,
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "strict",
         secure: isProduction,
         path: "/",
       });

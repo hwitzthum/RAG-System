@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import { env } from "@/lib/config/env";
@@ -13,6 +14,11 @@ export const maxDuration = 30;
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ipAddress = getClientIp(request);
+
+  const uuidValidation = z.string().uuid().safeParse(id);
+  if (!uuidValidation.success) {
+    return NextResponse.json({ error: "Invalid document ID" }, { status: 400 });
+  }
 
   const authResult = await requireAuthWithCsrf(request, ["admin"]);
   if (!authResult.ok) {
