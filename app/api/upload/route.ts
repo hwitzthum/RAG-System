@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Rate limit: 20 uploads per 15 minutes per user
-  const rl = await consumeSharedRateLimit(`upload:single:${authResult.user.id}`, 20, 900);
+  const rl = await consumeSharedRateLimit(`upload:single:${authResult.user.id}`, 20, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many upload requests" },

@@ -205,6 +205,7 @@ export async function POST(request: NextRequest) {
     `${authResult.user.id}:${ipAddress}`,
     env.AUTH_RATE_LIMIT_MAX_REQUESTS,
     env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    { failOpen: false },
   );
 
   if (!rate.allowed) {

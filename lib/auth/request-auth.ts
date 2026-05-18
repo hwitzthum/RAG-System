@@ -8,6 +8,15 @@ import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { getClientIp } from "@/lib/security/request";
 
+// Module-level guard: fail fast if the insecure dev bypass is enabled in production.
+// This is a belt-and-suspenders check in addition to the assertion in lib/config/env.ts.
+if (env.AUTH_DEV_INSECURE_BYPASS && env.NODE_ENV === "production") {
+  throw new Error(
+    "[request-auth] AUTH_DEV_INSECURE_BYPASS must not be enabled in production. " +
+      "Refusing to start.",
+  );
+}
+
 export type AuthMethod = "bearer" | "cookie" | "dev_bypass";
 
 export type AuthResult =
