@@ -31,15 +31,21 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
           {
+            // Disable DNS prefetching to avoid leaking visited resources to
+            // third-party DNS resolvers through speculative lookups.
             key: "X-DNS-Prefetch-Control",
-            value: "on",
+            value: "off",
           },
           {
             key: "Content-Security-Policy",
             // unsafe-inline (styles): required by Next.js for injected <style> tags.
             // unsafe-inline (scripts): required by Next.js for inline script hydration.
+            //   A nonce-based CSP is the recommended long-term approach to remove
+            //   unsafe-inline, but requires Next.js middleware integration.
             // unsafe-eval: only enabled in development (needed by webpack HMR / turbopack);
             //   removed in production to prevent arbitrary code execution via eval().
+            // upgrade-insecure-requests: instructs browsers to upgrade HTTP sub-resource
+            //   requests to HTTPS in production; omitted in dev to avoid blocking localhost.
             value: [
               "default-src 'self'",
               isDev
@@ -56,6 +62,7 @@ const nextConfig: NextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "object-src 'none'",
+              ...(!isDev ? ["upgrade-insecure-requests"] : []),
             ].join("; "),
           },
         ],

@@ -14,18 +14,17 @@ const updateRoleSchema = z.object({
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ipAddress = getClientIp(request);
+  const { id: targetUserId } = await params;
 
-  // Rate limit: 30 requests per 15 minutes per IP
-  const rl = await consumeSharedRateLimit(`admin:users:update:${ipAddress}`, 30, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
-    );
+  // Validate targetUserId is a UUID before any processing
+  const uuidValidation = z.string().uuid().safeParse(targetUserId);
+  if (!uuidValidation.success) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
   }
 
+  // Authenticate first so the rate-limit key can include the verified user ID,
+  // preventing IP-only keys from being exhausted by unauthenticated callers.
   const authResult = await requireAuthWithCsrf(request, ["admin"]);
-  const { id: targetUserId } = await params;
 
   if (!authResult.ok) {
     logAuditEvent({
@@ -38,6 +37,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       metadata: { reason: "unauthorized", targetUserId },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 30 requests per 15 minutes per authenticated admin user
+  const rl = await consumeSharedRateLimit(`admin:users:update:${authResult.user.id}`, 30, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   // Prevent self-demotion
@@ -122,18 +130,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ipAddress = getClientIp(request);
+  const { id: targetUserId } = await params;
 
-  // Rate limit: reuse admin update bucket
-  const rl = await consumeSharedRateLimit(`admin:users:update:${ipAddress}`, 30, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
-    );
+  // Validate targetUserId is a UUID before any processing
+  const uuidValidationDelete = z.string().uuid().safeParse(targetUserId);
+  if (!uuidValidationDelete.success) {
+    return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
   }
 
+  // Authenticate first so the rate-limit key can include the verified user ID,
+  // preventing IP-only keys from being exhausted by unauthenticated callers.
   const authResult = await requireAuthWithCsrf(request, ["admin"]);
-  const { id: targetUserId } = await params;
 
   if (!authResult.ok) {
     logAuditEvent({
@@ -146,6 +153,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       metadata: { reason: "unauthorized", targetUserId },
     });
     return authResult.response;
+  }
+
+  // Rate limit: reuse admin update bucket (keyed by authenticated user ID)
+  const rl = await consumeSharedRateLimit(`admin:users:update:${authResult.user.id}`, 30, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   // Prevent self-deletion

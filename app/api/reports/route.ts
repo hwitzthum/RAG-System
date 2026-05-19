@@ -133,6 +133,11 @@ export async function POST(request: NextRequest) {
         "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="report-${queryHistoryId.slice(0, 8)}.${extension}"`,
         "Content-Length": String(buffer.length),
+        // Security headers — Next.js global headers() config does not apply to
+        // manually constructed Response objects returned from route handlers.
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Cache-Control": "no-store",
       },
     });
   } catch (error) {

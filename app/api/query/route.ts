@@ -176,9 +176,13 @@ function buildQueryStreamResponse(input: {
     status: 200,
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
+      "Cache-Control": "no-cache, no-store, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      // Security headers — Next.js global headers() config does not apply to
+      // manually constructed Response objects returned from route handlers.
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
     },
   });
 }

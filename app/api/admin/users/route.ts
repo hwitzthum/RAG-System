@@ -13,15 +13,8 @@ const MAX_PER_PAGE = 200;
 export async function GET(request: NextRequest) {
   const ipAddress = getClientIp(request);
 
-  // Rate limit: 60 requests per 15 minutes per IP
-  const rl = await consumeSharedRateLimit(`admin:users:list:${ipAddress}`, 60, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
-    );
-  }
-
+  // Authenticate first so the rate-limit key can include the verified user ID,
+  // preventing IP-only keys from being exhausted by unauthenticated callers.
   const authResult = await requireAuth(request, ["admin"]);
 
   if (!authResult.ok) {
@@ -35,6 +28,15 @@ export async function GET(request: NextRequest) {
       metadata: { reason: "unauthorized" },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 60 requests per 15 minutes per authenticated admin user
+  const rl = await consumeSharedRateLimit(`admin:users:list:${authResult.user.id}`, 60, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   const url = request.nextUrl;
