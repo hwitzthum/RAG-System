@@ -29,14 +29,8 @@ export async function handleAdminRuntimeStatusGet(input: {
   ipAddress: string;
   dependencies: RuntimeStatusRouteDependencies;
 }): Promise<Response> {
-  const rl = await input.dependencies.consumeRateLimit(`admin:runtime-status:${input.ipAddress}`, 60, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
-    );
-  }
-
+  // Authenticate first so the rate-limit key can include the verified user ID,
+  // preventing IP-only keys from being exhausted by unauthenticated callers.
   const authResult = await input.dependencies.requireAdminAuth();
   if (!authResult.ok) {
     input.dependencies.logAuditEvent({
@@ -49,6 +43,15 @@ export async function handleAdminRuntimeStatusGet(input: {
       metadata: { reason: "unauthorized" },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 60 requests per 15 minutes per authenticated admin user
+  const rl = await input.dependencies.consumeRateLimit(`admin:runtime-status:${authResult.user.id}`, 60, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   try {
