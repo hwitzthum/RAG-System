@@ -453,7 +453,7 @@ Each contextualised chunk is embedded with OpenAI `text-embedding-3-large` and s
 
 **6. Background Worker**
 
-Ingestion runs in a background worker that polls for pending jobs at 15-second intervals using a distributed database lock, with exponential backoff on retries. This decouples upload request latency from ingestion work — a user uploading a 200-page PDF does not wait for all embeddings to be generated before receiving an HTTP response.
+Ingestion runs in a background worker that polls for pending jobs at 5-second intervals using a distributed database lock, with exponential backoff on retries. This decouples upload request latency from ingestion work — a user uploading a 200-page PDF does not wait for all embeddings to be generated before receiving an HTTP response.
 
 ---
 
