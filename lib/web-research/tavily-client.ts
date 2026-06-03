@@ -25,6 +25,7 @@ export async function searchTavily(
       max_results: maxResults,
       search_depth: "basic",
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {

@@ -9,11 +9,21 @@ export async function performWebResearch(query: string): Promise<WebSource[]> {
     return [];
   }
 
-  const sources = await searchTavily(
-    query,
-    env.RAG_WEB_SEARCH_API_KEY,
-    env.RAG_WEB_SEARCH_MAX_RESULTS,
-  );
-
-  return sources.filter((s) => s.relevanceScore >= MIN_RELEVANCE_SCORE);
+  try {
+    const sources = await searchTavily(
+      query,
+      env.RAG_WEB_SEARCH_API_KEY,
+      env.RAG_WEB_SEARCH_MAX_RESULTS,
+    );
+    return sources.filter((s) => s.relevanceScore >= MIN_RELEVANCE_SCORE);
+  } catch (err) {
+    // Web search is best-effort: a Tavily outage or API key error must not
+    // fail the entire RAG query. Degrade to document-only results and log
+    // so the operator can investigate via server logs.
+    console.error(
+      "[web-research] Tavily search failed, returning empty results:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return [];
+  }
 }
