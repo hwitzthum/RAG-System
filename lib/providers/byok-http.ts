@@ -76,7 +76,7 @@ export async function handleByokGet(request: NextRequest, config: ProviderByokRo
       },
     });
     if (message.includes("vault table is missing")) {
-      return NextResponse.json({ error: message }, { status: 503 });
+      return NextResponse.json({ error: `${config.providerLabel} BYOK vault is temporarily unavailable` }, { status: 503 });
     }
     return NextResponse.json({ error: providerErrorMessage(config, "load") }, { status: 500 });
   }
@@ -142,7 +142,7 @@ export async function handleByokPut(request: NextRequest, config: ProviderByokRo
       return NextResponse.json({ error: message }, { status: 400 });
     }
     if (message.includes("vault table is missing")) {
-      return NextResponse.json({ error: message }, { status: 503 });
+      return NextResponse.json({ error: `${config.providerLabel} BYOK vault is temporarily unavailable` }, { status: 503 });
     }
 
     return NextResponse.json({ error: providerErrorMessage(config, "store") }, { status: 500 });
@@ -203,7 +203,7 @@ export async function handleByokDelete(request: NextRequest, config: ProviderByo
       },
     });
     if (message.includes("vault table is missing")) {
-      return NextResponse.json({ error: message }, { status: 503 });
+      return NextResponse.json({ error: `${config.providerLabel} BYOK vault is temporarily unavailable` }, { status: 503 });
     }
     return NextResponse.json({ error: providerErrorMessage(config, "delete") }, { status: 500 });
   }
