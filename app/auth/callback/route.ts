@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { getClientIp } from "@/lib/security/request";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const type = searchParams.get("type"); // Supabase may pass e.g. "recovery"
   const next = searchParams.get("next");
+  const ipAddress = getClientIp(request);
 
   if (!code) {
     // No code — just redirect to login
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
         actorRole: "admin",
         outcome: "success",
         resource: "auth",
-        ipAddress: null,
+        ipAddress,
         metadata: { email: confirmedEmail, via: "email_verification_callback" },
       });
     } catch (promoteError) {
@@ -111,7 +113,7 @@ export async function GET(request: NextRequest) {
         actorRole: "pending",
         outcome: "failure",
         resource: "auth",
-        ipAddress: null,
+        ipAddress,
         metadata: {
           reason: "admin_promote_failed",
           message: promoteError instanceof Error ? promoteError.message : "unknown",
