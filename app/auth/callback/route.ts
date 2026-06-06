@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { env } from "@/lib/config/env";
+import { logAuditEvent } from "@/lib/observability/audit";
+import { getClientIp } from "@/lib/security/request";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +35,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const type = searchParams.get("type"); // Supabase may pass e.g. "recovery"
   const next = searchParams.get("next");
+  const ipAddress = getClientIp(request);
 
   if (!code) {
     // No code — just redirect to login
@@ -67,11 +71,55 @@ export async function GET(request: NextRequest) {
     },
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     console.error("[auth/callback] code exchange failed:", error.message);
     return NextResponse.redirect(`${origin}/login?error=confirmation_failed`);
+  }
+
+  // Admin email promotion: only granted here, after the user has clicked the
+  // verification link delivered to the admin inbox (proven email ownership).
+  // The signup route deliberately does NOT promote — doing it there would allow
+  // anyone who learns the ADMIN_EMAIL to obtain admin access before verification.
+  const confirmedEmail = sessionData.user?.email;
+  const confirmedUserId = sessionData.user?.id;
+  if (
+    confirmedEmail &&
+    confirmedUserId &&
+    env.ADMIN_EMAIL &&
+    confirmedEmail.toLowerCase() === env.ADMIN_EMAIL.toLowerCase()
+  ) {
+    try {
+      const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
+      const adminClient = getSupabaseAdminClient();
+      await adminClient.auth.admin.updateUserById(confirmedUserId, {
+        app_metadata: { role: "admin" },
+      });
+      logAuditEvent({
+        action: "auth.signup.admin_promote",
+        actorId: confirmedUserId,
+        actorRole: "admin",
+        outcome: "success",
+        resource: "auth",
+        ipAddress,
+        metadata: { email: confirmedEmail, via: "email_verification_callback" },
+      });
+    } catch (promoteError) {
+      console.error("[auth/callback] admin promote failed:", promoteError);
+      logAuditEvent({
+        action: "auth.signup.admin_promote",
+        actorId: confirmedUserId,
+        actorRole: "pending",
+        outcome: "failure",
+        resource: "auth",
+        ipAddress,
+        metadata: {
+          reason: "admin_promote_failed",
+          message: promoteError instanceof Error ? promoteError.message : "unknown",
+        },
+      });
+    }
   }
 
   // Determine where to send the user after exchange (safe redirect only)

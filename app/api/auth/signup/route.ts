@@ -78,36 +78,10 @@ export async function POST(request: NextRequest) {
   const signupData = (await signupResponse.json()) as { id?: string; user?: { id: string } };
   const userId = signupData.id ?? signupData.user?.id;
 
-  // If this is the admin email, promote to admin immediately
-  if (userId && env.ADMIN_EMAIL && email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase()) {
-    try {
-      const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
-      const supabase = getSupabaseAdminClient();
-      await supabase.auth.admin.updateUserById(userId, {
-        app_metadata: { role: "admin" },
-      });
-
-      logAuditEvent({
-        action: "auth.signup.admin_promote",
-        actorId: userId,
-        actorRole: "admin",
-        outcome: "success",
-        resource: "auth",
-        ipAddress,
-        metadata: { email },
-      });
-    } catch (error) {
-      logAuditEvent({
-        action: "auth.signup.admin_promote",
-        actorId: userId,
-        actorRole: "pending",
-        outcome: "failure",
-        resource: "auth",
-        ipAddress,
-        metadata: { reason: "admin_promote_failed", message: error instanceof Error ? error.message : "unknown" },
-      });
-    }
-  }
+  // Admin role promotion happens in app/auth/callback/route.ts after the user
+  // verifies their email. Promoting here (before verification) would allow
+  // anyone who knows the admin email address to obtain admin access without
+  // proving inbox control.
 
   logAuditEvent({
     action: "auth.signup",
