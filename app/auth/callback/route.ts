@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
@@ -88,7 +89,13 @@ export async function GET(request: NextRequest) {
     confirmedEmail &&
     confirmedUserId &&
     env.ADMIN_EMAIL &&
-    confirmedEmail.toLowerCase() === env.ADMIN_EMAIL.toLowerCase()
+    (() => {
+      // Timing-safe comparison prevents an attacker from learning the admin email
+      // address via response-time differences during the verification callback.
+      const a = Buffer.from(confirmedEmail.toLowerCase());
+      const b = Buffer.from((env.ADMIN_EMAIL ?? "").toLowerCase());
+      return a.length === b.length && timingSafeEqual(a, b);
+    })()
   ) {
     try {
       const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
