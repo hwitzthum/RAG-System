@@ -571,7 +571,7 @@ The application uses the double-submit cookie pattern:
 |---|---|---|---|
 | `POST /api/auth/login` | 20 req | 5 min | IP + email |
 | `POST /api/auth/signup` | 3 req | 1 hour | IP |
-| `POST /api/query` | 20 req | 15 min | User ID |
+| `POST /api/query` | 30 req | 1 min | User ID |
 | `POST /api/upload` | 20 req | 15 min | User ID |
 | `POST /api/reports` | 10 req | 15 min | User ID |
 
