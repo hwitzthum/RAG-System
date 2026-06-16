@@ -37,8 +37,10 @@ export async function POST(request: NextRequest) {
     return authResult.response;
   }
 
-  // Rate limit: 10 batch uploads per 15 minutes per user
-  const rl = await consumeSharedRateLimit(`upload:batch:${authResult.user.id}`, 10, 900);
+  // Rate limit: 10 batch uploads per 15 minutes per user — fail-closed so
+  // Supabase RPC unavailability doesn't bypass enforcement (matches the
+  // single-file upload endpoint at upload/route.ts which passes failOpen: false).
+  const rl = await consumeSharedRateLimit(`upload:batch:${authResult.user.id}`, 10, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many batch upload requests" },
