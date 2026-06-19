@@ -64,6 +64,7 @@ const envSchema = z.object({
   ANTHROPIC_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: z.string().min(1).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3001"),
 });
 
 const parsed = envSchema.safeParse({
@@ -114,6 +115,7 @@ const parsed = envSchema.safeParse({
   ANTHROPIC_BYOK_VAULT_KEY_VERSION: process.env.ANTHROPIC_BYOK_VAULT_KEY_VERSION,
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: process.env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN || undefined,
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
 
 if (!parsed.success) {

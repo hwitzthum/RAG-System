@@ -71,12 +71,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
 
-    // Guard: prevent demoting the last admin
+    // Guard: prevent demoting the last admin.
+    // Paginate through all users so the count is accurate regardless of user-base size;
+    // a single listUsers() call only returns the first page (default 50 rows).
     if (previousRole === "admin") {
-      const { data: allUsers } = await supabase.auth.admin.listUsers();
-      const adminCount = (allUsers?.users ?? []).filter(
-        (u) => (u.app_metadata?.role as string) === "admin",
-      ).length;
+      let adminCount = 0;
+      let page = 1;
+      while (true) {
+        const { data: pageData, error: listError } = await supabase.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        });
+        if (listError) {
+          throw listError;
+        }
+        adminCount += (pageData.users ?? []).filter(
+          (u) => (u.app_metadata?.role as string) === "admin",
+        ).length;
+        if (!pageData.nextPage) break;
+        page++;
+      }
       if (adminCount <= 1) {
         return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
       }

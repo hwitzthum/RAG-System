@@ -90,7 +90,9 @@ export async function handleByokPut(request: NextRequest, config: ProviderByokRo
     return authResult.response;
   }
 
-  const rl = await consumeSharedRateLimit(`byok:${config.providerSlug}:write:${authResult.user.id}`, 10, 900);
+  const rl = await consumeSharedRateLimit(`byok:${config.providerSlug}:write:${authResult.user.id}`, 10, 900, {
+    failOpen: false,
+  });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -157,7 +159,9 @@ export async function handleByokDelete(request: NextRequest, config: ProviderByo
     return authResult.response;
   }
 
-  const rl = await consumeSharedRateLimit(`byok:${config.providerSlug}:write:${authResult.user.id}`, 10, 900);
+  const rl = await consumeSharedRateLimit(`byok:${config.providerSlug}:write:${authResult.user.id}`, 10, 900, {
+    failOpen: false,
+  });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
