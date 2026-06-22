@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 export const CSRF_HEADER_NAME = "X-CSRF-Token";
@@ -21,12 +21,12 @@ export function validateCsrf(request: NextRequest): boolean {
     return false;
   }
 
-  const cookieBuffer = Buffer.from(cookieValue, "utf8");
-  const headerBuffer = Buffer.from(headerValue, "utf8");
+  // Hash both values to a fixed-length digest before comparing so that
+  // timingSafeEqual always runs the full comparison path regardless of
+  // input lengths, preventing a length-based timing side channel.
+  const key = "csrf-compare";
+  const cookieDigest = createHmac("sha256", key).update(cookieValue).digest();
+  const headerDigest = createHmac("sha256", key).update(headerValue).digest();
 
-  if (cookieBuffer.length !== headerBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(cookieBuffer, headerBuffer);
+  return timingSafeEqual(cookieDigest, headerDigest);
 }
