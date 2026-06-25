@@ -16,6 +16,10 @@ const envSchema = z.object({
     (val) => val === "true" || val === "1" || val === true,
     z.boolean().default(false),
   ),
+  // Optional shared secret for AUTH_DEV_INSECURE_BYPASS. When set, callers
+  // must supply a matching x-dev-bypass-secret header to use the dev bypass,
+  // preventing accidental exposure on staging deployments.
+  AUTH_DEV_BYPASS_SECRET: z.string().min(16).optional(),
   AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   AUTH_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(30),
   OPENAI_API_KEY: z.string().min(1),
@@ -78,6 +82,7 @@ const parsed = envSchema.safeParse({
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || undefined,
   AUTH_JWKS_URL: process.env.AUTH_JWKS_URL || undefined,
   AUTH_DEV_INSECURE_BYPASS: process.env.AUTH_DEV_INSECURE_BYPASS,
+  AUTH_DEV_BYPASS_SECRET: process.env.AUTH_DEV_BYPASS_SECRET || undefined,
   AUTH_RATE_LIMIT_WINDOW_SECONDS: process.env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
   AUTH_RATE_LIMIT_MAX_REQUESTS: process.env.AUTH_RATE_LIMIT_MAX_REQUESTS,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
