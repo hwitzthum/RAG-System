@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
+import { listAccessibleDocumentIds } from "@/lib/ingestion/runtime/effective-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { generateDocxReport } from "@/lib/reports/docx-generator";
 import { generatePdfReport } from "@/lib/reports/pdf-generator";
@@ -64,8 +65,28 @@ export async function POST(request: NextRequest) {
   }
 
   const citations = (historyRow.citations ?? []) as Array<{ documentId: string; pageNumber: number; chunkId: string }>;
-  const chunkIds = citations.map((c) => c.chunkId);
-  const uniqueDocIds = [...new Set(citations.map((c) => c.documentId))];
+  const allDocIds = [...new Set(citations.map((c) => c.documentId))];
+
+  // Defense-in-depth: verify that all cited documents are accessible to the
+  // requesting user.  The citations column is server-written at query time so
+  // the normal flow is safe, but a future data-import path or an RLS
+  // misconfiguration could allow an attacker to inject arbitrary chunk IDs and
+  // exfiltrate content from documents they never legitimately accessed.
+  // listAccessibleDocumentIds returns [] for admins (all docs allowed).
+  let uniqueDocIds: string[];
+  if (authResult.user.role === "admin") {
+    uniqueDocIds = allDocIds;
+  } else {
+    const accessibleIds = await listAccessibleDocumentIds(supabase, { user: authResult.user });
+    const accessibleSet = new Set(accessibleIds);
+    uniqueDocIds = allDocIds.filter((id) => accessibleSet.has(id));
+  }
+
+  // Keep only chunk IDs whose parent document passed the access check above.
+  const accessibleDocSet = new Set(uniqueDocIds);
+  const chunkIds = citations
+    .filter((c) => accessibleDocSet.has(c.documentId))
+    .map((c) => c.chunkId);
 
   // Fetch chunks and document titles in parallel (independent queries).
   const [chunkResult, docResult] = await Promise.all([

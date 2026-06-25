@@ -66,20 +66,33 @@ function redactInjectionLines(value: string): string {
     .trim();
 }
 
+// Labels for rules whose patterns are strong standalone indicators of
+// prompt injection. A single match at this confidence level is treated as
+// a block without requiring score accumulation to reach the compound threshold.
+const HIGH_CONFIDENCE_BLOCK_LABELS = new Set([
+  "system_prompt_exfiltration",
+  "secret_exfiltration",
+  "data_exfiltration",
+  "jailbreak_phrasing",
+]);
+
 export function scanPromptInjection(value: string): PromptInjectionScan {
   const normalized = stripControlChars(value.normalize("NFKC"));
-  const matchedLabels = PROMPT_INJECTION_RULES
-    .filter((rule) => rule.pattern.test(normalized))
-    .map((rule) => rule.label);
-  const score = PROMPT_INJECTION_RULES
-    .filter((rule) => rule.pattern.test(normalized))
-    .reduce((sum, rule) => sum + rule.score, 0);
+  const matchedRules = PROMPT_INJECTION_RULES.filter((rule) => rule.pattern.test(normalized));
+  const matchedLabels = matchedRules.map((rule) => rule.label);
+  const score = matchedRules.reduce((sum, rule) => sum + rule.score, 0);
+
+  const hasHighConfidenceMatch = matchedLabels.some((label) => HIGH_CONFIDENCE_BLOCK_LABELS.has(label));
 
   return {
     score,
     matchedLabels,
     suspicious: score >= 5,
-    blocked: score >= 10,
+    // Block if compound score threshold is met OR if any single high-confidence
+    // rule matches (score ≥ 7). This closes the gap where a single strong
+    // indicator like "system prompt" or "api key" was only flagged as suspicious
+    // despite being an unambiguous injection attempt.
+    blocked: score >= 10 || hasHighConfidenceMatch,
   };
 }
 
