@@ -71,13 +71,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
 
-    // Guard: prevent demoting the last admin
+    // Guard: prevent demoting the last admin.
+    // Pre-check: fast path to reject obvious cases.
     if (previousRole === "admin") {
-      const { data: allUsers } = await supabase.auth.admin.listUsers();
-      const adminCount = (allUsers?.users ?? []).filter(
+      const { data: allUsersPre } = await supabase.auth.admin.listUsers();
+      const adminCountPre = (allUsersPre?.users ?? []).filter(
         (u) => (u.app_metadata?.role as string) === "admin",
       ).length;
-      if (adminCount <= 1) {
+      if (adminCountPre <= 1) {
         return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
       }
     }
@@ -89,6 +90,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (updateError) {
       throw updateError;
+    }
+
+    // Post-check: guard against TOCTOU race where two concurrent requests both
+    // passed the pre-check and both proceeded to demote different admins,
+    // leaving zero admins.  If we detect zero admins after the update, revert
+    // immediately so the system is never left without an admin.
+    if (previousRole === "admin") {
+      const { data: allUsersPost } = await supabase.auth.admin.listUsers();
+      const adminCountPost = (allUsersPost?.users ?? []).filter(
+        (u) => (u.app_metadata?.role as string) === "admin",
+      ).length;
+      if (adminCountPost === 0) {
+        await supabase.auth.admin.updateUserById(targetUserId, {
+          app_metadata: { ...currentUser.user.app_metadata, role: "admin" },
+        });
+        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
+      }
     }
 
     logAuditEvent({
