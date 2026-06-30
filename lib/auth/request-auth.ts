@@ -46,16 +46,14 @@ function resolveDevBypassUser(request: NextRequest): AuthUser | null {
     return null;
   }
 
-  // Require a pre-shared secret when AUTH_DEV_BYPASS_SECRET is configured.
-  // This prevents any network-reachable caller from forging admin identity on
-  // non-production deployments (e.g. staging environments) where
-  // AUTH_DEV_INSECURE_BYPASS is accidentally enabled.
+  // Always require AUTH_DEV_BYPASS_SECRET to be set and provided on the request.
+  // Omitting the outer `if (configuredSecret)` guard (the previous pattern) allowed
+  // any caller to forge admin identity when the secret was not configured —
+  // setting X-Dev-User-Role: admin was enough to gain full access.
   const configuredSecret = env.AUTH_DEV_BYPASS_SECRET;
-  if (configuredSecret) {
-    const providedSecret = request.headers.get("x-dev-bypass-secret");
-    if (!providedSecret || providedSecret !== configuredSecret) {
-      return null;
-    }
+  const providedSecret = request.headers.get("x-dev-bypass-secret");
+  if (!configuredSecret || !providedSecret || providedSecret !== configuredSecret) {
+    return null;
   }
 
   const roleHeader = request.headers.get("x-dev-user-role");
