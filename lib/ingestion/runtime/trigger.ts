@@ -31,7 +31,7 @@ export async function runIngestionTrigger(input: {
 }): Promise<
   | { statusCode: 401; body: { error: "Unauthorized" } }
   | { statusCode: 200; body: { status: "idle" | "processed"; claimed: number } }
-  | { statusCode: 500; body: { error: "Failed to run ingestion batch"; message: string } }
+  | { statusCode: 500; body: { error: "Failed to run ingestion batch" } }
 > {
   if (
     !isIngestionTriggerAuthorized({
@@ -82,7 +82,6 @@ export async function runIngestionTrigger(input: {
       statusCode: 500,
       body: {
         error: "Failed to run ingestion batch",
-        message,
       },
     };
   }

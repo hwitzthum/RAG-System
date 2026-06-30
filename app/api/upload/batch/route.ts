@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
       });
       results.push(accepted);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "unknown_error";
-      results.push({ fileName: file.name, status: "rejected", error: message });
+      console.error("Batch upload entry failed:", error);
+      results.push({ fileName: file.name, status: "rejected", error: "Upload failed. Please try again." });
     }
   }
 
