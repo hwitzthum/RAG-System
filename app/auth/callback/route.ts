@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
@@ -92,9 +92,15 @@ export async function GET(request: NextRequest) {
     (() => {
       // Timing-safe comparison prevents an attacker from learning the admin email
       // address via response-time differences during the verification callback.
-      const a = Buffer.from(confirmedEmail.toLowerCase());
-      const b = Buffer.from((env.ADMIN_EMAIL ?? "").toLowerCase());
-      return a.length === b.length && timingSafeEqual(a, b);
+      // Both values are hashed to a fixed-length HMAC digest before comparison so
+      // that timingSafeEqual always runs the full comparison regardless of input
+      // length — a bare `a.length === b.length` short-circuit (the previous
+      // pattern) leaks the admin email's length via response timing, the same
+      // class of bug fixed for CSRF token comparison in lib/security/csrf.ts.
+      const key = "admin-email-compare";
+      const confirmedDigest = createHmac("sha256", key).update(confirmedEmail.toLowerCase()).digest();
+      const adminDigest = createHmac("sha256", key).update((env.ADMIN_EMAIL ?? "").toLowerCase()).digest();
+      return timingSafeEqual(confirmedDigest, adminDigest);
     })()
   ) {
     try {
