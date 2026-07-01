@@ -106,17 +106,19 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
       {turn.webSources && turn.webSources.length > 0 ? (
         <div className="mt-3 space-y-1">
           <p className="tone-info text-xs font-medium">Web Sources</p>
-          {turn.webSources.map((source) => (
-            <a
-              key={source.url}
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              className="badge-info block rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-90"
-            >
-              {source.title}
-            </a>
-          ))}
+          {turn.webSources
+            .filter((source) => /^https?:\/\//i.test(source.url))
+            .map((source) => (
+              <a
+                key={source.url}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="badge-info block rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-90"
+              >
+                {source.title}
+              </a>
+            ))}
         </div>
       ) : null}
       {!turn.pending && !turn.failed && turn.queryHistoryId ? (

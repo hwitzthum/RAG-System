@@ -12,7 +12,36 @@ const updateRoleSchema = z.object({
   role: z.enum(["reader", "suspended", "rejected"]),
 });
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// Count admins across every page; a single listUsers() call only returns the
+// first page (default 50 rows), which would make the last-admin guard miscount
+// on user bases larger than one page.
+async function countAdmins(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+): Promise<number> {
+  let adminCount = 0;
+  let page = 1;
+  while (true) {
+    const { data: pageData, error: listError } =
+      await supabase.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      });
+    if (listError) {
+      throw listError;
+    }
+    adminCount += (pageData.users ?? []).filter(
+      (u) => (u.app_metadata?.role as string) === "admin",
+    ).length;
+    if (!pageData.nextPage) break;
+    page++;
+  }
+  return adminCount;
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const ipAddress = getClientIp(request);
   const { id: targetUserId } = await params;
 
@@ -40,7 +69,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   // Rate limit: 30 requests per 15 minutes per authenticated admin user
-  const rl = await consumeSharedRateLimit(`admin:users:update:${authResult.user.id}`, 30, 900);
+  const rl = await consumeSharedRateLimit(
+    `admin:users:update:${authResult.user.id}`,
+    30,
+    900,
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -50,12 +83,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   // Prevent self-demotion
   if (targetUserId === authResult.user.id) {
-    return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Cannot change your own role" },
+      { status: 400 },
+    );
   }
 
-  const parsed = updateRoleSchema.safeParse(await request.json().catch(() => null));
+  const parsed = updateRoleSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const { role: newRole } = parsed.data;
@@ -64,29 +105,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const supabase = getSupabaseAdminClient();
 
     // Get current user to log the before state
-    const { data: currentUser, error: getUserError } = await supabase.auth.admin.getUserById(targetUserId);
+    const { data: currentUser, error: getUserError } =
+      await supabase.auth.admin.getUserById(targetUserId);
     if (getUserError || !currentUser.user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const previousRole = (currentUser.user.app_metadata?.role as string) ?? "pending";
+    const previousRole =
+      (currentUser.user.app_metadata?.role as string) ?? "pending";
 
     // Guard: prevent demoting the last admin.
     // Pre-check: fast path to reject obvious cases.
     if (previousRole === "admin") {
-      const { data: allUsersPre } = await supabase.auth.admin.listUsers();
-      const adminCountPre = (allUsersPre?.users ?? []).filter(
-        (u) => (u.app_metadata?.role as string) === "admin",
-      ).length;
+      const adminCountPre = await countAdmins(supabase);
       if (adminCountPre <= 1) {
-        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Cannot demote the last admin" },
+          { status: 400 },
+        );
       }
     }
 
     // Spread existing app_metadata to avoid destructive overwrite
-    const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(targetUserId, {
-      app_metadata: { ...currentUser.user.app_metadata, role: newRole },
-    });
+    const { data: updatedUser, error: updateError } =
+      await supabase.auth.admin.updateUserById(targetUserId, {
+        app_metadata: { ...currentUser.user.app_metadata, role: newRole },
+      });
 
     if (updateError) {
       throw updateError;
@@ -97,15 +141,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // leaving zero admins.  If we detect zero admins after the update, revert
     // immediately so the system is never left without an admin.
     if (previousRole === "admin") {
-      const { data: allUsersPost } = await supabase.auth.admin.listUsers();
-      const adminCountPost = (allUsersPost?.users ?? []).filter(
-        (u) => (u.app_metadata?.role as string) === "admin",
-      ).length;
+      const adminCountPost = await countAdmins(supabase);
       if (adminCountPost === 0) {
         await supabase.auth.admin.updateUserById(targetUserId, {
           app_metadata: { ...currentUser.user.app_metadata, role: "admin" },
         });
-        return NextResponse.json({ error: "Cannot demote the last admin" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Cannot demote the last admin" },
+          { status: 400 },
+        );
       }
     }
 
@@ -142,11 +186,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       ipAddress,
       metadata: { reason: "update_failed", targetUserId, message },
     });
-    return NextResponse.json({ error: "Failed to update user role" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update user role" },
+      { status: 500 },
+    );
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const ipAddress = getClientIp(request);
   const { id: targetUserId } = await params;
 
@@ -174,7 +224,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
 
   // Rate limit: reuse admin update bucket (keyed by authenticated user ID)
-  const rl = await consumeSharedRateLimit(`admin:users:update:${authResult.user.id}`, 30, 900);
+  const rl = await consumeSharedRateLimit(
+    `admin:users:update:${authResult.user.id}`,
+    30,
+    900,
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -184,19 +238,24 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   // Prevent self-deletion
   if (targetUserId === authResult.user.id) {
-    return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Cannot delete your own account" },
+      { status: 400 },
+    );
   }
 
   try {
     const supabase = getSupabaseAdminClient();
 
     // Get user info for audit log before deletion
-    const { data: targetUser, error: getUserError } = await supabase.auth.admin.getUserById(targetUserId);
+    const { data: targetUser, error: getUserError } =
+      await supabase.auth.admin.getUserById(targetUserId);
     if (getUserError || !targetUser.user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(targetUserId);
+    const { error: deleteError } =
+      await supabase.auth.admin.deleteUser(targetUserId);
     if (deleteError) {
       throw deleteError;
     }
@@ -215,7 +274,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       },
     });
 
-    return NextResponse.json({ deleted: true, id: targetUserId, email: targetUser.user.email ?? null });
+    return NextResponse.json({
+      deleted: true,
+      id: targetUserId,
+      email: targetUser.user.email ?? null,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     logAuditEvent({
@@ -227,6 +290,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       ipAddress,
       metadata: { reason: "delete_failed", targetUserId, message },
     });
-    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete user" },
+      { status: 500 },
+    );
   }
 }
