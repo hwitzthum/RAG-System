@@ -53,19 +53,21 @@ function normalizeCitations(value: unknown): CitationRecord[] {
 export async function GET(request: NextRequest) {
   const ipAddress = getClientIp(request);
 
-  // Rate limit: 120 requests per 15 minutes per IP
-  const rl = await consumeSharedRateLimit(`query-history:list:${ipAddress}`, 120, 900);
+  // Authenticate before rate-limiting so the bucket is keyed on the
+  // authenticated user rather than a client-controlled IP address.
+  const authResult = await requireAuth(request, ["reader", "admin"]);
+
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+
+  // Rate limit: 120 requests per 15 minutes per user+IP
+  const rl = await consumeSharedRateLimit(`query-history:list:${authResult.user.id}:${ipAddress}`, 120, 900);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
     );
-  }
-
-  const authResult = await requireAuth(request, ["reader", "admin"]);
-
-  if (!authResult.ok) {
-    return authResult.response;
   }
 
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());

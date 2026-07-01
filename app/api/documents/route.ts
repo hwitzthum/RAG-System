@@ -13,17 +13,22 @@ const MAX_LIMIT = 500;
 export async function GET(request: NextRequest) {
   const ipAddress = getClientIp(request);
 
-  // Rate limit: 120 requests per 15 minutes per IP
-  const rl = await consumeSharedRateLimit(`documents:list:${ipAddress}`, 120, 900);
+  // Authenticate before rate-limiting so the bucket is keyed on the
+  // authenticated user rather than a client-controlled IP address.
+  // Keying on IP alone lets an unauthenticated flood burn legitimate
+  // users' quota and (on non-Vercel deployments) lets attackers rotate
+  // synthetic x-forwarded-for values to bypass limits entirely.
+  const authResult = await requireAuth(request, ["admin", "reader"]);
+  if (!authResult.ok) return authResult.response;
+
+  // Rate limit: 120 requests per 15 minutes per user+IP
+  const rl = await consumeSharedRateLimit(`documents:list:${authResult.user.id}:${ipAddress}`, 120, 900);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
     );
   }
-
-  const authResult = await requireAuth(request, ["admin", "reader"]);
-  if (!authResult.ok) return authResult.response;
 
   const url = request.nextUrl;
   const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") ?? "", 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);

@@ -642,7 +642,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 | `POST` | `/api/auth/session` | No | No | — | Create session cookie from access token |
 | `GET` | `/api/auth/session` | Cookie | No | — | Return current session user |
 | `DELETE` | `/api/auth/session` | Cookie | Yes | — | Logout and clear session cookie |
-| `POST` | `/api/query` | Yes | Yes | 20/15 min per user | RAG query; response streamed as SSE |
+| `POST` | `/api/query` | Yes | Yes | 30/1 min per user | RAG query; response streamed as SSE |
 | `GET` | `/api/query-history` | Yes | No | — | List past queries for the current user |
 | `DELETE` | `/api/query-history/:id` | Yes | Yes | — | Delete a single query history entry |
 | `POST` | `/api/upload` | Yes | Yes | 20/15 min per user | Upload and enqueue a single PDF |

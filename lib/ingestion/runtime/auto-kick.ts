@@ -50,7 +50,6 @@ export function scheduleIngestionAutoKick(input: {
       logger.error("ingestion_auto_kick_failed", {
         acceptedCount,
         region: input.region?.trim() || "unknown",
-        message: result.body.message,
       });
     }
   });

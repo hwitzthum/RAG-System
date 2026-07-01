@@ -25,8 +25,13 @@ export async function POST(request: NextRequest) {
 
   const { email, password } = parsed.data;
 
-  // Rate limit: 3 signups per hour per IP (fail-closed for auth)
-  const rate = await consumeSharedRateLimit(`auth:signup:${ipAddress}`, 3, 3600, { failOpen: false });
+  // Rate limit: 3 signups per hour per IP AND per email (fail-closed for auth).
+  // Keying on IP alone allows distributed attacks across many IPs; keying on
+  // email alone allows an attacker to lock out a legitimate user's email address.
+  // Both keys must pass.
+  const rateIp = await consumeSharedRateLimit(`auth:signup:${ipAddress}`, 3, 3600, { failOpen: false });
+  const rateEmail = await consumeSharedRateLimit(`auth:signup:email:${email.toLowerCase()}`, 3, 3600, { failOpen: false });
+  const rate = rateIp.allowed ? rateEmail : rateIp;
   if (!rate.allowed) {
     logAuditEvent({
       action: "auth.signup",
@@ -58,6 +63,10 @@ export async function POST(request: NextRequest) {
   );
 
   if (!signupResponse.ok) {
+    // Do NOT forward Supabase's raw error message — it can reveal whether the
+    // email is already registered ("User already registered"), enabling email
+    // enumeration attacks.  Log the real reason internally; return a generic
+    // message to the client regardless of the failure cause.
     const errorBody = await signupResponse.json().catch(() => ({ msg: "Signup failed" })) as { msg?: string };
     logAuditEvent({
       action: "auth.signup",
@@ -66,11 +75,11 @@ export async function POST(request: NextRequest) {
       outcome: "failure",
       resource: "auth",
       ipAddress,
-      metadata: { reason: "signup_failed", email },
+      metadata: { reason: "signup_failed", supabaseMsg: errorBody.msg },
     });
     return NextResponse.json(
-      { error: errorBody.msg ?? "Signup failed" },
-      { status: signupResponse.status },
+      { error: "Signup failed. Please check your details and try again." },
+      { status: 400 },
     );
   }
 

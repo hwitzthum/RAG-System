@@ -23,15 +23,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: "Invalid query history entry ID" }, { status: 400 });
   }
 
-  // Rate limit: 60 deletes per 15 minutes per IP (fail-open: this is a non-critical write)
-  const rl = await consumeSharedRateLimit(`query-history:delete:${ipAddress}`, 60, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
-    );
-  }
-
+  // Authenticate before rate-limiting so the bucket is keyed on the
+  // authenticated user rather than a client-controlled IP address.
   const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
 
   if (!authResult.ok) {
@@ -45,6 +38,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       metadata: { reason: "unauthorized" },
     });
     return authResult.response;
+  }
+
+  // Rate limit: 60 deletes per 15 minutes per user+IP
+  const rl = await consumeSharedRateLimit(`query-history:delete:${authResult.user.id}:${ipAddress}`, 60, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   try {

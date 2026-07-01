@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       name: getSessionCookieName(isProduction),
       value: tokenData.access_token,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
       secure: isProduction,
       path: "/",
       // no maxAge: session cookie, deleted on browser close
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     name: getSessionCookieName(isProduction),
     value: tokenData.access_token,
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: isProduction,
     path: "/",
   });
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     name: getCsrfCookieName(),
     value: csrfToken,
     httpOnly: false,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: isProduction,
     path: "/",
   });

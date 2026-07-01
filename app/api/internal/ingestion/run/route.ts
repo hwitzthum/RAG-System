@@ -22,7 +22,6 @@ async function executeRun(request: NextRequest) {
       JSON.stringify({
         timestamp: new Date().toISOString(),
         eventType: "ingestion_run_failed",
-        message: result.body.message,
         ipAddress,
       }),
     );
