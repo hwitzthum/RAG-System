@@ -6,7 +6,7 @@ import { hasPdfSignature, normalizeLanguageHint } from "@/lib/ingestion/upload-h
 import { queueSingleUpload } from "@/lib/ingestion/upload-queue";
 import { env } from "@/lib/config/env";
 import { scheduleIngestionAutoKick } from "@/lib/ingestion/runtime/auto-kick";
-import { persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
+import { DuplicateDocumentOwnedByAnotherUserError, persistUploadAndQueueJob } from "@/lib/ingestion/upload-service";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitUploadCount } from "@/lib/observability/metrics";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
@@ -148,6 +148,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(queued.body, { status: queued.statusCode });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
+
+    if (error instanceof DuplicateDocumentOwnedByAnotherUserError) {
+      // Do not include any identifier of the existing document (id, storage
+      // path, status) in the response — doing so would let a caller who
+      // merely holds a byte-identical file confirm the existence and
+      // metadata of another user's private upload.
+      logAuditEvent({
+        action: "upload.create",
+        actorId: authResult.user.id,
+        actorRole: authResult.user.role,
+        outcome: "failure",
+        resource: "upload",
+        ipAddress,
+        metadata: { reason: "duplicate_owned_by_other_user" },
+      });
+
+      return NextResponse.json(
+        { error: "A file with identical content already exists under a different account." },
+        { status: 409 },
+      );
+    }
 
     logAuditEvent({
       action: "upload.create",

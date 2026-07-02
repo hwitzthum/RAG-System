@@ -7,7 +7,7 @@ import {
   createUploadExistingJobClient,
   ensureDocumentQueuedIngestionJob,
 } from "@/lib/ingestion/upload-existing-job";
-import { shouldRequeueExistingDocument } from "@/lib/ingestion/upload-state";
+import { isDuplicateAccessibleToUser, shouldRequeueExistingDocument } from "@/lib/ingestion/upload-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, DocumentStatus, IngestionJobStatus, SupportedLanguage } from "@/lib/supabase/database.types";
 
@@ -35,7 +35,20 @@ type DocumentRecord = {
   ingestion_version: number;
   storage_path: string;
   sha256: string;
+  user_id: string | null;
 };
+
+/**
+ * Thrown when an upload's checksum matches a document owned by a different
+ * user. The caller must not leak any details of the existing document (id,
+ * storage path, status) in this case — see isDuplicateAccessibleToUser.
+ */
+export class DuplicateDocumentOwnedByAnotherUserError extends Error {
+  constructor() {
+    super("A file with identical content already exists under a different account.");
+    this.name = "DuplicateDocumentOwnedByAnotherUserError";
+  }
+}
 
 type IngestionJobRecord = {
   id: string;
@@ -69,7 +82,7 @@ async function getDocumentByChecksum(
 ): Promise<DocumentRecord | null> {
   const { data, error } = await supabase
     .from("documents")
-    .select("id,status,ingestion_version,storage_path,sha256")
+    .select("id,status,ingestion_version,storage_path,sha256,user_id")
     .eq("sha256", checksumSha256)
     .maybeSingle<DocumentRecord>();
 
@@ -207,6 +220,9 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
 
   const existingDocument = await getDocumentByChecksum(supabase, checksumSha256);
   if (existingDocument) {
+    if (!isDuplicateAccessibleToUser(existingDocument.user_id, input.userId)) {
+      throw new DuplicateDocumentOwnedByAnotherUserError();
+    }
     return returnExistingDocumentResult(supabase, existingDocument);
   }
 
@@ -225,6 +241,9 @@ export async function persistUploadAndQueueJob(input: UploadPersistenceInput): P
     if (!created) {
       const racedDocument = await getDocumentByChecksum(supabase, checksumSha256);
       if (racedDocument) {
+        if (!isDuplicateAccessibleToUser(racedDocument.user_id, input.userId)) {
+          throw new DuplicateDocumentOwnedByAnotherUserError();
+        }
         return returnExistingDocumentResult(supabase, racedDocument);
       }
 
