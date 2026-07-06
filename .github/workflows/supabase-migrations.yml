@@ -11,6 +11,9 @@ concurrency:
   group: supabase-migrations
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   apply-migrations:
     runs-on: ubuntu-latest
@@ -19,11 +22,11 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: aaghjfmstezmxyxyrfri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
-          version: latest
+          version: 2.109.0
 
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
