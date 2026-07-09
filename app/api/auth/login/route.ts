@@ -100,6 +100,18 @@ export async function POST(request: NextRequest) {
       path: "/",
       // no maxAge: session cookie, deleted on browser close
     });
+    // Also set the CSRF cookie here (not just on the active-role branch below)
+    // so that /api/auth/session already has a valid CSRF cookie to check
+    // against once this pending user is later approved and re-hydrates their
+    // session from /pending-approval.
+    response.cookies.set({
+      name: getCsrfCookieName(),
+      value: generateCsrfToken(),
+      httpOnly: false,
+      sameSite: "strict",
+      secure: isProduction,
+      path: "/",
+    });
     return response;
   }
 

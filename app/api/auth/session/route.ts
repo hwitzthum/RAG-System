@@ -6,7 +6,7 @@ import type { Role } from "@/lib/auth/types";
 import { verifyAccessToken } from "@/lib/auth/verify";
 import { env } from "@/lib/config/env";
 import { logAuditEvent } from "@/lib/observability/audit";
-import { generateCsrfToken, getCsrfCookieName } from "@/lib/security/csrf";
+import { generateCsrfToken, getCsrfCookieName, validateCsrf } from "@/lib/security/csrf";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 
@@ -28,6 +28,26 @@ export async function POST(request: NextRequest) {
       { error: "Too many requests" },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
     );
+  }
+
+  // This endpoint turns a caller-supplied access token into an HttpOnly
+  // session cookie. Without a CSRF check, a cross-site request could plant
+  // the attacker's own (validly signed) token as the victim's session
+  // cookie, silently switching the victim onto the attacker's account
+  // (login CSRF). The CSRF cookie is issued at /api/auth/login for every
+  // successful login outcome, including "pending", so it is already present
+  // by the time an approved/reactivated user re-hydrates their session here.
+  if (!validateCsrf(request)) {
+    logAuditEvent({
+      action: "auth.session.create",
+      actorId: null,
+      actorRole: "anonymous",
+      outcome: "failure",
+      resource: "session",
+      ipAddress,
+      metadata: { reason: "csrf_validation_failed" },
+    });
+    return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
   }
 
   let requestBody: z.infer<typeof sessionRequestSchema>;
