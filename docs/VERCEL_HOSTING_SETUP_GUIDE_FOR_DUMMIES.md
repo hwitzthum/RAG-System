@@ -48,7 +48,7 @@ npm run infra:vercel:prepare-staging
 
 Expected result:
 
-- `CRON_SECRET` exists and is 32+ characters
+- `CRON_SECRET` exists and is 16+ characters
 
 ### 3. Run pre-signup readiness check
 
