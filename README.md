@@ -129,7 +129,7 @@ supabase link --project-ref your-project-ref
 supabase db push
 ```
 
-Or run each `.sql` file in `database/migrations/` manually in ascending filename order via the Supabase SQL editor.
+Or run each `.sql` file in `supabase/migrations/` manually in ascending filename order via the Supabase SQL editor.
 
 This creates all required tables (`documents`, `document_chunks`, `retrieval_cache`, `ingestion_jobs`, `query_history`, `rate_limit_buckets`, `user_*_keys`, `metric_events`), indexes, stored procedures, and RLS policies.
 
@@ -224,7 +224,7 @@ All variables are validated at startup via Zod. Missing required variables throw
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No | — | Bearer token for the metrics sink endpoint. Omit to disable the endpoint. |
-| `INGESTION_BATCH_SIZE` | No | `1` | Chunks processed per ingestion worker batch |
+| `INGESTION_BATCH_SIZE` | No | `50` | Chunks processed per ingestion worker batch |
 | `INGESTION_LOCK_TIMEOUT_SECONDS` | No | `900` | Distributed lock timeout for ingestion jobs |
 
 ---
@@ -639,9 +639,9 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 | `GET` | `/api/health` | No | No | — | Health check with config summary |
 | `POST` | `/api/auth/login` | No | No | 20/5 min per IP+email | Rate-limited server-side login |
 | `POST` | `/api/auth/signup` | No | No | 3/hour per IP+email | Rate-limited signup with role assignment |
-| `POST` | `/api/auth/session` | No | No | — | Create session cookie from access token |
+| `POST` | `/api/auth/session` | No | Yes | — | Create session cookie from access token |
 | `GET` | `/api/auth/session` | Cookie | No | — | Return current session user |
-| `DELETE` | `/api/auth/session` | Cookie | Yes | — | Logout and clear session cookie |
+| `DELETE` | `/api/auth/session` | Cookie | No | — | Logout and clear session cookie |
 | `POST` | `/api/query` | Yes | Yes | 30/1 min per user | RAG query; response streamed as SSE |
 | `GET` | `/api/query-history` | Yes | No | — | List past queries for the current user |
 | `DELETE` | `/api/query-history/:id` | Yes | Yes | — | Delete a single query history entry |
