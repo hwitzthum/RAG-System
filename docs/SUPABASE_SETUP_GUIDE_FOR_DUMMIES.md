@@ -232,7 +232,7 @@ EOF
 ```bash
 npm run dev
 ```
-2. Open `http://localhost:3000`
+2. Open `http://localhost:3001`
 3. Paste the token into the token input field
 4. Click **Create Session**
 

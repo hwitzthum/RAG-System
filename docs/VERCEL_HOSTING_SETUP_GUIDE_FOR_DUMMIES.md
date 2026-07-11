@@ -256,7 +256,7 @@ Important:
 
 ### 3.4 Required for Vercel ingestion runtime
 
-- `CRON_SECRET=<long-random-secret-at-least-16-chars>`
+- `CRON_SECRET=<long-random-secret-at-least-32-chars>`
 
 Any env var change requires a redeploy.
 
