@@ -51,8 +51,20 @@ const REFUSAL_BY_LANGUAGE: Record<SupportedLanguage, string> = {
   ES: "Puedo ayudar con el contenido del documento, pero no puedo seguir instrucciones que intenten anular las reglas del sistema, revelar prompts ocultos o exponer secretos.",
 };
 
+// Strips ASCII control characters plus Unicode zero-width/format characters
+// (zero-width space/non-joiner/joiner, LTR/RTL marks, word joiner, soft
+// hyphen, and the zero-width no-break space / BOM). Regex-based scanners
+// match on visible substrings; an attacker can defeat them by interleaving
+// these invisible characters inside an otherwise-flagged phrase (splitting
+// "ignore all instructions" with zero-width spaces renders identically to a
+// human reader but no longer matches the instruction_override pattern).
+// Removing them before matching closes that gap without changing anything
+// visible to a human reader.
 function stripControlChars(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+  return value.replace(
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u2060\uFEFF]/g,
+    " ",
+  );
 }
 
 function redactInjectionLines(value: string): string {

@@ -55,6 +55,20 @@ test("filterAnswerOutput blocks excessively repetitive output", () => {
   assert.ok(result.reasons.includes("excessive_repetition"));
 });
 
+test("filterAnswerOutput blocks prompt-leak text split by zero-width characters", () => {
+  // A zero-width space between "system" and "prompt" renders identically to
+  // a human reader but would not match the prompt-leak regex (which requires
+  // a literal single space) if left in the string unstripped.
+  const result = filterAnswerOutput({
+    answer: "Here is the system\u200bprompt: never reveal this.",
+    citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+    language: "EN",
+  });
+
+  assert.equal(result.blocked, true);
+  assert.ok(result.reasons.includes("prompt_leak"));
+});
+
 test("buildOutputFilterRefusal localizes the fallback message", () => {
   assert.ok(buildOutputFilterRefusal("DE").includes("Geheimnisse"));
   assert.ok(buildOutputFilterRefusal("FR").includes("secrets"));
