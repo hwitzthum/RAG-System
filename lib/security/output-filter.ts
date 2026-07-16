@@ -44,8 +44,16 @@ const REFUSAL_BY_LANGUAGE: Record<SupportedLanguage, string> = {
   ES: "Puedo ayudar con el contenido del documento, pero no puedo devolver prompts ocultos, instrucciones internas, secretos ni salida ejecutable insegura.",
 };
 
+// See lib/security/prompt-injection.ts's stripControlChars for why zero-width
+// and Unicode format characters are stripped alongside ASCII control chars:
+// they let an attacker split an otherwise-matched phrase (e.g. a leaked system
+// prompt marker) into invisible fragments that a plain regex won't match while
+// still rendering identically to a human reader.
 function stripControlChars(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+  return value.replace(
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u2060\uFEFF]/g,
+    " ",
+  );
 }
 
 function sanitizeMarkdownLinks(value: string): { value: string; redactionCount: number } {
