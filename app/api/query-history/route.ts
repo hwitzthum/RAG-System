@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Rate limit: 120 requests per 15 minutes per user+IP
-  const rl = await consumeSharedRateLimit(`query-history:list:${authResult.user.id}:${ipAddress}`, 120, 900);
+  const rl = await consumeSharedRateLimit(`query-history:list:${authResult.user.id}:${ipAddress}`, 120, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
