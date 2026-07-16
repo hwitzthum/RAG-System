@@ -41,7 +41,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
 
   // Rate limit: 60 deletes per 15 minutes per user+IP
-  const rl = await consumeSharedRateLimit(`query-history:delete:${authResult.user.id}:${ipAddress}`, 60, 900);
+  const rl = await consumeSharedRateLimit(`query-history:delete:${authResult.user.id}:${ipAddress}`, 60, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },

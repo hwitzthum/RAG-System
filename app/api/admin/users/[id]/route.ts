@@ -73,6 +73,7 @@ export async function PATCH(
     `admin:users:update:${authResult.user.id}`,
     30,
     900,
+    { failOpen: false },
   );
   if (!rl.allowed) {
     return NextResponse.json(
@@ -228,6 +229,7 @@ export async function DELETE(
     `admin:users:update:${authResult.user.id}`,
     30,
     900,
+    { failOpen: false },
   );
   if (!rl.allowed) {
     return NextResponse.json(

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Rate limit: 60 requests per 15 minutes per authenticated admin user
-  const rl = await consumeSharedRateLimit(`admin:users:list:${authResult.user.id}`, 60, 900);
+  const rl = await consumeSharedRateLimit(`admin:users:list:${authResult.user.id}`, 60, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },

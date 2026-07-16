@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Rate limit: 10 reports per 15 minutes per user
-  const rl = await consumeSharedRateLimit(`report:generate:${authResult.user.id}`, 10, 900);
+  const rl = await consumeSharedRateLimit(`report:generate:${authResult.user.id}`, 10, 900, { failOpen: false });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many report requests" },
