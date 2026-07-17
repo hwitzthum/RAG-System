@@ -647,7 +647,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 | `DELETE` | `/api/query-history/:id` | Yes | Yes | — | Delete a single query history entry |
 | `POST` | `/api/upload` | Yes | Yes | 20/15 min per user | Upload and enqueue a single PDF |
 | `GET` | `/api/upload/:documentId` | Yes | No | — | Poll ingestion job status |
-| `POST` | `/api/upload/batch` | Yes | Yes | 20/15 min per user | Batch upload up to 10 PDFs |
+| `POST` | `/api/upload/batch` | Yes | Yes | 10/15 min per user | Batch upload up to 10 PDFs |
 | `POST` | `/api/reports` | Yes | Yes | 10/15 min per user | Generate DOCX or PDF report for a query turn |
 | `GET` | `/api/byok/openai` | Yes | No | — | Check whether an OpenAI BYOK key is stored |
 | `PUT` | `/api/byok/openai` | Yes | Yes | — | Encrypt and store an OpenAI API key |
