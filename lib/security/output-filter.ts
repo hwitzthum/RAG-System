@@ -27,6 +27,32 @@ const SECRET_PATTERNS = [
   /\b(?:api[_ -]?key|secret|token|password|credential)\s*[:=]\s*["']?[A-Za-z0-9._~+/-]{8,}["']?\b/gi,
 ];
 
+// The README's "Output Filtering" section documents PII redaction (email
+// addresses, phone numbers, SSN formats) as one of the three categories the
+// filter scans for, alongside API keys and prompt-leak text. That category
+// was never actually implemented here — only secrets and prompt-leak text
+// were redacted. Because retrieved chunk content flows into the answer
+// verbatim (that's the point of RAG — the model is instructed to ground its
+// answer in source text), any PII present in an ingested document (a
+// customer's email, phone number, or SSN in a contract or support ticket
+// PDF) was returned to the requesting user with no redaction at all, despite
+// the documented control implying otherwise.
+const PII_PATTERNS = [
+  // Email address.
+  /\b[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+\b/g,
+  // US Social Security Number (XXX-XX-XXXX), excluding SSA-reserved ranges
+  // (area 000/666/900-999, group 00, serial 0000) to reduce false positives
+  // on other dash-separated numeric identifiers.
+  /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g,
+  // Phone number: optional country code, optional parenthesized area code,
+  // then 2-3 separator-delimited groups. Requires explicit separators
+  // (space, dot, or hyphen) between groups so plain numeric IDs and page
+  // references (which lack them) are not matched. The lookaround only
+  // excludes adjacent *digits* (not adjacent punctuation) so a phone number
+  // immediately followed by a sentence-ending period or comma still matches.
+  /(?<!\d)(?:\+\d{1,3}[-.\s]?)?(?:\(\d{2,4}\)[-.\s]?)?\d{2,4}[-.\s]\d{3,4}[-.\s]\d{2,4}(?:[-.\s]\d{2,4})?(?!\d)/g,
+];
+
 const DANGEROUS_HTML_PATTERNS = [
   /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
   /<style[\s\S]*?>[\s\S]*?<\/style>/gi,
@@ -75,6 +101,20 @@ function redactSecrets(value: string): { value: string; redactionCount: number }
   let redactionCount = 0;
 
   for (const pattern of SECRET_PATTERNS) {
+    current = current.replace(pattern, () => {
+      redactionCount += 1;
+      return "[REDACTED]";
+    });
+  }
+
+  return { value: current, redactionCount };
+}
+
+function redactPii(value: string): { value: string; redactionCount: number } {
+  let current = value;
+  let redactionCount = 0;
+
+  for (const pattern of PII_PATTERNS) {
     current = current.replace(pattern, () => {
       redactionCount += 1;
       return "[REDACTED]";
@@ -151,6 +191,14 @@ export function filterAnswerOutput(input: {
     redactionCount += secretResult.redactionCount;
     filtered = true;
     reasons.push("secret_redaction");
+  }
+
+  const piiResult = redactPii(answer);
+  if (piiResult.redactionCount > 0) {
+    answer = piiResult.value;
+    redactionCount += piiResult.redactionCount;
+    filtered = true;
+    reasons.push("pii_redaction");
   }
 
   const htmlResult = sanitizeHtml(answer);
