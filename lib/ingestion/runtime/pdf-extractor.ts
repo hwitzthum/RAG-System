@@ -1,6 +1,20 @@
 import type { ExtractedPage, RuntimeLogger } from "@/lib/ingestion/runtime/types";
 import { inflateRawSync, inflateSync } from "node:zlib";
 
+// Upper bound on the decompressed size of a single /FlateDecode stream when
+// the pdfjs-dist parser fails (or returns empty text) and we fall back to
+// scanning the raw PDF bytes for text-showing operators. Without this bound,
+// node:zlib's inflateSync/inflateRawSync will decompress an attacker-supplied
+// stream to completion regardless of size — a classic decompression/zlib
+// "bomb" (a few KB of crafted deflate input can expand to gigabytes) that
+// exhausts the ingestion worker's memory and crashes it, taking down
+// processing for every other queued document. The upload endpoint only
+// bounds the *compressed* file size (RAG_MAX_UPLOAD_BYTES); it does nothing
+// to bound decompressed output. 25 MB comfortably covers any legitimate text
+// content stream (page text rarely exceeds a few hundred KB even
+// decompressed) while keeping worst-case memory use per stream small.
+const MAX_INFLATED_STREAM_BYTES = 25 * 1024 * 1024;
+
 type PdfJsTextItem = {
   str?: string;
   transform?: number[];
@@ -323,10 +337,16 @@ function extractTextOperatorsFromContent(content: string): string[] {
 }
 
 function tryInflateStream(streamBytes: Uint8Array): string {
+  // maxOutputLength makes inflateSync/inflateRawSync throw ERR_BUFFER_TOO_LARGE
+  // instead of allocating unbounded memory for a decompression-bomb stream.
+  // The throw is handled by the caller's try/catch, which already treats any
+  // undecodable stream as "skip and continue scanning" — so an oversized
+  // stream degrades gracefully to missing text for that one stream instead of
+  // crashing the worker.
   try {
-    return inflateSync(streamBytes).toString("latin1");
+    return inflateSync(streamBytes, { maxOutputLength: MAX_INFLATED_STREAM_BYTES }).toString("latin1");
   } catch {
-    return inflateRawSync(streamBytes).toString("latin1");
+    return inflateRawSync(streamBytes, { maxOutputLength: MAX_INFLATED_STREAM_BYTES }).toString("latin1");
   }
 }
 
