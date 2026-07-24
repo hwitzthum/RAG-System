@@ -73,14 +73,19 @@ export function createInMemoryRateLimiter(): InMemoryRateLimiter {
 const fallbackLimiter = createInMemoryRateLimiter();
 
 export type SharedRateLimitOptions = {
-  /** When false, returns `{ allowed: false }` if the Supabase RPC fails instead of
-   *  falling back to the (possibly empty) in-memory limiter. Use for auth routes. */
+  /** When true, falls back to the (possibly empty, per-process) in-memory limiter
+   *  if the Supabase RPC fails, instead of returning `{ allowed: false }`. Defaults
+   *  to false (fail-closed) — the README documents this limiter as fail-closed, and
+   *  a caller that forgets to think about this option should get the safe behavior.
+   *  Opt into `failOpen: true` only for low-value/monitoring routes where masking an
+   *  outage behind a hard deny would itself be undesirable (e.g. health checks). */
   failOpen?: boolean;
 };
 
 /**
  * Shared rate limiter that calls the Supabase `consume_rate_limit` RPC.
- * Falls back to in-memory if the RPC call fails (unless `failOpen: false`).
+ * Fails closed (denies the request) if the RPC call fails, unless the caller
+ * explicitly opts into `failOpen: true`.
  */
 export async function consumeSharedRateLimit(
   bucketKey: string,
@@ -88,7 +93,7 @@ export async function consumeSharedRateLimit(
   windowSeconds: number,
   options: SharedRateLimitOptions = {},
 ): Promise<RateLimitDecision> {
-  const { failOpen = true } = options;
+  const { failOpen = false } = options;
 
   try {
     // Lazy import to avoid triggering env validation in unit tests
