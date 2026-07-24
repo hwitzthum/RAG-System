@@ -29,12 +29,28 @@ export type ProtectedWebSourcesResult = {
 const PROMPT_INJECTION_RULES: PromptInjectionRule[] = [
   { label: "instruction_override", pattern: /\bignore (?:all|any|the|these|previous|prior|above) (?:instructions|directions|rules)\b/i, score: 6 },
   { label: "role_override", pattern: /\byou are now\b|\bact as\b|\bnew role\b/i, score: 5 },
-  { label: "system_prompt_exfiltration", pattern: /\bsystem prompt\b|\bdeveloper message\b|\bhidden instructions\b/i, score: 7 },
+  { label: "system_prompt_exfiltration", pattern: /\bsystem prompt\b|\bdeveloper message\b|\bhidden instructions\b|\brepeat (?:everything|all|the text) (?:above|before) this (?:line|point)\b/i, score: 7 },
   { label: "secret_exfiltration", pattern: /\bapi key\b|\bsecret\b|\btoken\b|\bcredential\b|\bpassword\b/i, score: 7 },
   { label: "tool_or_browse_command", pattern: /\bbrowse the web\b|\buse the tool\b|\bcall the tool\b|\bexecute code\b|\brun command\b/i, score: 6 },
-  { label: "prompt_delimiter_markup", pattern: /<(?:system|assistant|developer|tool)>|BEGIN (?:SYSTEM|DEVELOPER|PROMPT)|role:\s*(?:system|assistant|developer|tool)/i, score: 6 },
+  { label: "prompt_delimiter_markup", pattern: /<(?:system|assistant|developer|tool)>|BEGIN (?:SYSTEM|DEVELOPER|PROMPT)|role:\s*(?:system|assistant|developer|tool)|#{2,}\s*(?:SYSTEM|DEVELOPER|ASSISTANT|TOOL)\s*:/i, score: 6 },
   { label: "data_exfiltration", pattern: /\bexfiltrat\w*\b|\bleak\b|\breveal\b.*\bprompt\b/i, score: 7 },
-  { label: "jailbreak_phrasing", pattern: /\bdo not follow\b.*\bpolicy\b|\boverride safety\b|\bjailbreak\b/i, score: 7 },
+  { label: "jailbreak_phrasing", pattern: /\bdo not follow\b.*\bpolicy\b|\boverride safety\b|\bjailbreak\b|\bpretend you have no (?:content policy|restrictions|rules)\b|\byou have no restrictions\b/i, score: 7 },
+  // README-documented category: coercing the model to encode its answer so that
+  // downstream output filtering (which matches plaintext patterns) cannot inspect it.
+  { label: "output_format_manipulation", pattern: /\b(?:respond|answer|reply|output)\b[^\n.!?]{0,40}\bonly in\b[^\n.!?]{0,10}\b(?:base64|rot13|hex(?:adecimal)?|binary|morse(?: code)?)\b|\bencode your (?:response|answer|reply) (?:in|as|using)\b/i, score: 5 },
+  // README-documented category: fabricated multi-turn Q&A / Human-Assistant transcripts
+  // embedded in content to condition the model into treating them as prior turns.
+  { label: "few_shot_poisoning", pattern: /(?:^|\n)\s*Q\s*:\s*.+\n\s*A\s*:\s*.+\n\s*Q\s*:\s*.+\n\s*A\s*:/i, score: 5 },
+  { label: "few_shot_poisoning", pattern: /(?:^|\n)\s*(?:human|user)\s*:\s*.+\n\s*(?:assistant|ai)\s*:\s*.+\n\s*(?:human|user)\s*:/i, score: 5 },
+  // README-documented category: the same instruction-override intent, phrased in the
+  // other languages this app explicitly supports (DE/FR/IT/ES) so a scanner that only
+  // matches English phrasing is trivially bypassed by non-English documents/queries.
+  {
+    label: "multi_language_evasion",
+    pattern:
+      /\bignoriere alle (?:vorherigen |vorangegangenen )?anweisungen\b|\bignorez? toutes les instructions(?: pr[ée]c[ée]dentes| ant[ée]rieures)?\b|\bignora tutte le istruzioni(?: precedenti)?\b|\bignora todas las instrucciones(?: anteriores| previas)?\b/i,
+    score: 6,
+  },
 ];
 
 const OUTPUT_LEAK_RULES = [
