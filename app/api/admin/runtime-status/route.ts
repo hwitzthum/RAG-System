@@ -14,7 +14,11 @@ export async function GET(request: NextRequest) {
   return handleAdminRuntimeStatusGet({
     ipAddress,
     dependencies: {
-      consumeRateLimit: (key, limit, windowSeconds) => consumeSharedRateLimit(key, limit, windowSeconds),
+      // Admin-only diagnostic endpoint: fail open on a rate-limiter RPC outage so
+      // admins can still check runtime health during the very incident that would
+      // be causing the RPC to fail in the first place.
+      consumeRateLimit: (key, limit, windowSeconds) =>
+        consumeSharedRateLimit(key, limit, windowSeconds, { failOpen: true }),
       requireAdminAuth: () => requireAuth(request, ["admin"]),
       getRuntimeStatus: () => getAdminRuntimeStatus(getSupabaseAdminClient()),
       logAuditEvent,

@@ -4,7 +4,9 @@ import { getClientIp } from "@/lib/security/request";
 
 export async function GET(request: NextRequest) {
   const ipAddress = getClientIp(request);
-  const rate = await consumeSharedRateLimit(`health:${ipAddress}`, 60, 60);
+  // Unauthenticated monitoring endpoint: fail open on a rate-limiter RPC outage so
+  // uptime checks aren't themselves masked by a hard 429 during a Supabase incident.
+  const rate = await consumeSharedRateLimit(`health:${ipAddress}`, 60, 60, { failOpen: true });
 
   if (!rate.allowed) {
     return NextResponse.json(
