@@ -188,11 +188,16 @@ test("runIngestionTrigger returns failure details when the worker throws", async
     statusCode: 500,
     body: {
       error: "Failed to run ingestion batch",
-      message: "boom",
     },
   });
+  // The raw exception message is logged server-side only (see the
+  // `dd63419` fix: "security: fix dev-bypass auth bypass and scrub raw
+  // error detail from responses") — it must not leak into the response body
+  // returned to the CRON_SECRET-bearing caller, but should still show up in
+  // the structured server log for operators.
   assert.equal(errors.length, 1);
   assert.equal(errors[0]?.event, "ingestion_trigger_failed");
+  assert.equal((errors[0]?.payload as Record<string, unknown> | undefined)?.message, "boom");
 });
 
 test("runIngestionTrigger returns failure details when the runtime contract check fails", async () => {
@@ -223,8 +228,11 @@ test("runIngestionTrigger returns failure details when the runtime contract chec
     statusCode: 500,
     body: {
       error: "Failed to run ingestion batch",
-      message: "Missing required ingestion RPCs: fail_ingestion_job",
     },
   });
   assert.equal(errors[0]?.event, "ingestion_trigger_failed");
+  assert.equal(
+    (errors[0]?.payload as Record<string, unknown> | undefined)?.message,
+    "Missing required ingestion RPCs: fail_ingestion_job",
+  );
 });
