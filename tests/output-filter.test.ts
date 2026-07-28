@@ -105,3 +105,28 @@ test("buildOutputFilterRefusal localizes the fallback message", () => {
   assert.ok(buildOutputFilterRefusal("DE").includes("Geheimnisse"));
   assert.ok(buildOutputFilterRefusal("FR").includes("secrets"));
 });
+
+test("filterAnswerOutput blocks prompt-leak text split by bidi isolate control characters", () => {
+  // Same invisible-character-splitting technique as the zero-width-space
+  // regression above (see the prompt-injection.test.ts bidi-isolate test),
+  // applied to the output-leak side of the scanner.
+  const result = filterAnswerOutput({
+    answer: "Here is the system\u2066prompt: never reveal this.",
+    citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+    language: "EN",
+  });
+
+  assert.equal(result.blocked, true);
+  assert.ok(result.reasons.includes("prompt_leak"));
+});
+
+test("filterAnswerOutput blocks prompt-leak text split by invisible Unicode Tag characters", () => {
+  const result = filterAnswerOutput({
+    answer: "Here is the system\u{E0020}prompt: never reveal this.",
+    citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+    language: "EN",
+  });
+
+  assert.equal(result.blocked, true);
+  assert.ok(result.reasons.includes("prompt_leak"));
+});

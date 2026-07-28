@@ -74,10 +74,15 @@ const REFUSAL_BY_LANGUAGE: Record<SupportedLanguage, string> = {
 // and Unicode format characters are stripped alongside ASCII control chars:
 // they let an attacker split an otherwise-matched phrase (e.g. a leaked system
 // prompt marker) into invisible fragments that a plain regex won't match while
-// still rendering identically to a human reader.
+// still rendering identically to a human reader. This also covers bidi
+// embedding/override/isolate controls (U+202A-U+202E, U+2066-U+2069) and the
+// Unicode Tag block (U+E0000-U+E007F) — both admit the identical bypass and
+// were missed by the original zero-width-only fix (see prompt-injection.ts
+// for the full rationale, including the "ASCII smuggling" LLM technique the
+// Tag block enables).
 function stripControlChars(value: string): string {
   return value.replace(
-    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u2060\uFEFF]/g,
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu,
     " ",
   );
 }
