@@ -69,16 +69,28 @@ const REFUSAL_BY_LANGUAGE: Record<SupportedLanguage, string> = {
 
 // Strips ASCII control characters plus Unicode zero-width/format characters
 // (zero-width space/non-joiner/joiner, LTR/RTL marks, word joiner, soft
-// hyphen, and the zero-width no-break space / BOM). Regex-based scanners
-// match on visible substrings; an attacker can defeat them by interleaving
-// these invisible characters inside an otherwise-flagged phrase (splitting
+// hyphen, the zero-width no-break space / BOM, bidi embedding/override/
+// isolate controls, and the Unicode Tag block). Regex-based scanners match
+// on visible substrings; an attacker can defeat them by interleaving
+// invisible characters inside an otherwise-flagged phrase (splitting
 // "ignore all instructions" with zero-width spaces renders identically to a
 // human reader but no longer matches the instruction_override pattern).
+//
+// The 2fc92c5 fix closed this for zero-width space/joiners, LRM/RLM, word
+// joiner, soft hyphen, and BOM, but left two further invisible-character
+// families unstripped that admit the exact same bypass:
+//   - Bidi embedding/override/isolate controls (U+202A-U+202E, U+2066-U+2069)
+//     render with zero width in effectively all fonts/terminals, same as the
+//     already-covered LRM/RLM marks (the "Trojan Source" class of Unicode
+//     control characters, CVE-2021-42574-adjacent).
+//   - Unicode Tag characters (U+E0000-U+E007F) are always invisible and are
+//     the basis of the documented "ASCII smuggling" prompt-injection
+//     technique against LLMs (invisible tag codepoints some models decode).
 // Removing them before matching closes that gap without changing anything
 // visible to a human reader.
 function stripControlChars(value: string): string {
   return value.replace(
-    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u2060\uFEFF]/g,
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu,
     " ",
   );
 }
@@ -208,5 +220,11 @@ export function buildPromptInjectionRefusal(language: SupportedLanguage): string
 }
 
 export function containsSensitiveLeakage(value: string): boolean {
-  return OUTPUT_LEAK_RULES.some((pattern) => pattern.test(value));
+  // Normalize the same way scanPromptInjection() does before matching: an
+  // LLM answer that leaks a system-prompt marker or bare "api key" mention
+  // with invisible characters interleaved (bidi controls, Unicode Tag
+  // characters, zero-width joiners, etc.) would otherwise silently skip this
+  // check and fall through to the caller treating the response as clean.
+  const normalized = stripControlChars(value.normalize("NFKC"));
+  return OUTPUT_LEAK_RULES.some((pattern) => pattern.test(normalized));
 }
