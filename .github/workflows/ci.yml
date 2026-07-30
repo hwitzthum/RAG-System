@@ -30,7 +30,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_ENV: production
+  # NODE_ENV is deliberately NOT set at the workflow/job level: npm treats
+  # NODE_ENV=production as "skip devDependencies" during install, which would
+  # make `npm ci` omit eslint/typescript and break every job below (found by
+  # running this workflow — the first version set it globally and both
+  # "npm run check" and "npm run build" failed with "eslint: not found" /
+  # "Cannot find module 'typescript'" because devDependencies were never
+  # installed). It's set instead as a step-level override, after `npm ci`,
+  # only on the steps that specifically need production-mode env validation.
   NEXT_PUBLIC_APP_NAME: RAG System
   NEXT_PUBLIC_APP_URL: http://localhost:3001
   INGESTION_BATCH_SIZE: "50"
@@ -110,6 +117,8 @@ jobs:
 
       - name: npm run build
         run: npm run build
+        env:
+          NODE_ENV: production
 
   infra-env-schema:
     name: Env var schema validation (advisory contract check)
@@ -132,3 +141,5 @@ jobs:
       # list validated on every PR without requiring real secrets in CI.
       - name: infra:check-env (web target)
         run: node scripts/infrastructure/validate-env.mjs --target web
+        env:
+          NODE_ENV: production
