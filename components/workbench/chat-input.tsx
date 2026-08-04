@@ -32,7 +32,10 @@ export function ChatInput({
         <textarea
           ref={textareaRef}
           value={query}
-          onChange={(e) => { setQuery(e.target.value); handleInput(); }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            handleInput();
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -70,14 +73,11 @@ export function ChatInput({
             type="checkbox"
             checked={enableQueryExpansion}
             onChange={(e) => setEnableQueryExpansion(e.target.checked)}
-            disabled={effectiveQueryScopeIds.length <= 1}
-            className="check-accent h-3.5 w-3.5 rounded disabled:cursor-not-allowed disabled:opacity-50"
+            className="check-accent h-3.5 w-3.5 rounded"
             data-testid="query-expansion-toggle"
           />
           Broaden search
-          <span className="fg-muted">
-            {effectiveQueryScopeIds.length > 1 ? "(multi-document)" : "(select 2+ scoped docs)"}
-          </span>
+          <span className="fg-muted">(query variations + HyDE)</span>
         </label>
         {effectiveQueryScopeIds.length > 0 ? (
           <button
@@ -85,13 +85,13 @@ export function ChatInput({
             onClick={onClearScope}
             className="badge badge-accent"
           >
-            Scope: {scopeSummary ?? `${effectiveQueryScopeIds.length} documents`} (clear)
+            Scope:{" "}
+            {scopeSummary ?? `${effectiveQueryScopeIds.length} documents`}{" "}
+            (clear)
           </button>
         ) : null}
         {!canQuery ? (
-          <span className="fg-muted text-xs">
-            Requires reader/admin role
-          </span>
+          <span className="fg-muted text-xs">Requires reader/admin role</span>
         ) : null}
       </div>
     </div>

@@ -3,7 +3,10 @@ import type {
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
-import { hasSufficientEvidence } from "@/lib/answering/policy";
+import {
+  hasSufficientEvidence,
+  selectChunkIndexesMeetingThreshold,
+} from "@/lib/answering/policy";
 import { resolveCitedChunks } from "@/lib/answering/citations";
 import {
   buildGroundedAnswerUserPrompt,
@@ -208,6 +211,12 @@ export async function generateGroundedAnswer(
 
 export type GenerateWebAugmentedAnswerInput = GenerateGroundedAnswerInput & {
   webSources: WebSource[];
+  /**
+   * Minimum number of web sources required before the answer may proceed
+   * without sufficient local document evidence. A single stray web hit must
+   * not bypass the evidence gate.
+   */
+  minWebSources?: number;
 };
 
 export async function generateWebAugmentedAnswer(
@@ -227,7 +236,11 @@ export async function generateWebAugmentedAnswer(
     documentScoped: Boolean(input.documentScopeId),
   });
 
-  if (!sufficientEvidence && protectedWebSources.webSources.length === 0) {
+  const minWebSources = Math.max(1, input.minWebSources ?? 2);
+  if (
+    !sufficientEvidence &&
+    protectedWebSources.webSources.length < minWebSources
+  ) {
     return {
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
@@ -249,10 +262,27 @@ export async function generateWebAugmentedAnswer(
     };
   }
 
+  // When the answer proceeds on web evidence alone, sub-threshold document
+  // chunks are dropped from the prompt: text that failed the evidence gate
+  // must not appear as citable "PRIMARY" evidence. The same indexes filter
+  // the attribution list so [n] markers keep resolving to the right chunks.
+  let promptChunks = protectedChunks.chunks;
+  let attributionChunks = input.chunks;
+  if (!sufficientEvidence) {
+    const keptIndexes = selectChunkIndexesMeetingThreshold({
+      chunks: protectedChunks.chunks,
+      minEvidenceChunks: input.minEvidenceChunks,
+      minRerankScore: input.minRerankScore,
+      minHeuristicRelevance: input.minHeuristicRelevance,
+    });
+    promptChunks = keptIndexes.map((index) => protectedChunks.chunks[index]!);
+    attributionChunks = keptIndexes.map((index) => input.chunks[index]!);
+  }
+
   const prompt = buildWebAugmentedUserPrompt({
     query: input.query,
     language: input.language,
-    chunks: protectedChunks.chunks,
+    chunks: promptChunks,
     webSources: protectedWebSources.webSources,
   });
 
@@ -288,7 +318,7 @@ export async function generateWebAugmentedAnswer(
   // Only the [n] document markers are resolved here. Web sources are marked
   // [WEB-n] by buildWebAugmentedUserPrompt and travel back to the client as
   // `webSources`, not as citations.
-  const attribution = resolveCitedChunks({ answer, chunks: input.chunks });
+  const attribution = resolveCitedChunks({ answer, chunks: attributionChunks });
 
   const filteredOutput = filterAnswerOutput({
     answer,

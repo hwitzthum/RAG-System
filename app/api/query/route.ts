@@ -162,7 +162,7 @@ function buildQueryStreamResponse(input: {
     queryExpansion: {
       requested: boolean;
       applied: boolean;
-      strategy: "standard" | "multi_document_expansion";
+      strategy: "standard" | "query_expansion";
       variationCount: number;
       hydeUsed: boolean;
       branchCount: number;
@@ -456,9 +456,13 @@ export async function POST(request: NextRequest) {
   let userOpenAiApiKey: string | null = null;
   let userCohereApiKey: string | null = null;
   try {
+    // The Cohere key is only consumed by the cross-encoder; skip decrypting a
+    // user's stored key entirely when that stage is disabled.
     [userOpenAiApiKey, userCohereApiKey] = await Promise.all([
       resolveUserOpenAiApiKey(authResult.user.id),
-      resolveUserCohereApiKey(authResult.user.id),
+      env.RAG_CROSS_ENCODER_ENABLED
+        ? resolveUserCohereApiKey(authResult.user.id)
+        : Promise.resolve(null),
     ]);
   } catch (error) {
     logAuditEvent({
@@ -510,6 +514,17 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // The relaxed single-chunk evidence requirement is reserved for scopes
+        // the user explicitly selected. A reader's injected RBAC list (every
+        // document they can access) is not a deliberate scoping decision and
+        // must not weaken the gate.
+        const explicitScopeId =
+          requestedDocumentIds.length > 0 &&
+          scopedDocumentIds &&
+          scopedDocumentIds.length > 0
+            ? scopedDocumentIds.join(",")
+            : null;
+
         const answerResult =
           webSources.length > 0
             ? await generateWebAugmentedAnswer({
@@ -520,11 +535,9 @@ export async function POST(request: NextRequest) {
                 minRerankScore: env.RAG_MIN_RERANK_SCORE,
                 minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
                 maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                documentScopeId:
-                  scopedDocumentIds && scopedDocumentIds.length > 0
-                    ? scopedDocumentIds.join(",")
-                    : null,
+                documentScopeId: explicitScopeId,
                 webSources,
+                minWebSources: env.RAG_WEB_MIN_SOURCES,
               })
             : await generateGroundedAnswer({
                 query: requestBody.query,
@@ -534,10 +547,7 @@ export async function POST(request: NextRequest) {
                 minRerankScore: env.RAG_MIN_RERANK_SCORE,
                 minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
                 maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                documentScopeId:
-                  scopedDocumentIds && scopedDocumentIds.length > 0
-                    ? scopedDocumentIds.join(",")
-                    : null,
+                documentScopeId: explicitScopeId,
               });
         const latencyMs = Date.now() - startedAt;
 

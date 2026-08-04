@@ -1,10 +1,13 @@
-import type { RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  RetrievedChunk,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 
 export type RerankInput = {
   normalizedQuery: string;
   candidates: RetrievedChunk[];
   poolSize: number;
-  topK: number;
+  language?: SupportedLanguage;
 };
 
 export type LlmGenerateInput = {

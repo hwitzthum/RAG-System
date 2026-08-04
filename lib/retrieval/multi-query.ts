@@ -1,9 +1,13 @@
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import { env } from "@/lib/config/env";
+import type { SupportedLanguage } from "@/lib/contracts/retrieval";
 
 const MULTI_QUERY_TIMEOUT_MS = 4000;
 
-export async function generateQueryVariations(originalQuery: string): Promise<string[]> {
+export async function generateQueryVariations(
+  originalQuery: string,
+  language: SupportedLanguage = "EN",
+): Promise<string[]> {
   const variationCount = env.RAG_MULTI_QUERY_VARIATIONS;
 
   const systemPrompt =
@@ -17,7 +21,10 @@ export async function generateQueryVariations(originalQuery: string): Promise<st
 
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("Multi-query generation timeout")), MULTI_QUERY_TIMEOUT_MS);
+    timer = setTimeout(
+      () => reject(new Error("Multi-query generation timeout")),
+      MULTI_QUERY_TIMEOUT_MS,
+    );
   });
 
   let raw: string;
@@ -26,7 +33,9 @@ export async function generateQueryVariations(originalQuery: string): Promise<st
       getDefaultProviders().llm.generateAnswer({
         systemPrompt,
         userPrompt,
-        language: "EN",
+        // Variations must be written in the query's language so they hit the
+        // same lexical space as the corpus text they are meant to retrieve.
+        language,
         maxOutputTokens: 300,
       }),
       timeout,

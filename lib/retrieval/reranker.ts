@@ -8,7 +8,6 @@ type RerankInput = {
   normalizedQuery: string;
   candidates: RetrievedChunk[];
   poolSize: number;
-  topK: number;
   language?: SupportedLanguage;
 };
 
@@ -108,10 +107,14 @@ function clampUnitInterval(value: number): number {
  * Reading the ordering score as though it were absolute is why the
  * insufficient-evidence gate never fired: the top candidate of any pool,
  * however weak, scored above `RAG_MIN_RERANK_SCORE`.
+ *
+ * Returns the full scored pool, not a topK slice: downstream stages
+ * (cross-encoder, contextual grouping) must see every pool member so a
+ * candidate ranked anywhere in the pool can still reach the final set. The
+ * caller slices to topK after those stages.
  */
 export function rerankCandidates(input: RerankInput): RetrievedChunk[] {
   const poolSize = Math.max(1, input.poolSize);
-  const topK = Math.max(1, input.topK);
   const tokens = extractQueryTokens(input.normalizedQuery);
 
   const pool = input.candidates.slice(0, poolSize);
@@ -175,5 +178,5 @@ export function rerankCandidates(input: RerankInput): RetrievedChunk[] {
     return right.retrievalScore - left.retrievalScore;
   });
 
-  return scored.slice(0, topK);
+  return scored;
 }

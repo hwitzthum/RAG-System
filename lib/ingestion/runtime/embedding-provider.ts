@@ -1,5 +1,7 @@
-import { createHash } from "node:crypto";
-import type { IngestionRuntimeSettings, RuntimeLogger } from "@/lib/ingestion/runtime/types";
+import type {
+  IngestionRuntimeSettings,
+  RuntimeLogger,
+} from "@/lib/ingestion/runtime/types";
 
 type OpenAiEmbeddingResponse = {
   data?: Array<{
@@ -21,25 +23,22 @@ export class EmbeddingProvider {
     this.apiKey = settings.openAiApiKey;
   }
 
-  private buildFallbackEmbedding(text: string): number[] {
-    const digest = createHash("sha256").update(text, "utf8").digest();
-    const vector = new Array<number>(this.settings.embeddingDim).fill(0);
-
-    for (let index = 0; index < this.settings.embeddingDim; index += 1) {
-      const byte = digest[index % digest.length] ?? 0;
-      vector[index] = (byte / 127.5) - 1.0;
-    }
-
-    return vector;
-  }
-
   async embedTexts(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) {
       return [];
     }
 
     if (!this.apiKey) {
-      return texts.map((text) => this.buildFallbackEmbedding(text));
+      // Previously this silently wrote SHA-256-derived fake vectors that were
+      // indistinguishable from real embeddings in the database. Failing the
+      // job (retry -> dead letter) is the only honest behaviour: corrupt
+      // embeddings poison retrieval for every future query.
+      this.logger.error("embedding_api_key_missing", {
+        model: this.settings.embeddingModel,
+      });
+      throw new Error(
+        "OPENAI_API_KEY is not configured; refusing to ingest without real embeddings",
+      );
     }
 
     const vectors: number[][] = [];
@@ -57,14 +56,21 @@ export class EmbeddingProvider {
         body: JSON.stringify({
           model: this.settings.embeddingModel,
           input: batch,
-          ...(this.settings.embeddingDimensions ? { dimensions: this.settings.embeddingDimensions } : {}),
+          ...(this.settings.embeddingDimensions
+            ? { dimensions: this.settings.embeddingDimensions }
+            : {}),
         }),
       });
 
       const payload = (await response.json()) as OpenAiEmbeddingResponse;
       if (!response.ok) {
-        const message = payload.error?.message ?? `Embedding provider request failed (status=${response.status})`;
-        this.logger.warn("embedding_request_failed", { message, batchSize: batch.length });
+        const message =
+          payload.error?.message ??
+          `Embedding provider request failed (status=${response.status})`;
+        this.logger.warn("embedding_request_failed", {
+          message,
+          batchSize: batch.length,
+        });
         throw new Error(message);
       }
 

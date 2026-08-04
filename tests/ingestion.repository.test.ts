@@ -14,7 +14,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-key";
 process.env.OPENAI_API_KEY ??= "test-openai-key";
 
 async function createRepositoryWithRpcError(message: string) {
-  const { SupabaseIngestionRuntimeRepository } = await import("../lib/ingestion/runtime/repository");
+  const { SupabaseIngestionRuntimeRepository } =
+    await import("../lib/ingestion/runtime/repository");
   const supabase = {
     async rpc() {
       return {
@@ -32,7 +33,9 @@ async function createRepositoryWithRpcError(message: string) {
 }
 
 test("claimIngestionJobs throws when the claim RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.claim_ingestion_jobs");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.claim_ingestion_jobs",
+  );
 
   await assert.rejects(
     repository.claimIngestionJobs({
@@ -46,7 +49,9 @@ test("claimIngestionJobs throws when the claim RPC is unavailable", async () => 
 });
 
 test("markJobCompleted throws when the completion RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.complete_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.complete_ingestion_job",
+  );
 
   await assert.rejects(
     repository.markJobCompleted("job-1", "EN"),
@@ -55,7 +60,9 @@ test("markJobCompleted throws when the completion RPC is unavailable", async () 
 });
 
 test("markJobFailed throws when the failure RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.fail_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.fail_ingestion_job",
+  );
 
   await assert.rejects(
     repository.markJobFailed(
@@ -72,7 +79,9 @@ test("markJobFailed throws when the failure RPC is unavailable", async () => {
 });
 
 test("saveChunkCandidates throws when the checkpoint RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.checkpoint_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.checkpoint_ingestion_job",
+  );
 
   await assert.rejects(
     repository.saveChunkCandidates("job-1", [], 0),
@@ -81,7 +90,9 @@ test("saveChunkCandidates throws when the checkpoint RPC is unavailable", async 
 });
 
 test("replaceDocumentChunks throws when the chunk replacement RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.replace_document_chunks");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.replace_document_chunks",
+  );
 
   await assert.rejects(
     repository.replaceDocumentChunks("doc-1", []),
@@ -90,7 +101,9 @@ test("replaceDocumentChunks throws when the chunk replacement RPC is unavailable
 });
 
 test("insertChunkBatch throws when the chunk append RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.append_document_chunks");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.append_document_chunks",
+  );
 
   await assert.rejects(
     repository.insertChunkBatch("doc-1", [
@@ -103,6 +116,9 @@ test("insertChunkBatch throws when the chunk append RPC is unavailable", async (
         context: "Context",
         language: "EN",
         embedding: [0],
+        extractionMethod: "pdfjs",
+        embeddingModel: "text-embedding-3-large@1024",
+        tokenCount: 1,
       },
     ]),
     /Required ingestion RPC append_document_chunks is unavailable/,
@@ -110,7 +126,9 @@ test("insertChunkBatch throws when the chunk append RPC is unavailable", async (
 });
 
 test("invalidateRetrievalCache throws when the cache invalidation RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.invalidate_retrieval_cache");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.invalidate_retrieval_cache",
+  );
 
   await assert.rejects(
     repository.invalidateRetrievalCache(),
@@ -119,7 +137,9 @@ test("invalidateRetrievalCache throws when the cache invalidation RPC is unavail
 });
 
 test("updateJobProgress throws when the checkpoint RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.checkpoint_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.checkpoint_ingestion_job",
+  );
 
   await assert.rejects(
     repository.updateJobProgress("job-1", 3),
@@ -128,7 +148,9 @@ test("updateJobProgress throws when the checkpoint RPC is unavailable", async ()
 });
 
 test("yieldJob throws when the yield RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.yield_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.yield_ingestion_job",
+  );
 
   await assert.rejects(
     repository.yieldJob("job-1"),
@@ -137,7 +159,9 @@ test("yieldJob throws when the yield RPC is unavailable", async () => {
 });
 
 test("updateJobStage throws when the checkpoint RPC is unavailable", async () => {
-  const repository = await createRepositoryWithRpcError("Could not find the function public.checkpoint_ingestion_job");
+  const repository = await createRepositoryWithRpcError(
+    "Could not find the function public.checkpoint_ingestion_job",
+  );
 
   await assert.rejects(
     repository.updateJobStage("job-1", "embedding"),

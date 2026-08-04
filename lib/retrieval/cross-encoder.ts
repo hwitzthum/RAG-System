@@ -7,11 +7,22 @@ export type CrossEncoderInput = {
   query: string;
   chunks: RetrievedChunk[];
   model: string;
-  topK: number;
 };
 
-const CROSS_ENCODER_POOL_CAP = 20;
+// Cohere accepts up to 1,000 documents per rerank call; capping well below
+// that bounds cost and latency. The heuristic pool (RAG_RERANK_POOL_SIZE,
+// default 40) fits entirely under this cap, so overflow only occurs with
+// unusual configuration.
+const CROSS_ENCODER_POOL_CAP = 100;
 
+/**
+ * Reranks the full candidate pool with Cohere's cross-encoder and returns the
+ * full pool in cross-encoded order. Deliberately does NOT truncate to topK:
+ * the caller slices after contextual grouping, so a candidate ranked anywhere
+ * in the pool can still reach the final set. On any failure (no key, timeout,
+ * API error) the input order is returned unchanged so the heuristic ranking
+ * stays in effect.
+ */
 export async function crossEncoderRerank(
   input: CrossEncoderInput,
 ): Promise<RetrievedChunk[]> {
@@ -23,10 +34,11 @@ export async function crossEncoderRerank(
   const apiKey = runtimeCohereApiKey ?? env.COHERE_API_KEY;
 
   if (!apiKey) {
-    return input.chunks.slice(0, input.topK);
+    return input.chunks;
   }
 
   const cappedChunks = input.chunks.slice(0, CROSS_ENCODER_POOL_CAP);
+  const overflowChunks = input.chunks.slice(CROSS_ENCODER_POOL_CAP);
 
   const documents = cappedChunks.map((chunk) =>
     `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
@@ -35,28 +47,40 @@ export async function crossEncoderRerank(
   try {
     const cohere = new CohereClient({ token: apiKey });
 
-    const response = await cohere.v2.rerank({
-      model: input.model,
-      query: input.query,
-      documents,
-      topN: input.topK,
-    });
+    const timeoutMs = env.RAG_CROSS_ENCODER_TIMEOUT_MS;
+    const response = await cohere.v2.rerank(
+      {
+        model: input.model,
+        query: input.query,
+        documents,
+        topN: documents.length,
+      },
+      {
+        timeoutInSeconds: Math.max(1, Math.ceil(timeoutMs / 1000)),
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(timeoutMs),
+      },
+    );
 
     // Cohere's relevanceScore is already an absolute query-document relevance
     // measure, so it serves as both the ordering score and the gate score. The
     // scale marker tells lib/answering/policy.ts which threshold applies —
     // these numbers are not comparable with the heuristic reranker's.
-    return response.results.map((result) => ({
-      ...cappedChunks[result.index],
+    const reranked = response.results.map((result) => ({
+      ...cappedChunks[result.index]!,
       rerankScore: result.relevanceScore,
       relevanceScore: result.relevanceScore,
       scoreScale: "cross_encoder" as const,
     }));
+
+    // Chunks beyond the cap keep their heuristic order and scores, behind the
+    // cross-encoded ones.
+    return [...reranked, ...overflowChunks];
   } catch (error) {
     console.warn(
-      "Cohere rerank failed, falling back to original order:",
+      "Cohere rerank failed, falling back to heuristic order:",
       error,
     );
-    return cappedChunks.slice(0, input.topK);
+    return input.chunks;
   }
 }

@@ -1,4 +1,7 @@
-import type { RetrievalTrace, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  RetrievalTrace,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import type { WebSource } from "@/lib/web-research/types";
 
 export type { WebSource } from "@/lib/web-research/types";
@@ -6,7 +9,8 @@ export type { WebSource } from "@/lib/web-research/types";
 export type Role = "admin" | "reader";
 
 export type DocumentStatus = "queued" | "processing" | "ready" | "failed";
-export type IngestionJobStatus = "queued" | "processing" | "completed" | "failed" | "dead_letter";
+export type IngestionJobStatus =
+  "queued" | "processing" | "completed" | "failed" | "dead_letter";
 
 export type UploadResponse = {
   documentId: string;
@@ -61,7 +65,7 @@ export type QueryResponseMeta = {
   queryExpansion?: {
     requested: boolean;
     applied: boolean;
-    strategy: "standard" | "multi_document_expansion";
+    strategy: "standard" | "query_expansion";
     variationCount: number;
     hydeUsed: boolean;
     branchCount: number;

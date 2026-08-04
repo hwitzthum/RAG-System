@@ -117,7 +117,6 @@ test("rerankCandidates prefers lexical matches in rerank pool", () => {
     normalizedQuery: "solar financing",
     candidates,
     poolSize: 20,
-    topK: 2,
   });
 
   assert.equal(reranked[0]?.chunkId, "match");
@@ -151,7 +150,6 @@ test("rerankCandidates emits an absolute relevance score independent of the pool
     normalizedQuery: "solar financing",
     candidates: weakPool,
     poolSize: 20,
-    topK: 2,
   });
 
   assert.equal(reranked[0]?.scoreScale, "heuristic");
@@ -179,7 +177,6 @@ test("rerankCandidates scores a genuinely relevant chunk highly in absolute term
       }),
     ],
     poolSize: 20,
-    topK: 1,
   });
 
   assert.ok((reranked[0]?.relevanceScore ?? 0) > 0.5);
@@ -211,11 +208,14 @@ test("rerankCandidates applies a language match boost to ordering only", () => {
     normalizedQuery: "vertragslaufzeit",
     candidates,
     poolSize: 20,
-    topK: 2,
     language: "DE",
   });
 
-  assert.equal(reranked[0]?.chunkId, "de", "same-language chunk should order first");
+  assert.equal(
+    reranked[0]?.chunkId,
+    "de",
+    "same-language chunk should order first",
+  );
   // The boost must not leak into the gate score: both chunks are equally
   // (ir)relevant to the query regardless of which language they are in.
   assert.equal(reranked[0]?.relevanceScore, reranked[1]?.relevanceScore);
@@ -226,13 +226,21 @@ test("detectQueryLanguage keeps EN when no language keyword matches", () => {
   // first key in LANGUAGE_KEYWORDS (DE), so English questions containing none
   // of the tracked stopwords were answered in German.
   assert.equal(
-    detectQueryLanguage("how does artificial intelligence affect employee wellbeing"),
+    detectQueryLanguage(
+      "how does artificial intelligence affect employee wellbeing",
+    ),
     "EN",
   );
   assert.equal(detectQueryLanguage("melting point tungsten carbide"), "EN");
 });
 
 test("detectQueryLanguage still detects a language from its keywords", () => {
-  assert.equal(detectQueryLanguage("was ist der inhalt und die struktur"), "DE");
-  assert.equal(detectQueryLanguage("what is the content and the structure"), "EN");
+  assert.equal(
+    detectQueryLanguage("was ist der inhalt und die struktur"),
+    "DE",
+  );
+  assert.equal(
+    detectQueryLanguage("what is the content and the structure"),
+    "EN",
+  );
 });

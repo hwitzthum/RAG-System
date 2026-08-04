@@ -1,4 +1,8 @@
-import type { DocumentStatus, IngestionJobStatus, SupportedLanguage } from "@/lib/supabase/database.types";
+import type {
+  DocumentStatus,
+  IngestionJobStatus,
+  SupportedLanguage,
+} from "@/lib/supabase/database.types";
 
 export type RuntimeLogger = Pick<Console, "info" | "warn" | "error">;
 
@@ -21,9 +25,13 @@ export type DocumentRecord = {
   ingestionVersion: number;
 };
 
+export type ExtractionMethod = "pdfjs" | "byte_scrape";
+
 export type ExtractedPage = {
   pageNumber: number;
   text: string;
+  /** How the text was obtained. Absent on injected test fixtures. */
+  method?: ExtractionMethod;
 };
 
 export type Section = {
@@ -38,15 +46,14 @@ export type ChunkCandidate = {
   sectionTitle: string;
   content: string;
   language: SupportedLanguage;
+  // Optional: absent on candidates checkpointed before provenance tracking;
+  // such chunks store NULL and are re-stamped on the next re-ingest.
+  extractionMethod?: ExtractionMethod;
+  tokenCount?: number;
 };
 
-export type ChunkWithContext = {
-  chunkIndex: number;
-  pageNumber: number;
-  sectionTitle: string;
-  content: string;
+export type ChunkWithContext = ChunkCandidate & {
   context: string;
-  language: SupportedLanguage;
 };
 
 export type ProcessJobResult = {
@@ -72,6 +79,10 @@ export type PreparedChunkRecord = {
   context: string;
   language: SupportedLanguage;
   embedding: number[];
+  extractionMethod: ExtractionMethod | null;
+  /** "<model>@<dimensions>", e.g. "text-embedding-3-large@1024". */
+  embeddingModel: string;
+  tokenCount: number | null;
 };
 
 export type IngestionRuntimeSettings = {
@@ -112,7 +123,10 @@ function parseIntegerEnv(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
-function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+function parseBooleanEnv(
+  value: string | undefined,
+  fallback: boolean,
+): boolean {
   if (!value) {
     return fallback;
   }
@@ -132,36 +146,67 @@ export function resolveIngestionRuntimeSettings(
 ): IngestionRuntimeSettings {
   const resolved: IngestionRuntimeSettings = {
     workerName: process.env.WORKER_NAME?.trim() || "rag-ingestion-worker",
-    workerPollIntervalSeconds: parseIntegerEnv(process.env.WORKER_POLL_INTERVAL_SECONDS, 5),
+    workerPollIntervalSeconds: parseIntegerEnv(
+      process.env.WORKER_POLL_INTERVAL_SECONDS,
+      5,
+    ),
     ingestionBatchSize: parseIntegerEnv(process.env.INGESTION_BATCH_SIZE, 1),
     maxRetries: parseIntegerEnv(process.env.WORKER_MAX_RETRIES, 3),
-    chunkTargetTokens: parseIntegerEnv(process.env.WORKER_CHUNK_TARGET_TOKENS, 700),
-    chunkOverlapTokens: parseIntegerEnv(process.env.WORKER_CHUNK_OVERLAP_TOKENS, 120),
+    chunkTargetTokens: parseIntegerEnv(
+      process.env.WORKER_CHUNK_TARGET_TOKENS,
+      700,
+    ),
+    chunkOverlapTokens: parseIntegerEnv(
+      process.env.WORKER_CHUNK_OVERLAP_TOKENS,
+      120,
+    ),
     chunkMinChars: parseIntegerEnv(process.env.WORKER_CHUNK_MIN_CHARS, 120),
-    contextModel: process.env.WORKER_CONTEXT_MODEL?.trim() || process.env.RAG_LLM_MODEL?.trim() || "gpt-4o-mini",
+    contextModel:
+      process.env.WORKER_CONTEXT_MODEL?.trim() ||
+      process.env.RAG_LLM_MODEL?.trim() ||
+      "gpt-4o-mini",
     contextEnabled: parseBooleanEnv(process.env.WORKER_CONTEXT_ENABLED, true),
     contextMaxChars: parseIntegerEnv(process.env.WORKER_CONTEXT_MAX_CHARS, 280),
     embeddingModel:
-      process.env.WORKER_EMBEDDING_MODEL?.trim() || process.env.RAG_QUERY_EMBEDDING_MODEL?.trim() || "text-embedding-3-large",
+      process.env.WORKER_EMBEDDING_MODEL?.trim() ||
+      process.env.RAG_QUERY_EMBEDDING_MODEL?.trim() ||
+      "text-embedding-3-large",
     embeddingDim: parseIntegerEnv(process.env.WORKER_EMBEDDING_DIM, 1024),
-    embeddingBatchSize: parseIntegerEnv(process.env.WORKER_EMBEDDING_BATCH_SIZE, 32),
-    openAiTimeoutSeconds: parseIntegerEnv(process.env.WORKER_OPENAI_TIMEOUT_SECONDS, 40),
+    embeddingBatchSize: parseIntegerEnv(
+      process.env.WORKER_EMBEDDING_BATCH_SIZE,
+      32,
+    ),
+    openAiTimeoutSeconds: parseIntegerEnv(
+      process.env.WORKER_OPENAI_TIMEOUT_SECONDS,
+      40,
+    ),
     openAiApiKey: process.env.OPENAI_API_KEY?.trim() || null,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || null,
-    embeddingDimensions: parseIntegerEnv(process.env.WORKER_EMBEDDING_DIMENSIONS, 1024),
-    ocrFallbackEnabled: parseBooleanEnv(process.env.WORKER_OCR_FALLBACK_ENABLED, true),
+    embeddingDimensions: parseIntegerEnv(
+      process.env.WORKER_EMBEDDING_DIMENSIONS,
+      1024,
+    ),
+    ocrFallbackEnabled: parseBooleanEnv(
+      process.env.WORKER_OCR_FALLBACK_ENABLED,
+      true,
+    ),
     lockTimeoutSeconds: parseIntegerEnv(
       process.env.WORKER_LOCK_TIMEOUT_SECONDS,
       parseIntegerEnv(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 120),
     ),
     chunksPerRun: parseIntegerEnv(process.env.WORKER_CHUNKS_PER_RUN, 5),
-    chunkInsertBatchSize: parseIntegerEnv(process.env.WORKER_CHUNK_INSERT_BATCH_SIZE, 100),
+    chunkInsertBatchSize: parseIntegerEnv(
+      process.env.WORKER_CHUNK_INSERT_BATCH_SIZE,
+      100,
+    ),
     ragStorageBucket: process.env.RAG_STORAGE_BUCKET?.trim() || "documents",
     ...overrides,
   };
 
   if (resolved.chunkOverlapTokens >= resolved.chunkTargetTokens) {
-    throw new Error("chunkOverlapTokens must be smaller than chunkTargetTokens");
+    throw new Error(
+      "chunkOverlapTokens must be smaller than chunkTargetTokens",
+    );
   }
 
   return resolved;
