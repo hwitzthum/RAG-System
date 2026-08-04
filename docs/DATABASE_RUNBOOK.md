@@ -68,6 +68,20 @@ The two credentials fail differently:
 
 A green run prints `Remote database is up to date.` when nothing is pending.
 
+### Schema layout
+
+This database is shared with a second application (Rezeptmeister), whose tables
+live in `public` and are managed independently by Alembic. Two migration systems
+in one namespace means `create or replace` from either side can silently
+overwrite the other's object.
+
+| Schema   | Contents                                                                                                                                                     | Exposed to PostgREST                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `public` | Tables, RLS policies, and every RPC the app calls via `supabase.rpc()` (`match_document_chunks`, `search_document_chunks_keyword`, ingestion and cache RPCs) | Yes — moving anything here breaks its call sites |
+| `rag`    | Internal SQL helpers with generic names, called only from other database objects (`language_text_search_config`, `build_keyword_tsquery`)                    | No, deliberately                                 |
+
+Put new helpers in `rag` unless the application needs to call them over REST.
+
 ## 4. Post-Apply Verification Queries
 
 ```sql
