@@ -57,7 +57,7 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 </td>
 <td>
 
-**Role-Based Access Control** — Four roles: `admin`, `reader`, `pending`, `suspended`. New signups queue for admin approval unless their email matches `ADMIN_EMAIL`.
+**Role-Based Access Control** — Five roles: `admin`, `reader`, `pending`, `suspended`, `rejected`. New signups queue for admin approval unless their email matches `ADMIN_EMAIL`.
 
 **Bring-Your-Own-Key Vault** — Store your own OpenAI, Cohere, or Anthropic API keys, AES-encrypted at rest, used per-request instead of the platform default.
 
@@ -223,7 +223,7 @@ All variables are validated at startup via Zod. Missing required variables throw
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No | — | Bearer token for the metrics sink endpoint. Omit to disable the endpoint. |
+| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No | — | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
 | `INGESTION_BATCH_SIZE` | No | `50` | Chunks processed per ingestion worker batch |
 | `INGESTION_LOCK_TIMEOUT_SECONDS` | No | `900` | Distributed lock timeout for ingestion jobs |
 
@@ -571,7 +571,7 @@ The application uses the double-submit cookie pattern:
 |---|---|---|---|
 | `POST /api/auth/login` | 20 req | 5 min | IP + email |
 | `POST /api/auth/signup` | 3 req | 1 hour | IP + email |
-| `POST /api/query` | 30 req | 1 min | User ID |
+| `POST /api/query` | 30 req | 1 min | User ID + IP |
 | `POST /api/upload` | 20 req | 15 min | User ID |
 | `POST /api/reports` | 10 req | 15 min | User ID |
 
@@ -650,8 +650,8 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 | `POST` | `/api/upload/batch` | Yes | Yes | 10/15 min per user | Batch upload up to 10 PDFs |
 | `POST` | `/api/reports` | Yes | Yes | 10/15 min per user | Generate DOCX or PDF report for a query turn |
 | `GET` | `/api/byok/openai` | Yes | No | — | Check whether an OpenAI BYOK key is stored |
-| `PUT` | `/api/byok/openai` | Yes | Yes | — | Encrypt and store an OpenAI API key |
-| `DELETE` | `/api/byok/openai` | Yes | Yes | — | Remove stored OpenAI API key |
+| `PUT` | `/api/byok/openai` | Yes | Yes | 10/15 min per user | Encrypt and store an OpenAI API key |
+| `DELETE` | `/api/byok/openai` | Yes | Yes | 10/15 min per user | Remove stored OpenAI API key |
 | `GET` | `/api/documents` | Yes | No | — | List all accessible documents |
 | `DELETE` | `/api/documents/:id` | Admin | Yes | — | Delete a document and its chunks |
 | `GET` | `/api/admin/users` | Admin | No | — | List all users with roles |
