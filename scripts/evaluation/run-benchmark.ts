@@ -38,6 +38,12 @@ type RunnerArgs = {
   expansion: boolean;
   /** LLM-judge metrics; defaults on for live mode, always off for dry-run. */
   judge: boolean;
+  /**
+   * Per-run retrieval cache namespace. Without it the "cached" pass measured
+   * whatever a previous run (possibly under a different ranking config) had
+   * left in `retrieval_cache` rather than this run's own cache latency.
+   */
+  cacheNamespace: string;
 };
 
 type RunCapture = {
@@ -72,6 +78,7 @@ type LiveDependencies = {
   retrieveRankedCandidatesWithRouting: typeof import("../../lib/retrieval/router").retrieveRankedCandidatesWithRouting;
   generateGroundedAnswer: typeof import("../../lib/answering/service").generateGroundedAnswer;
   judgeQueryResult: typeof import("../../lib/evaluation/llm-judge").judgeQueryResult;
+  retrievalConfigFingerprint: string;
   env: typeof import("../../lib/config/env").env;
 };
 
@@ -98,6 +105,8 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
           routerModule.retrieveRankedCandidatesWithRouting,
         generateGroundedAnswer: answerModule.generateGroundedAnswer,
         judgeQueryResult: judgeModule.judgeQueryResult,
+        retrievalConfigFingerprint:
+          retrievalModule.RETRIEVAL_CONFIG_FINGERPRINT,
         env: envModule.env,
       }),
     );
@@ -108,7 +117,11 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
 
 function parseArgs(argv: string[]): RunnerArgs {
   const args: RunnerArgs = {
-    datasetPath: "evaluation/evaluation_queries.json",
+    // The corpus-derived golden set. The 200-record synthetic fixture
+    // (evaluation/evaluation_queries.json) names documents such as
+    // `doc_company_profile` that exist nowhere in the corpus, so benchmarking
+    // against it measured nothing.
+    datasetPath: "evaluation/evaluation_queries.generated.json",
     reportsDir: "evaluation/reports",
     runsDir: "evaluation/runs",
     mode: "live",
@@ -118,6 +131,7 @@ function parseArgs(argv: string[]): RunnerArgs {
     failOnGate: true,
     expansion: false,
     judge: true,
+    cacheNamespace: `benchmark:${new Date().toISOString()}`,
   };
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -320,6 +334,7 @@ async function executeLive(
   query: EvaluationQueryRecord,
   topK: number,
   expansion: boolean,
+  cacheNamespace: string,
 ): Promise<QueryExecution> {
   const deps = await loadLiveDependencies();
 
@@ -334,6 +349,7 @@ async function executeLive(
       topK,
       languageHint: query.language,
       enableQueryExpansion: expansion,
+      cacheNamespace,
     },
     {
       retrieveBase: (input) =>
@@ -360,6 +376,7 @@ async function executeLive(
     topK,
     languageHint: query.language,
     enableQueryExpansion: expansion,
+    cacheNamespace,
   });
   const cachedAnswer = await deps.generateGroundedAnswer({
     query: query.question,
@@ -396,6 +413,85 @@ async function executeLive(
   };
 }
 
+type RunConfig = {
+  topK: number;
+  expansion: boolean;
+  judge: boolean;
+  cacheNamespace: string;
+  retrievalConfigFingerprint: string;
+  generatorModel: string;
+  judgeModel: string;
+  citationVerifierModel: string;
+  queryEmbeddingModel: string;
+  queryEmbeddingDimensions: number;
+  retrievalVersion: number;
+  rrfK: number;
+  rerankPoolSize: number;
+  llmMaxOutputTokens: number;
+  minEvidenceChunks: number;
+  minRerankScore: number;
+  minHeuristicRelevance: number;
+  cacheTtlSeconds: number;
+  crossEncoderEnabled: boolean;
+  crossEncoderModel: string;
+  crossEncoderTimeoutMs: number;
+  hydeEnabled: boolean;
+  contextualGroupingEnabled: boolean;
+  multiQueryEnabled: boolean;
+  multiQueryVariations: number;
+  evidencePlacement: string;
+  citationVerificationEnabled: boolean;
+  webSearchEnabled: boolean;
+  webMinSources: number;
+};
+
+/**
+ * Ten stored runs were previously indistinguishable by configuration: nothing
+ * in the artifact recorded which flags, models or pool sizes produced the
+ * numbers, so no two runs could honestly be compared. Null in dry-run mode,
+ * where no live environment is loaded.
+ */
+async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
+  if (args.mode !== "live") {
+    return null;
+  }
+
+  const deps = await loadLiveDependencies();
+  const env = deps.env;
+
+  return {
+    topK: args.topK,
+    expansion: args.expansion,
+    judge: args.judge,
+    cacheNamespace: args.cacheNamespace,
+    retrievalConfigFingerprint: deps.retrievalConfigFingerprint,
+    generatorModel: env.RAG_LLM_MODEL,
+    judgeModel: env.RAG_EVAL_JUDGE_MODEL,
+    citationVerifierModel: env.RAG_CITATION_VERIFIER_MODEL,
+    queryEmbeddingModel: env.RAG_QUERY_EMBEDDING_MODEL,
+    queryEmbeddingDimensions: env.RAG_QUERY_EMBEDDING_DIMENSIONS,
+    retrievalVersion: env.RAG_RETRIEVAL_VERSION,
+    rrfK: env.RAG_RRF_K,
+    rerankPoolSize: env.RAG_RERANK_POOL_SIZE,
+    llmMaxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+    minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+    minRerankScore: env.RAG_MIN_RERANK_SCORE,
+    minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+    cacheTtlSeconds: env.RAG_CACHE_TTL_SECONDS,
+    crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
+    crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
+    crossEncoderTimeoutMs: env.RAG_CROSS_ENCODER_TIMEOUT_MS,
+    hydeEnabled: env.RAG_HYDE_ENABLED,
+    contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
+    multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
+    multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
+    evidencePlacement: env.RAG_EVIDENCE_PLACEMENT,
+    citationVerificationEnabled: env.RAG_CITATION_VERIFICATION_ENABLED,
+    webSearchEnabled: env.RAG_WEB_SEARCH_ENABLED,
+    webMinSources: env.RAG_WEB_MIN_SOURCES,
+  };
+}
+
 function toFailure(
   failureType: QueryFailure["failureType"],
   probableRootCause: string,
@@ -412,6 +508,7 @@ function deriveFailures(
   queryId: string,
   retrievalMetrics: ReturnType<typeof computeRetrievalMetrics>,
   answerMetrics: ReturnType<typeof computeAnswerMetrics>,
+  judge: QueryBenchmarkResult["judge"],
   uncachedLatencyMs: number,
   cachedLatencyMs: number,
   cacheHitOnRepeat: boolean,
@@ -452,14 +549,17 @@ function deriveFailures(
     );
   }
 
+  // Driven by the LLM judge, not the token-overlap metric: the latter is now
+  // report-only because it could not fail.
   if (
-    answerMetrics.hallucinationRate >
-    DEFAULT_BENCHMARK_THRESHOLDS.hallucinationRateMax
+    judge?.judged &&
+    judge.faithfulness !== null &&
+    judge.faithfulness < DEFAULT_BENCHMARK_THRESHOLDS.faithfulnessMin
   ) {
     failures.push(
       toFailure(
         "grounding",
-        "Answer statements were insufficiently supported by retrieved evidence.",
+        `Judge found ${judge.unsupportedStatementCount ?? "one or more"} answer statement(s) unsupported by the retrieved evidence.`,
         queryId,
       ),
     );
@@ -497,6 +597,7 @@ function buildMarkdownReport(input: {
   runPath: string;
   generatedAt: string;
   queryCount: number;
+  config: RunConfig | null;
   summary: ReturnType<typeof summarizeBenchmark>;
   thresholdEvaluation: ReturnType<typeof evaluateThresholds>;
   results: QueryBenchmarkResult[];
@@ -505,7 +606,7 @@ function buildMarkdownReport(input: {
   const languageRows = languageOrder()
     .map((language) => {
       const metrics = input.summary.byLanguage[language];
-      return `| ${language} | ${metrics.queryCount} | ${formatMetric(metrics.recallAt5)} | ${formatMetric(metrics.ndcgAt10)} | ${formatMetric(metrics.citationAccuracy)} | ${formatMetric(metrics.hallucinationRate)} | ${formatMetric(metrics.cacheHitRate)} | ${formatMetric(metrics.uncachedP95LatencyMs)} | ${formatMetric(metrics.cachedP95LatencyMs)} |`;
+      return `| ${language} | ${metrics.queryCount} | ${formatMetric(metrics.recallAt5)} | ${formatMetric(metrics.ndcgAt10)} | ${formatMetric(metrics.citationAccuracy)} | ${metrics.judgedCount > 0 ? formatMetric(metrics.faithfulness) : "n/a"} | ${formatMetric(metrics.cacheHitRate)} | ${formatMetric(metrics.uncachedP95LatencyMs)} | ${formatMetric(metrics.cachedP95LatencyMs)} |`;
     })
     .join("\n");
 
@@ -552,6 +653,12 @@ function buildMarkdownReport(input: {
     ? "Proceed to release candidate review."
     : "Release blocked until failed gates are remediated and benchmark is re-run.";
 
+  const configRows = input.config
+    ? Object.entries(input.config)
+        .map(([key, value]) => `| ${key} | \`${String(value)}\` |`)
+        .join("\n")
+    : "| n/a | dry-run: no live configuration loaded |";
+
   return `# Phase 11 Benchmark Report
 
 Generated: ${input.generatedAt}
@@ -559,6 +666,14 @@ Mode: ${input.mode}
 Dataset: ${path.resolve(input.datasetPath)}
 Run artifact: ${path.resolve(input.runPath)}
 Evaluated queries: ${input.queryCount}
+Generator model: ${input.config?.generatorModel ?? "n/a"}
+Judge model: ${input.config?.judgeModel ?? "n/a"}
+
+## Run Configuration
+
+| Setting | Value |
+| --- | --- |
+${configRows}
 
 ## Summary
 
@@ -573,20 +688,31 @@ Evaluated queries: ${input.queryCount}
 | Citation evidence hit rate | ${formatMetric(overall.citationEvidenceHitRate)} |
 | Verified citation rate | ${overall.verifiedQueryCount > 0 ? formatMetric(overall.verifiedCitationRate) : "n/a"} (${overall.verifiedQueryCount} verified) |
 | Citation accuracy (strict, report-only) | ${formatMetric(overall.citationAccuracy)} |
-| Grounding score | ${formatMetric(overall.groundingScore)} |
-| Hallucination rate | ${formatMetric(overall.hallucinationRate)} |
 | Cache hit rate | ${formatMetric(overall.cacheHitRate)} |
 | Uncached p50 latency (ms) | ${formatMetric(overall.uncachedP50LatencyMs)} |
 | Uncached p95 latency (ms) | ${formatMetric(overall.uncachedP95LatencyMs)} |
 | Cached p50 latency (ms) | ${formatMetric(overall.cachedP50LatencyMs)} |
 | Cached p95 latency (ms) | ${formatMetric(overall.cachedP95LatencyMs)} |
 
-## LLM-Judge Metrics (report-only, not gated)
+## Token-Overlap Grounding (report-only, NOT gated)
+
+Bag-of-words overlap against the chunks that produced the answer. Kept for
+continuity only: it measures whether the model quoted its own evidence, which
+the system prompt instructs it to do, so it cannot detect an unsupported claim.
+Abstentions are excluded rather than scored as perfectly grounded.
+
+| Metric | Value |
+| --- | ---: |
+| Scored queries (abstentions excluded) | ${overall.groundedQueryCount} |
+| Grounding score | ${overall.groundedQueryCount > 0 ? formatMetric(overall.groundingScore) : "n/a"} |
+| Hallucination rate | ${overall.groundedQueryCount > 0 ? formatMetric(overall.hallucinationRate) : "n/a"} |
+
+## LLM-Judge Metrics (faithfulness is gated; the rest are report-only)
 
 | Metric | Value |
 | --- | ---: |
 | Judged queries | ${overall.judgedCount} |
-| Faithfulness | ${overall.judgedCount > 0 ? formatMetric(overall.faithfulness) : "n/a"} |
+| Faithfulness (GATED) | ${overall.judgedCount > 0 ? formatMetric(overall.faithfulness) : "n/a"} |
 | Answer relevance | ${overall.judgedCount > 0 ? formatMetric(overall.answerRelevance) : "n/a"} |
 | Context precision | ${overall.judgedCount > 0 ? formatMetric(overall.contextPrecision) : "n/a"} |
 | Context recall | ${overall.judgedCount > 0 ? formatMetric(overall.contextRecall) : "n/a"} |
@@ -600,7 +726,7 @@ ${thresholdRows}
 
 ## Per-Language Breakdown
 
-| Language | Queries | Recall@5 | nDCG@10 | Citation acc. | Hallucination | Cache hit | Uncached p95 (ms) | Cached p95 (ms) |
+| Language | Queries | Recall@5 | nDCG@10 | Citation acc. | Faithfulness | Cache hit | Uncached p95 (ms) | Cached p95 (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${languageRows}
 
@@ -628,7 +754,12 @@ async function evaluateQuery(
     const execution =
       args.mode === "dry-run"
         ? executeDryRun(query, args.topK)
-        : await executeLive(query, args.topK, args.expansion);
+        : await executeLive(
+            query,
+            args.topK,
+            args.expansion,
+            args.cacheNamespace,
+          );
 
     const retrievalMetrics = computeRetrievalMetrics(
       query,
@@ -690,6 +821,7 @@ async function evaluateQuery(
         query.id,
         retrievalMetrics,
         answerMetrics,
+        judgeMetrics,
         execution.uncached.latencyMs,
         execution.cached.latencyMs,
         cacheHitOnRepeat,
@@ -745,6 +877,33 @@ async function evaluateQuery(
   }
 }
 
+/**
+ * `faithfulness` is a release gate, so the judge must not be the generator.
+ * A judge sharing the generator's weights grades its own phrasing habits as
+ * correct, and the gate then certifies self-consistency rather than grounding.
+ */
+async function assertJudgePreflight(): Promise<void> {
+  const { env } = await loadLiveDependencies();
+  const generator = env.RAG_LLM_MODEL;
+  const judge = env.RAG_EVAL_JUDGE_MODEL;
+
+  console.log(`Generator model: ${generator}`);
+  console.log(`Judge model:     ${judge}`);
+
+  if (generator === judge) {
+    throw new Error(
+      `RAG_EVAL_JUDGE_MODEL must differ from RAG_LLM_MODEL (both are "${judge}"). ` +
+        "Set a judge from a different model family, or pass --no-judge to run without gated faithfulness.",
+    );
+  }
+
+  if (judge.startsWith("claude") && !env.ANTHROPIC_API_KEY) {
+    throw new Error(
+      `RAG_EVAL_JUDGE_MODEL is "${judge}" but ANTHROPIC_API_KEY is not configured.`,
+    );
+  }
+}
+
 async function run(): Promise<void> {
   const args = parseArgs(process.argv);
   const resolvedDatasetPath = path.resolve(args.datasetPath);
@@ -777,6 +936,10 @@ async function run(): Promise<void> {
       throw new Error(
         `Live benchmark preflight failed. Ensure staging env vars are configured (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY). ${message}`,
       );
+    }
+
+    if (args.judge) {
+      await assertJudgePreflight();
     }
   }
 
@@ -817,6 +980,7 @@ async function run(): Promise<void> {
     mode: args.mode,
     datasetPath: resolvedDatasetPath,
     queryCount: selectedRecords.length,
+    config: await buildRunConfig(args),
     thresholds: DEFAULT_BENCHMARK_THRESHOLDS,
     summary,
     thresholdEvaluation,
@@ -824,7 +988,14 @@ async function run(): Promise<void> {
   };
 
   const runPath = path.join(runsDir, `benchmark-${timestamp}.json`);
-  const latestRunPath = path.join(runsDir, "latest.json");
+  // A dry run fabricates chunks that always contain the expected page (recall
+  // 1.000, grounding 1.000). Writing that to latest.json made it eligible as
+  // release-gate input, so dry runs get their own filename and the release
+  // readiness gate only ever reads a live artifact.
+  const latestRunPath = path.join(
+    runsDir,
+    args.mode === "dry-run" ? "latest-dry-run.json" : "latest.json",
+  );
   fs.writeFileSync(
     runPath,
     `${JSON.stringify(runArtifact, null, 2)}\n`,
@@ -842,13 +1013,17 @@ async function run(): Promise<void> {
     runPath,
     generatedAt,
     queryCount: selectedRecords.length,
+    config: runArtifact.config,
     summary,
     thresholdEvaluation,
     results,
   });
 
   const reportPath = path.join(reportsDir, `benchmark-${timestamp}.md`);
-  const latestReportPath = path.join(reportsDir, "latest.md");
+  const latestReportPath = path.join(
+    reportsDir,
+    args.mode === "dry-run" ? "latest-dry-run.md" : "latest.md",
+  );
   fs.writeFileSync(reportPath, reportMarkdown, "utf8");
   fs.writeFileSync(latestReportPath, reportMarkdown, "utf8");
 

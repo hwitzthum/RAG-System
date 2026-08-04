@@ -5,7 +5,10 @@ import { detectQueryLanguage } from "../lib/retrieval/language";
 import { extractQueryTokens, normalizeQuery } from "../lib/retrieval/query";
 import { rerankCandidates } from "../lib/retrieval/reranker";
 import { reciprocalRankFusion } from "../lib/retrieval/rrf";
-import { buildRetrievalCacheKey } from "../lib/retrieval/trace";
+import {
+  buildRetrievalCacheKey,
+  computeRetrievalConfigFingerprint,
+} from "../lib/retrieval/trace";
 
 function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
   return {
@@ -43,6 +46,7 @@ test("buildRetrievalCacheKey varies by retrieval inputs", () => {
     retrievalVersion: 1,
     topK: 8,
     scopeKey: "scope:all",
+    configFingerprint: "cfg000000000",
   });
   const changed = buildRetrievalCacheKey({
     normalizedQuery: "solar financing",
@@ -50,6 +54,7 @@ test("buildRetrievalCacheKey varies by retrieval inputs", () => {
     retrievalVersion: 2,
     topK: 8,
     scopeKey: "scope:all",
+    configFingerprint: "cfg000000000",
   });
 
   assert.notEqual(base, changed);
@@ -62,6 +67,7 @@ test("buildRetrievalCacheKey varies by scope", () => {
     retrievalVersion: 1,
     topK: 8,
     scopeKey: "scope:all",
+    configFingerprint: "cfg000000000",
   });
   const scopedDocs = buildRetrievalCacheKey({
     normalizedQuery: "solar financing",
@@ -69,6 +75,7 @@ test("buildRetrievalCacheKey varies by scope", () => {
     retrievalVersion: 1,
     topK: 8,
     scopeKey: "docs:abc,def",
+    configFingerprint: "cfg000000000",
   });
 
   assert.notEqual(allDocs, scopedDocs);
@@ -243,4 +250,71 @@ test("detectQueryLanguage still detects a language from its keywords", () => {
     detectQueryLanguage("what is the content and the structure"),
     "EN",
   );
+});
+
+const BASE_RETRIEVAL_CONFIG = {
+  crossEncoderEnabled: true,
+  crossEncoderModel: "rerank-v3.5",
+  rerankPoolSize: 60,
+  rrfK: 60,
+  contextualGroupingEnabled: true,
+  multiQueryEnabled: false,
+  multiQueryVariations: 3,
+  queryEmbeddingModel: "text-embedding-3-large",
+  queryEmbeddingDimensions: 1024,
+};
+
+test("buildRetrievalCacheKey varies by ranking configuration", () => {
+  const shared = {
+    normalizedQuery: "solar financing",
+    language: "EN" as const,
+    retrievalVersion: 1,
+    topK: 8,
+    scopeKey: "scope:all",
+  };
+
+  const withCrossEncoder = buildRetrievalCacheKey({
+    ...shared,
+    configFingerprint: computeRetrievalConfigFingerprint(BASE_RETRIEVAL_CONFIG),
+  });
+  const withoutCrossEncoder = buildRetrievalCacheKey({
+    ...shared,
+    configFingerprint: computeRetrievalConfigFingerprint({
+      ...BASE_RETRIEVAL_CONFIG,
+      crossEncoderEnabled: false,
+    }),
+  });
+
+  assert.notEqual(withCrossEncoder, withoutCrossEncoder);
+});
+
+test("computeRetrievalConfigFingerprint is stable and covers every ranking knob", () => {
+  assert.equal(
+    computeRetrievalConfigFingerprint(BASE_RETRIEVAL_CONFIG),
+    computeRetrievalConfigFingerprint({ ...BASE_RETRIEVAL_CONFIG }),
+  );
+
+  const baseline = computeRetrievalConfigFingerprint(BASE_RETRIEVAL_CONFIG);
+  const mutations: Array<Partial<typeof BASE_RETRIEVAL_CONFIG>> = [
+    { crossEncoderEnabled: false },
+    { crossEncoderModel: "rerank-v3.0" },
+    { rerankPoolSize: 20 },
+    { rrfK: 40 },
+    { contextualGroupingEnabled: false },
+    { multiQueryEnabled: true },
+    { multiQueryVariations: 5 },
+    { queryEmbeddingModel: "text-embedding-3-small" },
+    { queryEmbeddingDimensions: 3072 },
+  ];
+
+  for (const mutation of mutations) {
+    assert.notEqual(
+      computeRetrievalConfigFingerprint({
+        ...BASE_RETRIEVAL_CONFIG,
+        ...mutation,
+      }),
+      baseline,
+      `fingerprint ignored ${Object.keys(mutation)[0]}`,
+    );
+  }
 });

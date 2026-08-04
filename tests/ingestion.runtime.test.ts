@@ -62,6 +62,20 @@ test("splitIntoSections detects uppercase headings and preserves page metadata",
   assert.equal(sections[0]?.pageNumber, 1);
 });
 
+test("splitIntoSections keeps a numeric table header row in the chunk body", () => {
+  // "2024 2025 2026" matched the all-caps heading pattern, so the row was
+  // consumed as a section title and deleted from the text entirely — taking
+  // the column labels for every figure below it with it.
+  const sections = splitIntoSections({
+    pageNumber: 1,
+    text: "REVENUE\n2024 2025 2026\nEurope 100 120 140",
+  });
+
+  assert.equal(sections.length, 1);
+  assert.equal(sections[0]?.sectionTitle, "Revenue");
+  assert.equal(sections[0]?.text.includes("2024 2025 2026"), true);
+});
+
 test("splitIntoSections preserves paragraph breaks within a section", () => {
   const sections = splitIntoSections({
     pageNumber: 2,

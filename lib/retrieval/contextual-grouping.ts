@@ -1,5 +1,19 @@
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 
+// Additive, per adjacent neighbour. A multiplicative variant
+// (`base * (1 + 0.08 * neighbours)`) was tried and reverted after measurement:
+// nDCG@10 fell 0.8168 -> 0.7989 overall and 0.6195 -> 0.5757 on EN
+// (benchmark-2026-08-04T20-47-41-690Z vs -T12-35-17-329Z; recall@5 and DE were
+// unchanged). `rerankScore` is pool-normalised, so top-of-pool candidates sit
+// near 0.95 and an 8% boost is worth ~0.076 there -- LARGER than the flat 0.05
+// it replaced, and applied exactly where nDCG@10 is measured.
+//
+// The genuine defect this exposed is the adjacency key, not the arithmetic:
+// pages are compared with a <= 1 gap, so several chunks retrieved from the SAME
+// page all boost each other and interior ones in the sort order boost twice.
+// Fixing that means keying on chunk_index, which needs a column on two SQL
+// RETURNS TABLE signatures and the RetrievedChunk contract. Do not re-tune this
+// constant without an nDCG@10 sweep.
 const ADJACENCY_BOOST = 0.05;
 
 export function applyContextualGrouping(

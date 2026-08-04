@@ -275,10 +275,12 @@ export async function generateGroundedAnswer(
 
   // Attribute before filtering: the marker indices refer to the model's own
   // output, and filterAnswerOutput may redact spans but never renumbers them.
+  // Attribution also returns the answer with dangling markers removed, so the
+  // filter (and everything downstream) works on the text the user will read.
   const attribution = resolveCitedChunks({ answer, chunks: attributionChunks });
 
   const filteredOutput = filterAnswerOutput({
-    answer,
+    answer: attribution.answer,
     citations: attribution.citations,
     language: input.language,
   });
@@ -437,7 +439,7 @@ export async function generateWebAugmentedAnswer(
   const attribution = resolveCitedChunks({ answer, chunks: attributionChunks });
 
   const filteredOutput = filterAnswerOutput({
-    answer,
+    answer: attribution.answer,
     citations: attribution.citations,
     language: input.language,
   });

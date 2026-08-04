@@ -285,6 +285,7 @@ export async function retrieveRankedCandidatesWithRouting(
       cacheKey: `${baseTrace.cacheKey}::expanded`,
       cacheHit: branchResults.every((item) => item.result.trace.cacheHit),
       retrievalVersion: baseTrace.retrievalVersion,
+      configFingerprint: baseTrace.configFingerprint,
       topK: input.topK,
       candidateCounts,
     },

@@ -260,13 +260,16 @@ export function computeAnswerMetrics(
       ? verification.supportedCount / verification.checkedCount
       : null;
 
+  // An abstention makes no claims, so it has no grounding score to give.
+  // Returning 1/0 here was the single largest contributor to a hallucination
+  // rate that could not fail: every refusal scored as perfectly grounded.
   if (insufficientEvidence || hasInsufficientEvidenceSignal(answer)) {
     return {
       citationAccuracy,
       citationEvidenceHit,
       verifiedCitationRate,
-      groundingScore: 1,
-      hallucinationRate: 0,
+      groundingScore: null,
+      hallucinationRate: null,
     };
   }
 
@@ -350,12 +353,13 @@ function summarizeBucket(
   const citationValues = evaluated.map(
     (result) => result.metrics.citationAccuracy,
   );
-  const groundingValues = evaluated.map(
-    (result) => result.metrics.groundingScore,
-  );
-  const hallucinationValues = evaluated.map(
-    (result) => result.metrics.hallucinationRate,
-  );
+  // Abstentions carry null and are excluded rather than averaged as perfect.
+  const groundingValues = evaluated
+    .map((result) => result.metrics.groundingScore)
+    .filter((value): value is number => value !== null);
+  const hallucinationValues = evaluated
+    .map((result) => result.metrics.hallucinationRate)
+    .filter((value): value is number => value !== null);
   const cacheHitValues = evaluated.map((result) =>
     result.metrics.cacheHitOnRepeat ? 1 : 0,
   );
@@ -397,6 +401,7 @@ function summarizeBucket(
     citationAccuracy: average(citationValues),
     groundingScore: average(groundingValues),
     hallucinationRate: average(hallucinationValues),
+    groundedQueryCount: groundingValues.length,
     cacheHitRate: average(cacheHitValues),
     uncachedP50LatencyMs: computePercentile(uncachedLatencies, 50),
     uncachedP95LatencyMs: computePercentile(uncachedLatencies, 95),
@@ -454,10 +459,18 @@ function thresholdChecks(
         summary.verifiedCitationRate >= thresholds.verifiedCitationRate,
     },
     {
-      metric: "Hallucination rate",
-      actual: summary.hallucinationRate,
-      target: `< ${thresholds.hallucinationRateMax}`,
-      passed: summary.hallucinationRate < thresholds.hallucinationRateMax,
+      // Replaces the bag-of-words "Hallucination rate" gate, which measured
+      // 35% token overlap between the answer and the very chunks that produced
+      // it, against a prompt instructing the model to quote those chunks. It
+      // was structurally incapable of failing; it is now report-only.
+      metric: "Faithfulness (LLM judge)",
+      actual: summary.faithfulness,
+      target: `>= ${thresholds.faithfulnessMin}`,
+      // A run with zero judged queries fails loudly rather than passing on an
+      // empty average -- same fail-closed pattern as verifiedCitationRate.
+      passed:
+        summary.judgedCount > 0 &&
+        summary.faithfulness >= thresholds.faithfulnessMin,
     },
     {
       metric: "Cache hit rate",

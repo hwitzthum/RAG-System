@@ -45,8 +45,7 @@
     "perf:resilience:dry": "tsx scripts/production/run-resilience-checks.ts --mode dry-run",
     "perf:soak:verify": "tsx scripts/production/verify-staging-soak.ts --mode live",
     "perf:soak:verify:dry": "tsx scripts/production/verify-staging-soak.ts --mode dry-run --no-fail-on-gate --no-write-latest",
-    "release:readiness": "tsx scripts/production/generate-release-readiness.ts --benchmark-gate-mode live",
-    "release:readiness:precutover": "tsx scripts/production/generate-release-readiness.ts --benchmark-gate-mode allow-dry",
+    "release:readiness": "tsx scripts/production/generate-release-readiness.ts",
     "release:matrix:precutover": "tsx scripts/production/run-validation-matrix.ts --mode precutover",
     "release:matrix:strict": "tsx scripts/production/run-validation-matrix.ts --mode strict"
   },

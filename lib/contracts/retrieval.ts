@@ -59,6 +59,12 @@ export type RetrievalTrace = {
   cacheKey: string;
   cacheHit: boolean;
   retrievalVersion: number;
+  /**
+   * Hash of the ranking configuration that produced this result. Folded into
+   * `cacheKey` and recorded on the audit event, so an answer can be traced
+   * back to the exact retrieval settings that generated it.
+   */
+  configFingerprint: string;
   topK: number;
   candidateCounts: {
     vector: number;

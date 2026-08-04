@@ -140,7 +140,7 @@ function buildSteps(args: ScriptArgs): MatrixStep[] {
       ...common,
       { name: "benchmark_dry", command: ["npm", "run", "eval:benchmark:dry"], required: true },
       { name: "soak_verify_live", command: ["npm", "run", "perf:soak:verify", "--", ...soakArgs], required: true },
-      { name: "release_readiness_precutover", command: ["npm", "run", "release:readiness:precutover"], required: true },
+      { name: "release_readiness", command: ["npm", "run", "release:readiness"], required: true },
     ];
   }
 
