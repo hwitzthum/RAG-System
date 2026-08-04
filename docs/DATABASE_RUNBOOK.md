@@ -78,9 +78,25 @@ overwrite the other's object.
 | Schema   | Contents                                                                                                                                                     | Exposed to PostgREST                             |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | `public` | Tables, RLS policies, and every RPC the app calls via `supabase.rpc()` (`match_document_chunks`, `search_document_chunks_keyword`, ingestion and cache RPCs) | Yes — moving anything here breaks its call sites |
-| `rag`    | Internal SQL helpers with generic names, called only from other database objects (`language_text_search_config`, `build_keyword_tsquery`)                    | No, deliberately                                 |
+| `rag`    | Internal SQL helpers with generic names, called only from other database objects : `language_text_search_config`, `build_keyword_tsquery`, and the RLS/trigger helpers `app_role`, `is_admin`, `is_reader_or_admin`, `set_updated_at`                    | No, deliberately                                 |
 
 Put new helpers in `rag` unless the application needs to call them over REST.
+
+The RLS helpers matter most: 11 policies (including one on `storage.objects`)
+evaluate `is_admin()` / `is_reader_or_admin()`. Had those names stayed in
+`public`, a `create or replace function public.is_admin()` from the other
+application's migrations would have replaced the body in place — same OID, same
+policies, a different definition of "admin".
+
+Policies and triggers bind to functions by OID, so relocating one with
+`ALTER ... SET SCHEMA` or redefining it with `CREATE OR REPLACE` does not
+require touching the policies. Verify with:
+
+```sql
+select tablename, policyname, qual
+from pg_policies
+where qual ~ 'is_admin|is_reader_or_admin';   -- should render as rag.is_admin()
+```
 
 ## 4. Post-Apply Verification Queries
 
