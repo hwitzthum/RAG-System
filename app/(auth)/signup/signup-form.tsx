@@ -40,11 +40,14 @@ export default function SignUpForm() {
     return (
       <>
         <h1 className="fg-primary text-3xl font-bold">Account Created</h1>
+        <p className="badge badge-accent mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
+          Check your inbox and click the confirmation link to verify your email — remember to look in your spam folder. You cannot sign in until your email is confirmed.
+        </p>
         <p className="fg-secondary mt-4 text-sm leading-relaxed">
-          Your account has been created. An administrator will review your request and approve your access.
+          Once your email is confirmed, an administrator will review your request and approve your access.
         </p>
         <p className="fg-secondary mt-2 text-sm leading-relaxed">
-          You&apos;ll be able to sign in once your account is approved.
+          You&apos;ll be able to sign in once both steps are complete.
         </p>
         <Link
           href="/login"

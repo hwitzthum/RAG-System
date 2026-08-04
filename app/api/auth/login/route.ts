@@ -53,6 +53,35 @@ export async function POST(request: NextRequest) {
   });
 
   if (!tokenResponse.ok) {
+    const errorBody = (await tokenResponse.json().catch(() => null)) as { error_code?: string } | null;
+
+    // Supabase validates the password BEFORE the confirmation flag, so
+    // `email_not_confirmed` is only returned when the password was correct (a
+    // wrong password on an unconfirmed account still yields
+    // `invalid_credentials`).  Surfacing it therefore tells an attacker
+    // nothing they could not already learn, and it is the only way the account
+    // owner discovers that an unclicked confirmation link — not a bad
+    // password — is what is blocking them.
+    if (errorBody?.error_code === "email_not_confirmed") {
+      logAuditEvent({
+        action: "auth.login",
+        actorId: null,
+        actorRole: "anonymous",
+        outcome: "failure",
+        resource: "auth",
+        ipAddress,
+        metadata: { reason: "email_not_confirmed", email },
+      });
+      return NextResponse.json(
+        {
+          code: "email_not_confirmed",
+          error:
+            "Please confirm your email address before signing in. Check your inbox for the confirmation link we sent when you signed up — remember to look in your spam folder — then sign in again.",
+        },
+        { status: 403 },
+      );
+    }
+
     logAuditEvent({
       action: "auth.login",
       actorId: null,

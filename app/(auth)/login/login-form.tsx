@@ -11,11 +11,13 @@ function LoginFormInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
 
     try {
@@ -28,11 +30,19 @@ function LoginFormInner() {
 
       const serverData = (await serverResponse.json()) as {
         status?: string;
+        code?: string;
         error?: string;
         redirect?: string;
       };
 
       if (!serverResponse.ok) {
+        // An unconfirmed email is actionable guidance, not a credential
+        // failure — surface it as a notice so the user knows to check their
+        // inbox instead of retrying a password that was never the problem.
+        if (serverData.code === "email_not_confirmed") {
+          setNotice(serverData.error ?? "Please confirm your email address before signing in.");
+          return;
+        }
         setError(serverData.error ?? "Login failed");
         return;
       }
@@ -123,6 +133,12 @@ function LoginFormInner() {
             placeholder="Enter your password"
           />
         </div>
+
+        {notice && (
+          <p className="badge badge-accent flex rounded-2xl px-4 py-2.5 text-sm font-medium" role="status" aria-live="polite">
+            {notice}
+          </p>
+        )}
 
         {error && <p className="tone-danger text-sm" role="alert" aria-live="assertive">{error}</p>}
 
