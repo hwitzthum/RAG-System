@@ -6,6 +6,13 @@ Thumbs.db
 
 # Playwright auth state
 tests/e2e/.auth/
+
+# Playwright run artifacts (regenerated on every run)
+test-results/
+playwright-report/
+blob-report/
+.playwright-mcp/
+
 .idea/
 .vscode/
 *.swp
