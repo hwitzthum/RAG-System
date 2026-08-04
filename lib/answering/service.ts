@@ -3,11 +3,18 @@ import type {
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
+import { env } from "@/lib/config/env";
 import {
   hasSufficientEvidence,
   selectChunkIndexesMeetingThreshold,
 } from "@/lib/answering/policy";
 import { resolveCitedChunks } from "@/lib/answering/citations";
+import { orderEvidenceIndexes } from "@/lib/answering/evidence-order";
+import {
+  verifyCitedStatements,
+  type CitationVerification,
+} from "@/lib/answering/verification";
+import { redactStreamedSentence } from "@/lib/security/output-filter";
 import {
   buildGroundedAnswerUserPrompt,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
@@ -36,6 +43,13 @@ export type GenerateGroundedAnswerInput = {
   minHeuristicRelevance: number;
   maxOutputTokens: number;
   documentScopeId?: string | null;
+  /**
+   * When provided (and the LLM provider supports streaming), completed,
+   * per-sentence-redacted sentences are emitted as they are generated. The
+   * returned result remains authoritative: its answer has passed the full
+   * output filter and may differ from (or retract) the streamed text.
+   */
+  onSentence?: (sentence: string) => void;
 };
 
 export type GenerateGroundedAnswerResult = {
@@ -63,6 +77,8 @@ export type GenerateGroundedAnswerResult = {
     /** True when the model wrote no usable marker and all chunks were returned. */
     fellBack: boolean;
   };
+  /** Annotate-only citation check; null when disabled or not applicable. */
+  citationVerification: CitationVerification | null;
 };
 
 export type AnswerServiceDependencies = {
@@ -101,6 +117,77 @@ function uniqueCitations(citations: Citation[]): Citation[] {
   return output;
 }
 
+const SENTENCE_BOUNDARY_PATTERN = /^[\s\S]*?[.!?][)"'»\]]*\s+/;
+
+/**
+ * Generates the answer, streaming per-sentence when both a callback and a
+ * streaming-capable provider are available. Each completed sentence passes
+ * per-sentence redaction before emission; a prompt-leak signature halts
+ * further emission (the caller's final, fully-filtered result retracts).
+ * Always resolves with the complete raw answer text.
+ */
+async function generateAnswerText(
+  llmProvider: AnswerServiceDependencies["llmProvider"],
+  input: {
+    systemPrompt: string;
+    userPrompt: string;
+    language: SupportedLanguage;
+    maxOutputTokens: number;
+    onSentence?: (sentence: string) => void;
+  },
+): Promise<string> {
+  const { onSentence } = input;
+  if (!onSentence || !llmProvider.generateAnswerStream) {
+    return llmProvider.generateAnswer({
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+      language: input.language,
+      maxOutputTokens: input.maxOutputTokens,
+    });
+  }
+
+  let pending = "";
+  let halted = false;
+
+  const emitSentence = (sentence: string) => {
+    if (halted) {
+      return;
+    }
+    const redacted = redactStreamedSentence(sentence);
+    if (redacted.halted) {
+      halted = true;
+      return;
+    }
+    if (redacted.text.trim()) {
+      onSentence(redacted.text);
+    }
+  };
+
+  const fullText = await llmProvider.generateAnswerStream(
+    {
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+      language: input.language,
+      maxOutputTokens: input.maxOutputTokens,
+    },
+    (delta) => {
+      pending += delta;
+      let match: RegExpMatchArray | null;
+      while ((match = pending.match(SENTENCE_BOUNDARY_PATTERN))) {
+        const sentence = match[0];
+        pending = pending.slice(sentence.length);
+        emitSentence(sentence);
+      }
+    },
+  );
+
+  if (pending.trim()) {
+    emitSentence(pending);
+  }
+
+  return fullText;
+}
+
 export async function generateGroundedAnswer(
   input: GenerateGroundedAnswerInput,
   overrides: Partial<AnswerServiceDependencies> = {},
@@ -136,20 +223,31 @@ export async function generateGroundedAnswer(
         redactionCount: 0,
       },
       citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
     };
   }
+
+  // Evidence placement happens AFTER the gate (which reads score order) and
+  // applies the same permutation to the sanitized prompt chunks and the raw
+  // attribution chunks, so [n] markers keep resolving to the right chunk.
+  const evidenceOrder = orderEvidenceIndexes(protectedChunks.chunks);
+  const promptChunks = evidenceOrder.map(
+    (index) => protectedChunks.chunks[index]!,
+  );
+  const attributionChunks = evidenceOrder.map((index) => input.chunks[index]!);
 
   const prompt = buildGroundedAnswerUserPrompt({
     query: input.query,
     language: input.language,
-    chunks: protectedChunks.chunks,
+    chunks: promptChunks,
   });
 
-  const answer = await llmProvider.generateAnswer({
+  const answer = await generateAnswerText(llmProvider, {
     systemPrompt: GROUNDED_ANSWER_SYSTEM_PROMPT,
     userPrompt: prompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
+    onSentence: input.onSentence,
   });
 
   if (containsSensitiveLeakage(answer)) {
@@ -171,18 +269,27 @@ export async function generateGroundedAnswer(
         redactionCount: 0,
       },
       citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
     };
   }
 
   // Attribute before filtering: the marker indices refer to the model's own
   // output, and filterAnswerOutput may redact spans but never renumbers them.
-  const attribution = resolveCitedChunks({ answer, chunks: input.chunks });
+  const attribution = resolveCitedChunks({ answer, chunks: attributionChunks });
 
   const filteredOutput = filterAnswerOutput({
     answer,
     citations: attribution.citations,
     language: input.language,
   });
+
+  const citationVerification =
+    env.RAG_CITATION_VERIFICATION_ENABLED && !filteredOutput.blocked
+      ? await verifyCitedStatements({
+          answer: filteredOutput.answer,
+          chunks: attributionChunks,
+        })
+      : null;
 
   return {
     answer: filteredOutput.answer,
@@ -206,6 +313,7 @@ export async function generateGroundedAnswer(
       invalidMarkerCount: attribution.invalidMarkerCount,
       fellBack: attribution.fellBack,
     },
+    citationVerification,
   };
 }
 
@@ -259,6 +367,7 @@ export async function generateWebAugmentedAnswer(
         redactionCount: 0,
       },
       citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
     };
   }
 
@@ -279,6 +388,11 @@ export async function generateWebAugmentedAnswer(
     attributionChunks = keptIndexes.map((index) => input.chunks[index]!);
   }
 
+  // Ends-first evidence placement, applied to both parallel arrays.
+  const evidenceOrder = orderEvidenceIndexes(promptChunks);
+  promptChunks = evidenceOrder.map((index) => promptChunks[index]!);
+  attributionChunks = evidenceOrder.map((index) => attributionChunks[index]!);
+
   const prompt = buildWebAugmentedUserPrompt({
     query: input.query,
     language: input.language,
@@ -286,11 +400,12 @@ export async function generateWebAugmentedAnswer(
     webSources: protectedWebSources.webSources,
   });
 
-  const answer = await llmProvider.generateAnswer({
+  const answer = await generateAnswerText(llmProvider, {
     systemPrompt: WEB_AUGMENTED_SYSTEM_PROMPT,
     userPrompt: prompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
+    onSentence: input.onSentence,
   });
 
   if (containsSensitiveLeakage(answer)) {
@@ -312,6 +427,7 @@ export async function generateWebAugmentedAnswer(
         redactionCount: 0,
       },
       citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
     };
   }
 
@@ -325,6 +441,14 @@ export async function generateWebAugmentedAnswer(
     citations: attribution.citations,
     language: input.language,
   });
+
+  const citationVerification =
+    env.RAG_CITATION_VERIFICATION_ENABLED && !filteredOutput.blocked
+      ? await verifyCitedStatements({
+          answer: filteredOutput.answer,
+          chunks: attributionChunks,
+        })
+      : null;
 
   return {
     answer: filteredOutput.answer,
@@ -348,5 +472,6 @@ export async function generateWebAugmentedAnswer(
       invalidMarkerCount: attribution.invalidMarkerCount,
       fellBack: attribution.fellBack,
     },
+    citationVerification,
   };
 }

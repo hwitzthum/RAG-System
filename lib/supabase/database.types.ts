@@ -13,6 +13,7 @@ export type Database = {
           sha256: string;
           user_id: string | null;
           title: string | null;
+          summary: string | null;
           language: SupportedLanguage | null;
           status: DocumentStatus;
           ingestion_version: number;
@@ -25,6 +26,7 @@ export type Database = {
           sha256: string;
           user_id?: string | null;
           title?: string | null;
+          summary?: string | null;
           language?: SupportedLanguage | null;
           status?: DocumentStatus;
           ingestion_version?: number;
@@ -37,6 +39,7 @@ export type Database = {
           sha256?: string;
           user_id?: string | null;
           title?: string | null;
+          summary?: string | null;
           language?: SupportedLanguage | null;
           status?: DocumentStatus;
           ingestion_version?: number;

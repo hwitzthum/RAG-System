@@ -32,6 +32,7 @@ export type ClaimIngestionJobsInput = {
 export interface IngestionRuntimeRepository {
   claimIngestionJobs(input: ClaimIngestionJobsInput): Promise<IngestionJob[]>;
   getDocument(documentId: string): Promise<DocumentRecord>;
+  setDocumentSummary(documentId: string, summary: string): Promise<void>;
   downloadDocument(storagePath: string): Promise<Uint8Array>;
   replaceDocumentChunks(
     documentId: string,
@@ -86,6 +87,7 @@ function toDocumentRecord(row: DocumentRow): DocumentRecord {
     storagePath: row.storage_path,
     sha256: row.sha256,
     title: row.title,
+    summary: row.summary,
     language: row.language,
     status: row.status,
     ingestionVersion: row.ingestion_version,
@@ -183,7 +185,7 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     const { data, error } = await this.supabase
       .from("documents")
       .select(
-        "id,user_id,storage_path,sha256,title,language,status,ingestion_version",
+        "id,user_id,storage_path,sha256,title,summary,language,status,ingestion_version",
       )
       .eq("id", documentId)
       .single<DocumentRow>();
@@ -193,6 +195,17 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     }
 
     return toDocumentRecord(data);
+  }
+
+  async setDocumentSummary(documentId: string, summary: string): Promise<void> {
+    const { error } = await this.supabase
+      .from("documents")
+      .update({ summary })
+      .eq("id", documentId);
+
+    if (error) {
+      throw new Error(`Failed to persist document summary: ${error.message}`);
+    }
   }
 
   async downloadDocument(storagePath: string): Promise<Uint8Array> {

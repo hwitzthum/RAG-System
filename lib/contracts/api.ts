@@ -84,6 +84,13 @@ export type QueryResponseMeta = {
     reasons: string[];
     redactionCount: number;
   };
+  /** Annotate-only citation check; null/absent when disabled or blocked. */
+  citationVerification?: {
+    checkedCount: number;
+    supportedCount: number;
+    unsupportedCount: number;
+    unverified: boolean;
+  } | null;
 };
 
 export type QuerySseMetaEvent = {

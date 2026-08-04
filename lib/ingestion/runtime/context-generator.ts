@@ -7,8 +7,24 @@ import type {
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
 
+// Contextual-retrieval prompt: the model sees the document's title and
+// summary so the chunk context can situate the chunk within the WHOLE
+// document (the ingredient that makes contextual retrieval work), not just
+// restate the chunk.
 const CONTEXT_SYSTEM_PROMPT =
-  "Create a concise retrieval context summary for this document chunk. Keep factual entities and key qualifiers. Max 2 sentences.";
+  "Create a concise retrieval context summary that situates this document chunk within the overall document. " +
+  "State what the chunk covers and how it relates to the document's subject. " +
+  "Keep factual entities and key qualifiers. Max 2 sentences.";
+
+const DOCUMENT_SUMMARY_SYSTEM_PROMPT =
+  "Summarize this document in one paragraph (max 4 sentences). " +
+  "Name the document type, its subject, the key entities involved, and its purpose. " +
+  "Write in the document's own language.";
+
+export type DocumentContextMeta = {
+  title: string | null;
+  summary: string | null;
+};
 
 type OpenAiChatCompletionResponse = {
   choices?: Array<{
@@ -41,9 +57,13 @@ export class ContextGenerator {
       : null;
   }
 
-  private heuristicContext(chunk: ChunkCandidate): string {
+  private heuristicContext(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): string {
     let compact = chunk.content.replace(/\s+/g, " ").trim();
-    const prefix = `${chunk.sectionTitle} | page ${chunk.pageNumber}`;
+    const titlePrefix = document.title ? `${document.title} | ` : "";
+    const prefix = `${titlePrefix}${chunk.sectionTitle} | page ${chunk.pageNumber}`;
 
     if (compact.length > this.settings.contextMaxChars) {
       compact = `${compact.slice(0, this.settings.contextMaxChars).trimEnd()}...`;
@@ -52,9 +72,30 @@ export class ContextGenerator {
     return `${prefix}: ${compact}`;
   }
 
-  private async openAiContext(chunk: ChunkCandidate): Promise<string> {
+  private buildChunkPromptBody(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): string {
+    const documentLines = [
+      document.title ? `Document title: ${document.title}` : null,
+      document.summary ? `Document summary: ${document.summary}` : null,
+    ].filter((line): line is string => line !== null);
+
+    return [
+      ...documentLines,
+      `Language: ${chunk.language}`,
+      `Section: ${chunk.sectionTitle}`,
+      `Page: ${chunk.pageNumber}`,
+      `Chunk:\n${chunk.content}`,
+    ].join("\n");
+  }
+
+  private async openAiContext(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): Promise<string> {
     if (!this.apiKey) {
-      return this.heuristicContext(chunk);
+      return this.heuristicContext(chunk, document);
     }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -75,11 +116,7 @@ export class ContextGenerator {
           },
           {
             role: "user",
-            content:
-              `Language: ${chunk.language}\n` +
-              `Section: ${chunk.sectionTitle}\n` +
-              `Page: ${chunk.pageNumber}\n` +
-              `Chunk:\n${chunk.content}`,
+            content: this.buildChunkPromptBody(chunk, document),
           },
         ],
       }),
@@ -95,13 +132,16 @@ export class ContextGenerator {
 
     const content = payload.choices?.[0]?.message?.content?.trim();
     if (!content) {
-      return this.heuristicContext(chunk);
+      return this.heuristicContext(chunk, document);
     }
 
     return content;
   }
 
-  private async claudeContext(chunk: ChunkCandidate): Promise<string> {
+  private async claudeContext(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): Promise<string> {
     const response = await this.anthropicClient!.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 140,
@@ -115,11 +155,7 @@ export class ContextGenerator {
       messages: [
         {
           role: "user",
-          content:
-            `Language: ${chunk.language}\n` +
-            `Section: ${chunk.sectionTitle}\n` +
-            `Page: ${chunk.pageNumber}\n` +
-            `Chunk:\n${chunk.content}`,
+          content: this.buildChunkPromptBody(chunk, document),
         },
       ],
     });
@@ -129,16 +165,19 @@ export class ContextGenerator {
       const text = textBlock.text?.trim();
       if (text) return text;
     }
-    return this.heuristicContext(chunk);
+    return this.heuristicContext(chunk, document);
   }
 
-  private async enrichSingle(chunk: ChunkCandidate): Promise<ChunkWithContext> {
+  private async enrichSingle(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): Promise<ChunkWithContext> {
     let context: string;
     if (!this.settings.contextEnabled) {
-      context = this.heuristicContext(chunk);
+      context = this.heuristicContext(chunk, document);
     } else if (this.anthropicApiKey) {
       try {
-        context = await this.claudeContext(chunk);
+        context = await this.claudeContext(chunk, document);
       } catch (error) {
         const message =
           error instanceof Error
@@ -149,14 +188,14 @@ export class ContextGenerator {
           message,
         });
         try {
-          context = await this.openAiContext(chunk);
+          context = await this.openAiContext(chunk, document);
         } catch {
-          context = this.heuristicContext(chunk);
+          context = this.heuristicContext(chunk, document);
         }
       }
     } else if (this.apiKey) {
       try {
-        context = await this.openAiContext(chunk);
+        context = await this.openAiContext(chunk, document);
       } catch (error) {
         const message =
           error instanceof Error
@@ -166,10 +205,10 @@ export class ContextGenerator {
           chunkIndex: chunk.chunkIndex,
           message,
         });
-        context = this.heuristicContext(chunk);
+        context = this.heuristicContext(chunk, document);
       }
     } else {
-      context = this.heuristicContext(chunk);
+      context = this.heuristicContext(chunk, document);
     }
 
     // Spread rather than field-by-field so optional provenance fields
@@ -180,7 +219,10 @@ export class ContextGenerator {
     };
   }
 
-  async enrich(chunks: ChunkCandidate[]): Promise<ChunkWithContext[]> {
+  async enrich(
+    chunks: ChunkCandidate[],
+    document: DocumentContextMeta = { title: null, summary: null },
+  ): Promise<ChunkWithContext[]> {
     // Process in parallel batches of 5 to balance throughput vs rate limits.
     const BATCH_SIZE = 5;
     const enriched: ChunkWithContext[] = [];
@@ -188,11 +230,95 @@ export class ContextGenerator {
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
-        batch.map((chunk) => this.enrichSingle(chunk)),
+        batch.map((chunk) => this.enrichSingle(chunk, document)),
       );
       enriched.push(...results);
     }
 
     return enriched;
+  }
+
+  private heuristicDocumentSummary(title: string | null, text: string): string {
+    const compact = text.replace(/\s+/g, " ").trim().slice(0, 400);
+    return title ? `${title}: ${compact}` : compact;
+  }
+
+  /**
+   * One-paragraph document summary generated once per document at ingest and
+   * fed into every chunk's context prompt. Falls back to a truncated excerpt
+   * when no LLM is available — a weak summary beats none for situating chunks.
+   */
+  async summarizeDocument(input: {
+    title: string | null;
+    text: string;
+  }): Promise<string> {
+    const excerpt = input.text.replace(/\s+/g, " ").trim().slice(0, 6_000);
+    if (!excerpt) {
+      return input.title ?? "";
+    }
+
+    const userContent = [
+      input.title ? `Document title: ${input.title}` : null,
+      `Document text (excerpt):\n${excerpt}`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n\n");
+
+    if (this.settings.contextEnabled && this.anthropicApiKey) {
+      try {
+        const response = await this.anthropicClient!.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 220,
+          system: DOCUMENT_SUMMARY_SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userContent }],
+        });
+        const textBlock = response.content.find((b) => b.type === "text");
+        if (textBlock && textBlock.type === "text" && textBlock.text?.trim()) {
+          return textBlock.text.trim();
+        }
+      } catch (error) {
+        this.logger.warn("claude_document_summary_failed", {
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
+
+    if (this.settings.contextEnabled && this.apiKey) {
+      try {
+        const response = await fetch(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            signal: AbortSignal.timeout(
+              this.settings.openAiTimeoutSeconds * 1000,
+            ),
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: this.settings.contextModel,
+              temperature: 0,
+              max_tokens: 220,
+              messages: [
+                { role: "system", content: DOCUMENT_SUMMARY_SYSTEM_PROMPT },
+                { role: "user", content: userContent },
+              ],
+            }),
+          },
+        );
+        const payload = (await response.json()) as OpenAiChatCompletionResponse;
+        const content = payload.choices?.[0]?.message?.content?.trim();
+        if (response.ok && content) {
+          return content;
+        }
+      } catch (error) {
+        this.logger.warn("document_summary_failed", {
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
+
+    return this.heuristicDocumentSummary(input.title, input.text);
   }
 }

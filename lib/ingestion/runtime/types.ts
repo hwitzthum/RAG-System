@@ -20,6 +20,7 @@ export type DocumentRecord = {
   storagePath: string;
   sha256: string;
   title: string | null;
+  summary: string | null;
   language: SupportedLanguage | null;
   status: DocumentStatus;
   ingestionVersion: number;

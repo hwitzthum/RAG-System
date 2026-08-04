@@ -190,7 +190,10 @@ function groupSectionsByLanguage(
 }
 
 type ExtractPagesFn = typeof extractPages;
-type ContextGeneratorPort = Pick<ContextGenerator, "enrich">;
+// summarizeDocument is optional so lean test doubles that only stub enrich
+// keep working; without it the document simply gets no generated summary.
+type ContextGeneratorPort = Pick<ContextGenerator, "enrich"> &
+  Partial<Pick<ContextGenerator, "summarizeDocument">>;
 type EmbeddingProviderPort = Pick<EmbeddingProvider, "embedTexts">;
 type ContextGeneratorFactory = (
   settings: IngestionRuntimeSettings,
@@ -317,6 +320,32 @@ export class IngestionPipeline {
         extractionMethod: extractionMethod ?? null,
       });
 
+      // One document-level summary, generated once and persisted: it feeds
+      // every chunk's context prompt (full contextual retrieval) on this run
+      // and on any resumed run. Failure to summarise must not fail ingestion.
+      if (!document.summary && contextGenerator.summarizeDocument) {
+        try {
+          const summary = await contextGenerator.summarizeDocument({
+            title: document.title,
+            text: pages.map((page) => page.text).join("\n\n"),
+          });
+          if (summary) {
+            await this.repository.setDocumentSummary(document.id, summary);
+            document.summary = summary;
+            this.logger.info("pipeline_step", {
+              step: "document_summary_generated",
+              elapsed: elapsed(),
+              summaryChars: summary.length,
+            });
+          }
+        } catch (error) {
+          this.logger.warn("document_summary_generation_failed", {
+            documentId: document.id,
+            message: error instanceof Error ? error.message : "unknown_error",
+          });
+        }
+      }
+
       await setStage("chunking");
       const sections = [];
       for (const page of pages) {
@@ -435,9 +464,12 @@ export class IngestionPipeline {
       total: chunksTotal,
     });
 
-    // Enrich batch with context
+    // Enrich batch with context, situating each chunk within the document.
     await setStage("contextualizing");
-    const batchWithContext = await contextGenerator.enrich(batch);
+    const batchWithContext = await contextGenerator.enrich(batch, {
+      title: document.title,
+      summary: document.summary,
+    });
     this.logger.info("pipeline_step", {
       step: "batch_context_enriched",
       elapsed: elapsed(),

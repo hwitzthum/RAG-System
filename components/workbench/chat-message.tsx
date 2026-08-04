@@ -42,12 +42,21 @@ function CopyButton({ text }: { text: string }) {
       className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium active:scale-[0.98]"
       title="Copy answer"
     >
-      {copied ? <Check className="tone-success h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? (
+        <Check className="tone-success h-3.5 w-3.5" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
     </button>
   );
 }
 
-export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMessageProps) {
+export function ChatMessage({
+  turn,
+  isActive,
+  onClick,
+  downloadReport,
+}: ChatMessageProps) {
   return (
     <article
       className={`cursor-pointer rounded-2xl border p-4 transition ${
@@ -76,17 +85,31 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
             {turn.retrievalMeta ? (
               <span
                 className={`badge ${
-                  turn.retrievalMeta.cacheHit ? "badge-success" : "badge-warning"
+                  turn.retrievalMeta.cacheHit
+                    ? "badge-success"
+                    : "badge-warning"
                 }`}
               >
                 cache {turn.retrievalMeta.cacheHit ? "hit" : "miss"}
               </span>
             ) : null}
+            {turn.retrievalMeta?.citationVerification &&
+            !turn.retrievalMeta.citationVerification.unverified &&
+            turn.retrievalMeta.citationVerification.unsupportedCount > 0 ? (
+              <span
+                className="badge badge-warning"
+                title={`${turn.retrievalMeta.citationVerification.unsupportedCount} of ${turn.retrievalMeta.citationVerification.checkedCount} cited statements could not be verified against their sources`}
+              >
+                {turn.retrievalMeta.citationVerification.unsupportedCount}{" "}
+                unverified claim
+                {turn.retrievalMeta.citationVerification.unsupportedCount > 1
+                  ? "s"
+                  : ""}
+              </span>
+            ) : null}
             {turn.pending ? <StreamingDots /> : null}
             {turn.failed ? (
-              <span className="badge badge-danger">
-                failed
-              </span>
+              <span className="badge badge-danger">failed</span>
             ) : null}
           </div>
         </div>
@@ -125,14 +148,20 @@ export function ChatMessage({ turn, isActive, onClick, downloadReport }: ChatMes
         <div className="mt-3 flex gap-2" data-testid="report-downloads">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); downloadReport(turn.queryHistoryId!, "docx"); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadReport(turn.queryHistoryId!, "docx");
+            }}
             className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
           >
             DOCX
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); downloadReport(turn.queryHistoryId!, "pdf"); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadReport(turn.queryHistoryId!, "pdf");
+            }}
             className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
           >
             PDF

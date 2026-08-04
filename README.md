@@ -206,21 +206,24 @@ All variables are validated at startup via Zod. Missing required variables throw
 
 ### Optional Features
 
-| Variable                       | Required | Default | Description                                                 |
-| ------------------------------ | -------- | ------- | ----------------------------------------------------------- |
-| `RAG_CROSS_ENCODER_ENABLED`    | No       | `true`  | Cohere cross-encoder reranking (no-op without a Cohere key) |
-| `RAG_CROSS_ENCODER_TIMEOUT_MS` | No       | `3000`  | Cross-encoder timeout; heuristic order on expiry            |
-| `COHERE_API_KEY`               | No       | —       | Enables cross-encoder reranking when set                    |
-| `COHERE_BYOK_VAULT_KEY`        | No       | —       | AES vault key for per-user Cohere key encryption            |
-| `RAG_MULTI_QUERY_ENABLED`      | No       | `false` | Multi-query retrieval in the standard (non-expansion) path  |
-| `RAG_MULTI_QUERY_VARIATIONS`   | No       | `3`     | Number of expanded query variations to generate             |
-| `RAG_HYDE_ENABLED`             | No       | `true`  | HyDE branch inside the "Broaden search" expansion path      |
-| `RAG_WEB_MIN_SOURCES`          | No       | `2`     | Web sources required to answer without local evidence       |
-| `RAG_WEB_SEARCH_ENABLED`       | No       | `false` | Enable Tavily web-augmented retrieval globally              |
-| `RAG_WEB_SEARCH_API_KEY`       | No       | —       | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`  |
-| `RAG_WEB_SEARCH_MAX_RESULTS`   | No       | `5`     | Maximum web results per query                               |
-| `ANTHROPIC_API_KEY`            | No       | —       | Enables Anthropic Claude as an alternative LLM backend      |
-| `ANTHROPIC_BYOK_VAULT_KEY`     | No       | —       | AES vault key for per-user Anthropic key encryption         |
+| Variable                            | Required | Default       | Description                                                                                                    |
+| ----------------------------------- | -------- | ------------- | -------------------------------------------------------------------------------------------------------------- |
+| `RAG_CROSS_ENCODER_ENABLED`         | No       | `true`        | Cohere cross-encoder reranking (no-op without a Cohere key)                                                    |
+| `RAG_CROSS_ENCODER_TIMEOUT_MS`      | No       | `3000`        | Cross-encoder timeout; heuristic order on expiry                                                               |
+| `COHERE_API_KEY`                    | No       | —             | Enables cross-encoder reranking when set                                                                       |
+| `COHERE_BYOK_VAULT_KEY`             | No       | —             | AES vault key for per-user Cohere key encryption                                                               |
+| `RAG_MULTI_QUERY_ENABLED`           | No       | `false`       | Multi-query retrieval in the standard (non-expansion) path                                                     |
+| `RAG_MULTI_QUERY_VARIATIONS`        | No       | `3`           | Number of expanded query variations to generate                                                                |
+| `RAG_HYDE_ENABLED`                  | No       | `true`        | HyDE branch inside the "Broaden search" expansion path                                                         |
+| `RAG_WEB_MIN_SOURCES`               | No       | `2`           | Web sources required to answer without local evidence                                                          |
+| `RAG_EVIDENCE_PLACEMENT`            | No       | `ends`        | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order |
+| `RAG_CITATION_VERIFICATION_ENABLED` | No       | `true`        | Post-answer LLM check that cited sentences are supported (annotate-only)                                       |
+| `RAG_EVAL_JUDGE_MODEL`              | No       | `gpt-4o-mini` | Model for the benchmark judge and the citation verifier                                                        |
+| `RAG_WEB_SEARCH_ENABLED`            | No       | `false`       | Enable Tavily web-augmented retrieval globally                                                                 |
+| `RAG_WEB_SEARCH_API_KEY`            | No       | —             | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`                                                     |
+| `RAG_WEB_SEARCH_MAX_RESULTS`        | No       | `5`           | Maximum web results per query                                                                                  |
+| `ANTHROPIC_API_KEY`                 | No       | —             | Enables Anthropic Claude as an alternative LLM backend                                                         |
+| `ANTHROPIC_BYOK_VAULT_KEY`          | No       | —             | AES vault key for per-user Anthropic key encryption                                                            |
 
 ### Observability
 
@@ -520,9 +523,11 @@ Query
 
 **1. Evidence Sufficiency Gate** — Before any LLM call, checks minimum chunk count (relaxed to 1 only when the user explicitly scoped documents), at least one chunk above the scale-appropriate relevance threshold (`RAG_MIN_RERANK_SCORE` for cross-encoder scores, `RAG_MIN_HEURISTIC_RELEVANCE` for heuristic scores), and a minimum average over the top chunks. Failing the gate returns a calibrated "insufficient evidence" response rather than a hallucination.
 
-**2. Prompt Construction** — Each chunk is rendered as an `<evidence_chunk index="n">` block with page and section metadata, wrapped in untrusted-data guards. The model cites with inline `[n]` markers, which are parsed post-generation to resolve `documentId` and `pageNumber` — exact document-and-page references without requiring structured JSON from the model.
+**2. Prompt Construction** — Each chunk is rendered as an `<evidence_chunk index="n">` block with page and section metadata, wrapped in untrusted-data guards. Evidence is placed **ends-first** (`RAG_EVIDENCE_PLACEMENT`): the strongest document group opens the context and the second-strongest closes it, countering the lost-in-the-middle attention bias. The model cites with inline `[n]` markers, which are parsed post-generation to resolve `documentId` and `pageNumber` — exact document-and-page references without requiring structured JSON from the model.
 
-**3. LLM Inference** — Default model `gpt-4o-mini` at temperature 0. The completed, security-filtered answer is delivered over SSE as word-level token events followed by an authoritative `final` event. Model is configurable per-deployment or per-user BYOK.
+**3. LLM Inference (streamed)** — Default model `gpt-4o-mini` at temperature 0, streamed sentence-by-sentence: each completed sentence passes per-sentence redaction (secrets, PII, HTML, unsafe links; prompt-leak signatures halt the stream) before it is emitted as an SSE token event. The `final` event carries the fully-filtered authoritative answer and the client replaces streamed text with it. Model is configurable per-deployment or per-user BYOK.
+
+**3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_EVAL_JUDGE_MODEL`) checks that every `[n]`-cited sentence is entailed by the chunk(s) it cites. The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
 
 **4. Web Augmentation (opt-in)** — Tavily results with relevance ≥ 0.5 are appended as `[WEB-N]` sources after the document evidence. The model is instructed to prefer document sources; web sources are surfaced separately in the response. When local evidence fails the gate, the answer proceeds only with at least `RAG_WEB_MIN_SOURCES` (default 2) web sources, and sub-threshold document chunks are dropped from the prompt.
 

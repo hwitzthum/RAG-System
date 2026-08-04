@@ -1,3 +1,5 @@
+import { Tiktoken } from "js-tiktoken/lite";
+import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 import type {
   ChunkCandidate,
   ExtractedPage,
@@ -97,8 +99,41 @@ function decodeTokens(
   return tokens.slice(tokenStart, tokenEnd).join(" ");
 }
 
+// cl100k_base matches text-embedding-3-large, the model the budgets exist
+// for. Lazy: the ranks table is ~1.6 MB and only the ingestion worker pays it.
+let bpeEncoder: Tiktoken | null = null;
+
+function getBpeEncoder(): Tiktoken {
+  if (!bpeEncoder) {
+    bpeEncoder = new Tiktoken(cl100k_base);
+  }
+  return bpeEncoder;
+}
+
+// The packing loop re-counts the same paragraphs (overlap carry-over,
+// merge probes), so counts are memoized. Bounded to keep a long-lived worker
+// from accumulating unbounded strings.
+const TOKEN_COUNT_CACHE_LIMIT = 20_000;
+const tokenCountCache = new Map<string, number>();
+
+/**
+ * True BPE token count. Chunk budgets (`WORKER_CHUNK_TARGET_TOKENS` etc.) are
+ * measured in the embedding model's own tokens — the previous
+ * whitespace-word count undercounted by ~30%, so a "700 token" chunk was
+ * really ~900-1000 model tokens.
+ */
 export function countTokens(text: string): number {
-  return tokenize(text).length;
+  const cached = tokenCountCache.get(text);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const count = getBpeEncoder().encode(text).length;
+  if (tokenCountCache.size >= TOKEN_COUNT_CACHE_LIMIT) {
+    tokenCountCache.clear();
+  }
+  tokenCountCache.set(text, count);
+  return count;
 }
 
 const SENTENCE_END_PATTERN = /[.!?]$/;
@@ -243,11 +278,22 @@ function chunkOversizedParagraph(
   overlapTokens: number,
 ): string[] {
   const tokens = tokenize(paragraph);
+
+  // Slicing happens at word boundaries, but the budget is BPE tokens. The
+  // paragraph's own words-per-BPE ratio converts the budgets into word
+  // windows, adapting to language and compression.
+  const wordsPerBpeToken = tokens.length / Math.max(1, countTokens(paragraph));
+  const wordBudget = Math.max(1, Math.floor(targetTokens * wordsPerBpeToken));
+  const overlapWordBudget = Math.max(
+    0,
+    Math.floor(overlapTokens * wordsPerBpeToken),
+  );
+
   const chunks: string[] = [];
   let start = 0;
 
   while (start < tokens.length) {
-    const rawEnd = Math.min(start + targetTokens, tokens.length);
+    const rawEnd = Math.min(start + wordBudget, tokens.length);
     const end =
       rawEnd < tokens.length
         ? findSentenceBoundary(tokens, rawEnd, tokens.length)
@@ -259,7 +305,7 @@ function chunkOversizedParagraph(
     if (end >= tokens.length) {
       break;
     }
-    start = Math.max(end - overlapTokens, start + 1);
+    start = Math.max(end - overlapWordBudget, start + 1);
   }
 
   return chunks;

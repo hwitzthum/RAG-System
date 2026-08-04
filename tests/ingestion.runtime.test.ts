@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chunkSections, splitIntoSections } from "../lib/ingestion/runtime/chunking";
+import {
+  chunkSections,
+  splitIntoSections,
+} from "../lib/ingestion/runtime/chunking";
 import { IngestionPipeline } from "../lib/ingestion/runtime/pipeline";
 import { extractPages } from "../lib/ingestion/runtime/pdf-extractor";
 import { runIngestionBatch } from "../lib/ingestion/runtime/runner";
@@ -13,7 +16,10 @@ import type {
   PreparedChunkRecord,
   ProcessJobResult,
 } from "../lib/ingestion/runtime/types";
-import type { ClaimIngestionJobsInput, IngestionRuntimeRepository } from "../lib/ingestion/runtime/repository";
+import type {
+  ClaimIngestionJobsInput,
+  IngestionRuntimeRepository,
+} from "../lib/ingestion/runtime/repository";
 import type { SupportedLanguage } from "../lib/supabase/database.types";
 
 const quietLogger = {
@@ -23,7 +29,11 @@ const quietLogger = {
 };
 
 function createCapturingLogger() {
-  const entries: Array<{ level: "info" | "warn" | "error"; event: string; payload: Record<string, unknown> | undefined }> = [];
+  const entries: Array<{
+    level: "info" | "warn" | "error";
+    event: string;
+    payload: Record<string, unknown> | undefined;
+  }> = [];
 
   return {
     entries,
@@ -58,7 +68,10 @@ test("splitIntoSections preserves paragraph breaks within a section", () => {
     text: "OVERVIEW\nFirst paragraph.\n\nSecond paragraph.\n\nDETAILS\nThird paragraph.",
   });
 
-  assert.equal(sections[0]?.text.includes("First paragraph.\n\nSecond paragraph."), true);
+  assert.equal(
+    sections[0]?.text.includes("First paragraph.\n\nSecond paragraph."),
+    true,
+  );
 });
 
 test("chunkSections respects overlap and emits sequential chunk indices per call", () => {
@@ -158,13 +171,19 @@ class FakeRepository implements IngestionRuntimeRepository {
     storagePath: "uploads/doc-1.pdf",
     sha256: "abc123",
     title: "Test",
+    summary: null,
     language: "EN",
     status: "queued",
     ingestionVersion: 1,
   };
 
+  public documentSummaries: Array<{ documentId: string; summary: string }> = [];
+
   public readonly replacedChunksHistory: PreparedChunkRecord[][] = [];
-  public readonly completedJobs: Array<{ jobId: string; language?: SupportedLanguage | null }> = [];
+  public readonly completedJobs: Array<{
+    jobId: string;
+    language?: SupportedLanguage | null;
+  }> = [];
   public claimedJobs: IngestionJob[] = [];
   public readonly failedCalls: Array<{ jobId: string; message: string }> = [];
   public retrievalCacheInvalidationCalls = 0;
@@ -178,7 +197,9 @@ class FakeRepository implements IngestionRuntimeRepository {
   public insertedChunkBatches: PreparedChunkRecord[][] = [];
   public stageUpdates: string[] = [];
 
-  async claimIngestionJobs(_input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
+  async claimIngestionJobs(
+    _input: ClaimIngestionJobsInput,
+  ): Promise<IngestionJob[]> {
     void _input;
     return this.claimedJobs;
   }
@@ -188,21 +209,36 @@ class FakeRepository implements IngestionRuntimeRepository {
     return this.document;
   }
 
+  async setDocumentSummary(documentId: string, summary: string): Promise<void> {
+    this.documentSummaries.push({ documentId, summary });
+  }
+
   async downloadDocument(storagePath: string): Promise<Uint8Array> {
     assert.equal(storagePath, this.document.storagePath);
     return new TextEncoder().encode("%PDF-1.7 synthetic");
   }
 
-  async replaceDocumentChunks(documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
+  async replaceDocumentChunks(
+    documentId: string,
+    chunks: PreparedChunkRecord[],
+  ): Promise<void> {
     assert.equal(documentId, this.document.id);
-    this.replacedChunksHistory.push(chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })));
+    this.replacedChunksHistory.push(
+      chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })),
+    );
   }
 
-  async markJobCompleted(jobId: string, language?: SupportedLanguage | null): Promise<void> {
+  async markJobCompleted(
+    jobId: string,
+    language?: SupportedLanguage | null,
+  ): Promise<void> {
     this.completedJobs.push({ jobId, language });
   }
 
-  async markJobFailed(_job: IngestionJob, _errorMessage: string): Promise<boolean> {
+  async markJobFailed(
+    _job: IngestionJob,
+    _errorMessage: string,
+  ): Promise<boolean> {
     this.failedCalls.push({ jobId: _job.id, message: _errorMessage });
     return this.deadLetterIds.has(_job.id);
   }
@@ -211,7 +247,11 @@ class FakeRepository implements IngestionRuntimeRepository {
     this.retrievalCacheInvalidationCalls += 1;
   }
 
-  async saveChunkCandidates(_jobId: string, chunks: ChunkCandidate[], total: number): Promise<void> {
+  async saveChunkCandidates(
+    _jobId: string,
+    chunks: ChunkCandidate[],
+    total: number,
+  ): Promise<void> {
     this.savedCandidates = chunks;
     this.savedChunksTotal = total;
   }
@@ -229,7 +269,10 @@ class FakeRepository implements IngestionRuntimeRepository {
     this.stageUpdates.push(stage);
   }
 
-  async updateJobProgress(_jobId: string, chunksProcessed: number): Promise<void> {
+  async updateJobProgress(
+    _jobId: string,
+    chunksProcessed: number,
+  ): Promise<void> {
     this.currentChunksProcessed = chunksProcessed;
   }
 
@@ -237,8 +280,13 @@ class FakeRepository implements IngestionRuntimeRepository {
     this.yieldedJobs.push(jobId);
   }
 
-  async insertChunkBatch(_documentId: string, chunks: PreparedChunkRecord[]): Promise<void> {
-    this.insertedChunkBatches.push(chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })));
+  async insertChunkBatch(
+    _documentId: string,
+    chunks: PreparedChunkRecord[],
+  ): Promise<void> {
+    this.insertedChunkBatches.push(
+      chunks.map((chunk) => ({ ...chunk, embedding: [...chunk.embedding] })),
+    );
   }
 }
 
@@ -309,7 +357,8 @@ test("IngestionPipeline extracts and processes all chunks in a single invocation
         })),
     },
     embeddingProvider: {
-      embedTexts: async (texts) => texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
+      embedTexts: async (texts) =>
+        texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
     },
   });
 
@@ -381,7 +430,8 @@ test("IngestionPipeline processes chunks incrementally across multiple invocatio
         })),
     },
     embeddingProvider: {
-      embedTexts: async (texts) => texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
+      embedTexts: async (texts) =>
+        texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
     },
   });
 
@@ -443,7 +493,8 @@ test("IngestionPipeline uses relaxed document fallback when all sections are bel
         })),
     },
     embeddingProvider: {
-      embedTexts: async (texts) => texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
+      embedTexts: async (texts) =>
+        texts.map((_text, index) => [index + 0.1, index + 0.2, index + 0.3]),
     },
   });
 
@@ -457,7 +508,10 @@ test("IngestionPipeline uses relaxed document fallback when all sections are bel
   assert.equal(result.status, "completed");
   assert.equal(repository.insertedChunkBatches.length, 1);
   assert.equal(repository.insertedChunkBatches[0]?.length, 1);
-  assert.equal(repository.insertedChunkBatches[0]?.[0]?.content.includes("Tiny text"), true);
+  assert.equal(
+    repository.insertedChunkBatches[0]?.[0]?.content.includes("Tiny text"),
+    true,
+  );
   assert.equal(repository.retrievalCacheInvalidationCalls, 1);
 });
 
@@ -497,7 +551,10 @@ test("runIngestionBatch reports completed, partial, failed, and dead-letter outc
   assert.equal(metrics.deadLettered, 1);
   assert.equal(repository.failedCalls.length, 2);
   assert.equal(repository.completedJobs.length, 1);
-  assert.deepEqual(repository.completedJobs[0], { jobId: "job-1", language: null });
+  assert.deepEqual(repository.completedJobs[0], {
+    jobId: "job-1",
+    language: null,
+  });
   assert.equal(metrics.jobs.length, 3);
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
@@ -575,7 +632,11 @@ test("runIngestionBatch loops through partial batches until completion", async (
       processJob: async (): Promise<ProcessJobResult> => {
         callCount += 1;
         if (callCount < 3) {
-          return { status: "partial", chunksProcessed: callCount * 5, chunksTotal: 15 };
+          return {
+            status: "partial",
+            chunksProcessed: callCount * 5,
+            chunksTotal: 15,
+          };
         }
         return { status: "completed", chunksProcessed: 15, chunksTotal: 15 };
       },
@@ -587,7 +648,10 @@ test("runIngestionBatch loops through partial batches until completion", async (
   assert.equal(metrics.completed, 1);
   assert.equal(metrics.failed, 0);
   assert.equal(repository.completedJobs.length, 1);
-  assert.deepEqual(repository.completedJobs[0], { jobId: "job-loop", language: null });
+  assert.deepEqual(repository.completedJobs[0], {
+    jobId: "job-loop",
+    language: null,
+  });
   assert.deepEqual(
     metrics.jobs.map((job) => [job.id, job.outcome]),
     [["job-loop", "completed"]],
@@ -596,7 +660,9 @@ test("runIngestionBatch loops through partial batches until completion", async (
 
 test("runIngestionBatch passes completed document language to markJobCompleted", async () => {
   const repository = new FakeRepository();
-  repository.claimedJobs = [{ id: "job-lang", documentId: "doc-1", status: "processing", attempt: 1 }];
+  repository.claimedJobs = [
+    { id: "job-lang", documentId: "doc-1", status: "processing", attempt: 1 },
+  ];
 
   const metrics = await runIngestionBatch({
     repository,
@@ -612,5 +678,7 @@ test("runIngestionBatch passes completed document language to markJobCompleted",
   });
 
   assert.equal(metrics.completed, 1);
-  assert.deepEqual(repository.completedJobs, [{ jobId: "job-lang", language: "DE" }]);
+  assert.deepEqual(repository.completedJobs, [
+    { jobId: "job-lang", language: "DE" },
+  ]);
 });
