@@ -2,7 +2,9 @@ import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 
 const ADJACENCY_BOOST = 0.05;
 
-export function applyContextualGrouping(chunks: RetrievedChunk[]): RetrievedChunk[] {
+export function applyContextualGrouping(
+  chunks: RetrievedChunk[],
+): RetrievedChunk[] {
   if (chunks.length <= 1) {
     return chunks;
   }
@@ -25,10 +27,18 @@ export function applyContextualGrouping(chunks: RetrievedChunk[]): RetrievedChun
       if (i > 0 && sorted[i].pageNumber - sorted[i - 1].pageNumber <= 1) {
         boost += ADJACENCY_BOOST;
       }
-      if (i < sorted.length - 1 && sorted[i + 1].pageNumber - sorted[i].pageNumber <= 1) {
+      if (
+        i < sorted.length - 1 &&
+        sorted[i + 1].pageNumber - sorted[i].pageNumber <= 1
+      ) {
         boost += ADJACENCY_BOOST;
       }
 
+      // Boost the ordering score only. `relevanceScore` is deliberately left
+      // alone: page adjacency says something about presentation order, nothing
+      // about whether a chunk answers the query. Folding it into the score the
+      // evidence gate reads made weak evidence look stronger purely because it
+      // happened to sit next to another retrieved chunk.
       const baseScore = sorted[i].rerankScore ?? sorted[i].retrievalScore;
       boosted.push({
         ...sorted[i],

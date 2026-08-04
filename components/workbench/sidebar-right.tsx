@@ -67,13 +67,21 @@ export function SidebarRight({
         {/* Evidence Tab */}
         {activeTab === "evidence" && (
           <section>
-            <h3 className="fg-secondary text-xs font-medium">Evidence Navigator</h3>
-            <p className="fg-muted mt-0.5 text-xs">Citations for the selected answer.</p>
+            <h3 className="fg-secondary text-xs font-medium">
+              Evidence Navigator
+            </h3>
+            <p className="fg-muted mt-0.5 text-xs">
+              Citations for the selected answer.
+            </p>
             <div className="mt-2 space-y-1.5">
               {activeTurn?.citations.length ? (
                 activeTurn.citations.map((citation) => {
-                  const doc = documents.find((d) => d.id === citation.documentId);
-                  const docName = doc ? getDocumentDisplayName(doc) : citation.documentId.slice(0, 8);
+                  const doc = documents.find(
+                    (d) => d.id === citation.documentId,
+                  );
+                  const docName = doc
+                    ? getDocumentDisplayName(doc)
+                    : citation.documentId.slice(0, 8);
                   return (
                     <a
                       key={`${citation.documentId}:${citation.pageNumber}:${citation.chunkId}`}
@@ -82,9 +90,26 @@ export function SidebarRight({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <p><span className="fg-primary font-medium">Doc:</span> {docName}</p>
-                      <p><span className="fg-primary font-medium">Page:</span> {citation.pageNumber}</p>
-                      <p><span className="fg-primary font-medium">Chunk:</span> {citation.chunkId.slice(0, 12)}</p>
+                      {citation.evidenceIndex ? (
+                        <p>
+                          <span className="fg-primary font-medium">
+                            Marker:
+                          </span>{" "}
+                          [{citation.evidenceIndex}]
+                        </p>
+                      ) : null}
+                      <p>
+                        <span className="fg-primary font-medium">Doc:</span>{" "}
+                        {docName}
+                      </p>
+                      <p>
+                        <span className="fg-primary font-medium">Page:</span>{" "}
+                        {citation.pageNumber}
+                      </p>
+                      <p>
+                        <span className="fg-primary font-medium">Chunk:</span>{" "}
+                        {citation.chunkId.slice(0, 12)}
+                      </p>
                     </a>
                   );
                 })
@@ -102,7 +127,9 @@ export function SidebarRight({
           <div className="space-y-4">
             {/* Ingestion Desk */}
             <section>
-              <h3 className="fg-secondary text-xs font-medium">Ingestion Desk</h3>
+              <h3 className="fg-secondary text-xs font-medium">
+                Ingestion Desk
+              </h3>
               <div className="mt-2 space-y-2">
                 <input
                   ref={uploadFileInputRef}
@@ -112,7 +139,10 @@ export function SidebarRight({
                   onChange={handleUploadFileChange}
                   data-testid="single-upload-input"
                 />
-                <label htmlFor="upload-title-input" className="fg-secondary text-xs font-medium">
+                <label
+                  htmlFor="upload-title-input"
+                  className="fg-secondary text-xs font-medium"
+                >
                   Document Title
                 </label>
                 <input
@@ -147,14 +177,24 @@ export function SidebarRight({
                   className="btn-primary w-full rounded-2xl px-3 py-2 text-sm font-medium disabled:cursor-not-allowed active:scale-[0.98]"
                   data-testid="upload-submit-button"
                 >
-                  {uploading ? "Uploading..." : uploadFile ? "Upload PDF" : "Select PDF"}
+                  {uploading
+                    ? "Uploading..."
+                    : uploadFile
+                      ? "Upload PDF"
+                      : "Select PDF"}
                 </button>
                 {!canUpload ? (
-                  <p className="fg-muted text-xs">Create a session first. Current role: {userRole ?? "none"}.</p>
+                  <p className="fg-muted text-xs">
+                    Create a session first. Current role: {userRole ?? "none"}.
+                  </p>
                 ) : !uploadFile ? (
-                  <p className="fg-muted text-xs">Select a PDF file to enable upload.</p>
+                  <p className="fg-muted text-xs">
+                    Select a PDF file to enable upload.
+                  </p>
                 ) : (
-                  <p className="fg-secondary text-xs">Selected: {uploadFile.name}</p>
+                  <p className="fg-secondary text-xs">
+                    Selected: {uploadFile.name}
+                  </p>
                 )}
                 {/* Document Scope Selector */}
                 <div className="mt-1">
@@ -227,8 +267,13 @@ export function SidebarRight({
                 {batchFiles.length > 0 ? (
                   <div className="space-y-1">
                     {batchFiles.map((entry, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
-                        <span className="fg-secondary truncate">{entry.file.name}</span>
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span className="fg-secondary truncate">
+                          {entry.file.name}
+                        </span>
                         <span
                           className={`badge ${
                             entry.status === "failed"
@@ -250,12 +295,27 @@ export function SidebarRight({
 
               {/* Upload Status */}
               {uploadStatus ? (
-                <div className="surface-muted fg-secondary mt-3 rounded-2xl p-3 text-xs" data-testid="upload-status-panel">
-                  <p><span className="fg-primary font-medium">Document:</span> {getDocumentDisplayName(uploadStatus.document)}</p>
-                  <p><span className="fg-primary font-medium">Status:</span> {uploadStatus.document.status}</p>
-                  <p><span className="fg-primary font-medium">Job:</span> {uploadStatus.latestIngestionJob?.status ?? "n/a"}</p>
+                <div
+                  className="surface-muted fg-secondary mt-3 rounded-2xl p-3 text-xs"
+                  data-testid="upload-status-panel"
+                >
+                  <p>
+                    <span className="fg-primary font-medium">Document:</span>{" "}
+                    {getDocumentDisplayName(uploadStatus.document)}
+                  </p>
+                  <p>
+                    <span className="fg-primary font-medium">Status:</span>{" "}
+                    {uploadStatus.document.status}
+                  </p>
+                  <p>
+                    <span className="fg-primary font-medium">Job:</span>{" "}
+                    {uploadStatus.latestIngestionJob?.status ?? "n/a"}
+                  </p>
                   {uploadStatus.latestIngestionJob?.last_error ? (
-                    <p><span className="fg-primary font-medium">Error:</span> {uploadStatus.latestIngestionJob.last_error}</p>
+                    <p>
+                      <span className="fg-primary font-medium">Error:</span>{" "}
+                      {uploadStatus.latestIngestionJob.last_error}
+                    </p>
                   ) : null}
                   {canDeleteDocuments ? (
                     <button
@@ -273,7 +333,10 @@ export function SidebarRight({
 
             {/* BYOK Vault */}
             {providerVaults.map((providerVault) => (
-              <ProviderKeyVault key={providerVault.providerSlug} {...providerVault} />
+              <ProviderKeyVault
+                key={providerVault.providerSlug}
+                {...providerVault}
+              />
             ))}
           </div>
         )}
@@ -282,7 +345,11 @@ export function SidebarRight({
         {activeTab === "status" && (
           <section>
             <h3 className="fg-secondary text-xs font-medium">Status</h3>
-            <p aria-live="polite" className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`} data-testid="workspace-status-message">
+            <p
+              aria-live="polite"
+              className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`}
+              data-testid="workspace-status-message"
+            >
               {workspaceMessage}
             </p>
           </section>

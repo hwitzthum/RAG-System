@@ -1,10 +1,16 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
   INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
-  INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(900),
+  INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(900),
   // CRON_SECRET must be at least 32 chars to provide adequate entropy.
   CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_URL: z.string().url(),
@@ -20,21 +26,42 @@ const envSchema = z.object({
   // must supply a matching x-dev-bypass-secret header to use the dev bypass,
   // preventing accidental exposure on staging deployments.
   AUTH_DEV_BYPASS_SECRET: z.string().min(16).optional(),
-  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60),
   AUTH_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(30),
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_BYOK_VAULT_KEY: z.string().min(1).optional(),
   OPENAI_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
   COHERE_BYOK_VAULT_KEY: z.string().min(1).optional(),
   COHERE_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
-  RAG_QUERY_EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-large"),
+  RAG_QUERY_EMBEDDING_MODEL: z
+    .string()
+    .min(1)
+    .default("text-embedding-3-large"),
   RAG_RETRIEVAL_VERSION: z.coerce.number().int().positive().default(1),
   RAG_RRF_K: z.coerce.number().int().positive().default(60),
   RAG_RERANK_POOL_SIZE: z.coerce.number().int().positive().default(40),
   RAG_LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
   RAG_LLM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(700),
   RAG_MIN_EVIDENCE_CHUNKS: z.coerce.number().int().positive().default(2),
+  // Evidence gate, cross-encoder scale (Cohere relevanceScore).
   RAG_MIN_RERANK_SCORE: z.coerce.number().nonnegative().default(0.25),
+  // Evidence gate, heuristic-reranker scale. Separate knob because the two
+  // rerankers emit scores on scales that are not comparable, so one threshold
+  // would silently mean two different things depending on
+  // RAG_CROSS_ENCODER_ENABLED.
+  //
+  // Calibrated, not guessed: 14 queries against the live corpus (8 on-topic
+  // across EN/DE, 6 deliberately off-topic) produced top-1 relevance of
+  // 0.171-0.923 on-topic and 0.012-0.124 off-topic. 0.14 sits in that gap.
+  // The binding constraint is a cross-lingual off-topic query (French against
+  // an EN/DE corpus) scoring 0.124 on the vector term alone — every other
+  // off-topic query stayed below 0.05, so re-calibrate if the corpus gains
+  // languages. Script: scratchpad/calibrate-relevance.ts.
+  RAG_MIN_HEURISTIC_RELEVANCE: z.coerce.number().nonnegative().default(0.14),
   RAG_DEFAULT_TOP_K: z.coerce.number().int().positive().default(8),
   RAG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
   RAG_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
@@ -62,10 +89,18 @@ const envSchema = z.object({
     z.boolean().default(false),
   ),
   RAG_MULTI_QUERY_VARIATIONS: z.coerce.number().int().positive().default(3),
-  RAG_QUERY_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1024),
+  RAG_QUERY_EMBEDDING_DIMENSIONS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1024),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_BYOK_VAULT_KEY: z.string().min(1).optional(),
-  ANTHROPIC_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
+  ANTHROPIC_BYOK_VAULT_KEY_VERSION: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1),
   OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: z.string().min(1).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3001"),
@@ -99,6 +134,7 @@ const parsed = envSchema.safeParse({
   RAG_LLM_MAX_OUTPUT_TOKENS: process.env.RAG_LLM_MAX_OUTPUT_TOKENS,
   RAG_MIN_EVIDENCE_CHUNKS: process.env.RAG_MIN_EVIDENCE_CHUNKS,
   RAG_MIN_RERANK_SCORE: process.env.RAG_MIN_RERANK_SCORE,
+  RAG_MIN_HEURISTIC_RELEVANCE: process.env.RAG_MIN_HEURISTIC_RELEVANCE,
   RAG_DEFAULT_TOP_K: process.env.RAG_DEFAULT_TOP_K,
   RAG_CACHE_TTL_SECONDS: process.env.RAG_CACHE_TTL_SECONDS,
   RAG_MAX_UPLOAD_BYTES: process.env.RAG_MAX_UPLOAD_BYTES,
@@ -117,40 +153,63 @@ const parsed = envSchema.safeParse({
   RAG_QUERY_EMBEDDING_DIMENSIONS: process.env.RAG_QUERY_EMBEDDING_DIMENSIONS,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
   ANTHROPIC_BYOK_VAULT_KEY: process.env.ANTHROPIC_BYOK_VAULT_KEY || undefined,
-  ANTHROPIC_BYOK_VAULT_KEY_VERSION: process.env.ANTHROPIC_BYOK_VAULT_KEY_VERSION,
-  OBSERVABILITY_METRICS_SINK_AUTH_TOKEN: process.env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN || undefined,
+  ANTHROPIC_BYOK_VAULT_KEY_VERSION:
+    process.env.ANTHROPIC_BYOK_VAULT_KEY_VERSION,
+  OBSERVABILITY_METRICS_SINK_AUTH_TOKEN:
+    process.env.OBSERVABILITY_METRICS_SINK_AUTH_TOKEN || undefined,
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
 
 if (!parsed.success) {
-  console.error("Invalid environment configuration", parsed.error.flatten().fieldErrors);
+  console.error(
+    "Invalid environment configuration",
+    parsed.error.flatten().fieldErrors,
+  );
   throw new Error("Environment variable validation failed");
 }
 
 const config = {
   ...parsed.data,
-  AUTH_JWKS_URL: parsed.data.AUTH_JWKS_URL ?? `${parsed.data.SUPABASE_URL}/auth/v1/keys`,
+  AUTH_JWKS_URL:
+    parsed.data.AUTH_JWKS_URL ?? `${parsed.data.SUPABASE_URL}/auth/v1/keys`,
 };
 
 if (!config.SUPABASE_JWT_SECRET && !config.AUTH_JWKS_URL) {
-  throw new Error("Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured");
+  throw new Error(
+    "Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured",
+  );
 }
 
 if (config.NODE_ENV === "production" && config.AUTH_DEV_INSECURE_BYPASS) {
   throw new Error("AUTH_DEV_INSECURE_BYPASS cannot be enabled in production");
 }
 
-if (config.OPENAI_BYOK_VAULT_KEY && Buffer.from(config.OPENAI_BYOK_VAULT_KEY, "base64").length !== 32) {
-  throw new Error("OPENAI_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
+if (
+  config.OPENAI_BYOK_VAULT_KEY &&
+  Buffer.from(config.OPENAI_BYOK_VAULT_KEY, "base64").length !== 32
+) {
+  throw new Error(
+    "OPENAI_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes",
+  );
 }
 
-if (config.COHERE_BYOK_VAULT_KEY && Buffer.from(config.COHERE_BYOK_VAULT_KEY, "base64").length !== 32) {
-  throw new Error("COHERE_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
+if (
+  config.COHERE_BYOK_VAULT_KEY &&
+  Buffer.from(config.COHERE_BYOK_VAULT_KEY, "base64").length !== 32
+) {
+  throw new Error(
+    "COHERE_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes",
+  );
 }
 
-if (config.ANTHROPIC_BYOK_VAULT_KEY && Buffer.from(config.ANTHROPIC_BYOK_VAULT_KEY, "base64").length !== 32) {
-  throw new Error("ANTHROPIC_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes");
+if (
+  config.ANTHROPIC_BYOK_VAULT_KEY &&
+  Buffer.from(config.ANTHROPIC_BYOK_VAULT_KEY, "base64").length !== 32
+) {
+  throw new Error(
+    "ANTHROPIC_BYOK_VAULT_KEY must be base64-encoded and decode to 32 bytes",
+  );
 }
 
 if (config.NODE_ENV === "production" && !config.OPENAI_BYOK_VAULT_KEY) {
@@ -158,7 +217,9 @@ if (config.NODE_ENV === "production" && !config.OPENAI_BYOK_VAULT_KEY) {
 }
 
 if (process.env.VERCEL && !config.CRON_SECRET) {
-  throw new Error("CRON_SECRET must be configured for deployment environments that expose the ingestion trigger");
+  throw new Error(
+    "CRON_SECRET must be configured for deployment environments that expose the ingestion trigger",
+  );
 }
 
 export const env = config;

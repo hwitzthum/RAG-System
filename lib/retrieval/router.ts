@@ -1,9 +1,17 @@
 import { env } from "@/lib/config/env";
-import type { RetrievedChunk, RetrievalTrace, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  RetrievedChunk,
+  RetrievalTrace,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
-import { retrieveRankedCandidates, type RetrieveRankedCandidatesInput, type RetrieveRankedCandidatesResult } from "@/lib/retrieval/service";
+import {
+  retrieveRankedCandidates,
+  type RetrieveRankedCandidatesInput,
+  type RetrieveRankedCandidatesResult,
+} from "@/lib/retrieval/service";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { normalizeQuery } from "@/lib/retrieval/query";
@@ -23,14 +31,20 @@ export type RoutedRetrievalResult = RetrieveRankedCandidatesResult & {
 };
 
 type RoutedRetrievalDependencies = {
-  retrieveBase: (input: RetrieveRankedCandidatesInput) => Promise<RetrieveRankedCandidatesResult>;
+  retrieveBase: (
+    input: RetrieveRankedCandidatesInput,
+  ) => Promise<RetrieveRankedCandidatesResult>;
   generateVariations: (query: string) => Promise<string[]>;
-  generateHyde: (input: { query: string; language: SupportedLanguage }) => Promise<string | null>;
+  generateHyde: (input: {
+    query: string;
+    language: SupportedLanguage;
+  }) => Promise<string | null>;
   rerankCandidates: (input: {
     normalizedQuery: string;
     candidates: RetrievedChunk[];
     poolSize: number;
     topK: number;
+    language?: SupportedLanguage;
   }) => Promise<RetrievedChunk[]>;
 };
 
@@ -55,10 +69,19 @@ function getDefaultDependencies(): RoutedRetrievalDependencies {
 }
 
 function normalizeDocumentScope(documentIds: string[] | undefined): string[] {
-  return [...new Set((documentIds ?? []).map((item) => item.trim()).filter((item) => item.length > 0))].sort();
+  return [
+    ...new Set(
+      (documentIds ?? [])
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    ),
+  ].sort();
 }
 
-function buildBranchCacheNamespace(cacheNamespace: string | undefined, suffix: string): string | undefined {
+function buildBranchCacheNamespace(
+  cacheNamespace: string | undefined,
+  suffix: string,
+): string | undefined {
   if (!cacheNamespace) {
     return undefined;
   }
@@ -66,7 +89,12 @@ function buildBranchCacheNamespace(cacheNamespace: string | undefined, suffix: s
   return `${cacheNamespace}::${suffix}`;
 }
 
-function fuseBranchCandidates(branchResults: Array<{ branch: Branch; result: RetrieveRankedCandidatesResult }>): RetrievedChunk[] {
+function fuseBranchCandidates(
+  branchResults: Array<{
+    branch: Branch;
+    result: RetrieveRankedCandidatesResult;
+  }>,
+): RetrievedChunk[] {
   const fused = new Map<string, RetrievedChunk>();
   const fusedScores = new Map<string, number>();
 
@@ -90,10 +118,16 @@ function fuseBranchCandidates(branchResults: Array<{ branch: Branch; result: Ret
     }
   }
 
-  return [...fused.values()].sort((left, right) => right.retrievalScore - left.retrievalScore);
+  return [...fused.values()].sort(
+    (left, right) => right.retrievalScore - left.retrievalScore,
+  );
 }
 
-function summarizeCandidateCounts(branchResults: Array<{ result: RetrieveRankedCandidatesResult }>, fusedCount: number, rerankedCount: number): RetrievalTrace["candidateCounts"] {
+function summarizeCandidateCounts(
+  branchResults: Array<{ result: RetrieveRankedCandidatesResult }>,
+  fusedCount: number,
+  rerankedCount: number,
+): RetrievalTrace["candidateCounts"] {
   const totals = branchResults.reduce(
     (acc, item) => {
       acc.vector += item.result.trace.candidateCounts.vector;
@@ -144,22 +178,35 @@ export async function retrieveRankedCandidatesWithRouting(
 
   const normalizedQuery = normalizeQuery(input.query);
   const language = detectQueryLanguage(normalizedQuery, input.languageHint);
-  const branchTopK = Math.max(input.topK, Math.min(env.RAG_RERANK_POOL_SIZE, Math.max(input.topK * 2, 8)));
+  const branchTopK = Math.max(
+    input.topK,
+    Math.min(env.RAG_RERANK_POOL_SIZE, Math.max(input.topK * 2, 8)),
+  );
 
   const [queries, hydePassage] = await Promise.all([
     deps.generateVariations(normalizedQuery),
     deps.generateHyde({ query: normalizedQuery, language }),
   ]);
 
-  const uniqueVariations = [...new Set(queries.map((query) => query.trim()).filter((query) => query.length > 0))]
-    .filter((query) => query.toLowerCase() !== normalizedQuery.toLowerCase());
+  const uniqueVariations = [
+    ...new Set(
+      queries.map((query) => query.trim()).filter((query) => query.length > 0),
+    ),
+  ].filter((query) => query.toLowerCase() !== normalizedQuery.toLowerCase());
 
   const branches: Branch[] = [
     { kind: "base", weight: 1, query: input.query },
-    ...uniqueVariations.map((query) => ({ kind: "variation" as const, weight: 0.9, query })),
+    ...uniqueVariations.map((query) => ({
+      kind: "variation" as const,
+      weight: 0.9,
+      query,
+    })),
   ];
 
-  if (hydePassage && hydePassage.trim().toLowerCase() !== normalizedQuery.toLowerCase()) {
+  if (
+    hydePassage &&
+    hydePassage.trim().toLowerCase() !== normalizedQuery.toLowerCase()
+  ) {
     branches.push({ kind: "hyde", weight: 0.75, query: hydePassage });
   }
 
@@ -171,17 +218,28 @@ export async function retrieveRankedCandidatesWithRouting(
         topK: branchTopK,
         languageHint: input.languageHint,
         documentIds: scopedDocumentIds,
-        cacheNamespace: buildBranchCacheNamespace(input.cacheNamespace, `${branch.kind}-${index}`),
+        cacheNamespace: buildBranchCacheNamespace(
+          input.cacheNamespace,
+          `${branch.kind}-${index}`,
+        ),
+        // This branch is already a query variation. Without this the service
+        // would expand it again, turning N branches into N x variations
+        // embedding calls per request.
+        disableMultiQuery: true,
       }),
     })),
   );
 
-  const fusedCandidates = fuseBranchCandidates(branchResults).slice(0, Math.max(env.RAG_RERANK_POOL_SIZE, input.topK * 4));
+  const fusedCandidates = fuseBranchCandidates(branchResults).slice(
+    0,
+    Math.max(env.RAG_RERANK_POOL_SIZE, input.topK * 4),
+  );
   let rerankedCandidates = await deps.rerankCandidates({
     normalizedQuery,
     candidates: fusedCandidates,
     poolSize: env.RAG_RERANK_POOL_SIZE,
     topK: input.topK,
+    language,
   });
 
   if (env.RAG_CROSS_ENCODER_ENABLED) {
@@ -202,7 +260,11 @@ export async function retrieveRankedCandidatesWithRouting(
   }
 
   const baseTrace = branchResults[0]!.result.trace;
-  const candidateCounts = summarizeCandidateCounts(branchResults, fusedCandidates.length, rerankedCandidates.length);
+  const candidateCounts = summarizeCandidateCounts(
+    branchResults,
+    fusedCandidates.length,
+    rerankedCandidates.length,
+  );
 
   return {
     chunks: rerankedCandidates,

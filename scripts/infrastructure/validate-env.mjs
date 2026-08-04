@@ -37,7 +37,10 @@ function parseDotEnv(rawText) {
     const key = trimmed.slice(0, idx).trim();
     let value = trimmed.slice(idx + 1).trim();
 
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
 
@@ -84,12 +87,13 @@ function requiredKeysByTarget(target) {
       "RAG_LLM_MAX_OUTPUT_TOKENS",
       "RAG_MIN_EVIDENCE_CHUNKS",
       "RAG_MIN_RERANK_SCORE",
+      "RAG_MIN_HEURISTIC_RELEVANCE",
       "RAG_DEFAULT_TOP_K",
       "RAG_CACHE_TTL_SECONDS",
       "RAG_MAX_UPLOAD_BYTES",
       "RAG_STORAGE_BUCKET",
       "VERCEL_ORG_ID",
-      "VERCEL_PROJECT_ID"
+      "VERCEL_PROJECT_ID",
     ];
   }
 
@@ -113,10 +117,11 @@ function requiredKeysByTarget(target) {
     "RAG_LLM_MAX_OUTPUT_TOKENS",
     "RAG_MIN_EVIDENCE_CHUNKS",
     "RAG_MIN_RERANK_SCORE",
+    "RAG_MIN_HEURISTIC_RELEVANCE",
     "RAG_DEFAULT_TOP_K",
     "RAG_CACHE_TTL_SECONDS",
     "RAG_MAX_UPLOAD_BYTES",
-    "RAG_STORAGE_BUCKET"
+    "RAG_STORAGE_BUCKET",
   ];
 }
 
@@ -174,18 +179,30 @@ function run() {
   }
 
   if (!env.SUPABASE_JWT_SECRET && !env.AUTH_JWKS_URL) {
-    invalid.push("Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured");
+    invalid.push(
+      "Either SUPABASE_JWT_SECRET or AUTH_JWKS_URL must be configured",
+    );
   }
 
-  if ((target === "staging" || process.env.VERCEL === "1" || process.env.VERCEL === "true") && !env.CRON_SECRET) {
-    invalid.push("CRON_SECRET must be configured for deployment environments that expose the ingestion trigger");
+  if (
+    (target === "staging" ||
+      process.env.VERCEL === "1" ||
+      process.env.VERCEL === "true") &&
+    !env.CRON_SECRET
+  ) {
+    invalid.push(
+      "CRON_SECRET must be configured for deployment environments that expose the ingestion trigger",
+    );
   }
 
   if (env.CRON_SECRET && env.CRON_SECRET.length < 16) {
     invalid.push("CRON_SECRET must be at least 16 characters");
   }
 
-  if (env.OPENAI_BYOK_VAULT_KEY && !isValidBase64AesKey(env.OPENAI_BYOK_VAULT_KEY)) {
+  if (
+    env.OPENAI_BYOK_VAULT_KEY &&
+    !isValidBase64AesKey(env.OPENAI_BYOK_VAULT_KEY)
+  ) {
     invalid.push("OPENAI_BYOK_VAULT_KEY must be a base64-encoded 32-byte key");
   }
 
@@ -213,24 +230,38 @@ function run() {
     }
   }
 
-  if (env.RAG_MIN_RERANK_SCORE) {
-    const score = Number.parseFloat(env.RAG_MIN_RERANK_SCORE);
-    if (!Number.isFinite(score) || score < 0) {
-      invalid.push("RAG_MIN_RERANK_SCORE must be a non-negative number");
+  for (const scoreKey of [
+    "RAG_MIN_RERANK_SCORE",
+    "RAG_MIN_HEURISTIC_RELEVANCE",
+  ]) {
+    if (env[scoreKey]) {
+      const score = Number.parseFloat(env[scoreKey]);
+      if (!Number.isFinite(score) || score < 0) {
+        invalid.push(`${scoreKey} must be a non-negative number`);
+      }
     }
   }
 
-  for (const intKey of ["AUTH_RATE_LIMIT_WINDOW_SECONDS", "AUTH_RATE_LIMIT_MAX_REQUESTS"]) {
+  for (const intKey of [
+    "AUTH_RATE_LIMIT_WINDOW_SECONDS",
+    "AUTH_RATE_LIMIT_MAX_REQUESTS",
+  ]) {
     if (target !== "worker" && env[intKey] && !isPositiveInt(env[intKey])) {
       invalid.push(`${intKey} must be a positive integer`);
     }
   }
 
-  if (env.NODE_ENV && !["development", "test", "production"].includes(env.NODE_ENV)) {
+  if (
+    env.NODE_ENV &&
+    !["development", "test", "production"].includes(env.NODE_ENV)
+  ) {
     invalid.push("NODE_ENV must be one of development|test|production");
   }
 
-  if (env.NODE_ENV === "production" && env.AUTH_DEV_INSECURE_BYPASS === "true") {
+  if (
+    env.NODE_ENV === "production" &&
+    env.AUTH_DEV_INSECURE_BYPASS === "true"
+  ) {
     invalid.push("AUTH_DEV_INSECURE_BYPASS cannot be true in production");
   }
 
@@ -240,7 +271,9 @@ function run() {
       console.error(`Missing keys: ${missing.join(", ")}`);
     }
     if (placeholder.length) {
-      console.error(`Placeholder values detected for: ${placeholder.join(", ")}`);
+      console.error(
+        `Placeholder values detected for: ${placeholder.join(", ")}`,
+      );
     }
     if (invalid.length) {
       console.error(`Invalid values: ${invalid.join("; ")}`);
