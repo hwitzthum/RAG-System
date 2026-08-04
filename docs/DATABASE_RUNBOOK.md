@@ -43,6 +43,31 @@ supabase db push --local
 supabase db push
 ```
 
+Merging a migration to `main` runs this automatically via
+`.github/workflows/supabase-migrations.yml`.
+
+### Deploy credential expiry
+
+`.github/workflows/supabase-connectivity.yml` runs `supabase db push --dry-run`
+daily, and on any pull request touching `supabase/migrations/**`. It applies
+nothing; it verifies that a real push _would_ work.
+
+It exists because the apply workflow only triggers on migration changes, so
+nothing exercised the deploy credentials between migration PRs.
+`SUPABASE_DB_PASSWORD` went stale after 2026-07-14 and that was invisible until
+a merge on 2026-08-04 needed it — three weeks in which any migration would have
+silently failed to deploy.
+
+The two credentials fail differently:
+
+| Symptom                                                                        | Cause                                                                                                                           | Fix                                                                                                                           |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `Link project` step fails on privileges                                        | `SUPABASE_ACCESS_TOKEN` expired                                                                                                 | Regenerate at Account → Access Tokens, update the repo secret                                                                 |
+| `failed SASL auth (FATAL: password authentication failed for user "postgres")` | `SUPABASE_DB_PASSWORD` stale                                                                                                    | Settings → Database → Reset database password, update the repo secret                                                         |
+| `Remote migration versions not found in local migrations directory`            | A migration was applied out of band (e.g. `mcp__supabase__apply_migration`), so remote history holds versions with no repo file | Either rename/split the repo files to match the recorded versions, or `supabase migration repair --status reverted <version>` |
+
+A green run prints `Remote database is up to date.` when nothing is pending.
+
 ## 4. Post-Apply Verification Queries
 
 ```sql
