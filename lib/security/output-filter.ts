@@ -87,21 +87,30 @@ function stripControlChars(value: string): string {
   );
 }
 
-function sanitizeMarkdownLinks(value: string): { value: string; redactionCount: number } {
+function sanitizeMarkdownLinks(value: string): {
+  value: string;
+  redactionCount: number;
+} {
   let redactionCount = 0;
-  const sanitized = value.replace(/(!?\[[^\]]*])\(([^)]+)\)/g, (match, label, rawUrl) => {
-    const url = rawUrl.trim();
-    if (/^(?:javascript|data|vbscript|file):/i.test(url)) {
-      redactionCount += 1;
-      return `${label}(#)`;
-    }
-    return match;
-  });
+  const sanitized = value.replace(
+    /(!?\[[^\]]*])\(([^)]+)\)/g,
+    (match, label, rawUrl) => {
+      const url = rawUrl.trim();
+      if (/^(?:javascript|data|vbscript|file):/i.test(url)) {
+        redactionCount += 1;
+        return `${label}(#)`;
+      }
+      return match;
+    },
+  );
 
   return { value: sanitized, redactionCount };
 }
 
-function redactSecrets(value: string): { value: string; redactionCount: number } {
+function redactSecrets(value: string): {
+  value: string;
+  redactionCount: number;
+} {
   let current = value;
   let redactionCount = 0;
 
@@ -129,7 +138,10 @@ function redactPii(value: string): { value: string; redactionCount: number } {
   return { value: current, redactionCount };
 }
 
-function sanitizeHtml(value: string): { value: string; redactionCount: number } {
+function sanitizeHtml(value: string): {
+  value: string;
+  redactionCount: number;
+} {
   let current = value;
   let redactionCount = 0;
 
@@ -167,6 +179,37 @@ function trimForSafety(value: string): string {
 
 export function buildOutputFilterRefusal(language: SupportedLanguage): string {
   return REFUSAL_BY_LANGUAGE[language];
+}
+
+export type StreamedSentenceResult = {
+  text: string;
+  /** A prompt-leak signature was detected; stop emitting further sentences. */
+  halted: boolean;
+};
+
+/**
+ * Per-sentence redaction pass for streamed delivery. Applies every redaction
+ * the full filter applies (secrets, PII, HTML, unsafe links) before a
+ * sentence reaches the client, and halts the stream on prompt-leak
+ * signatures. Whole-answer checks (repetition, truncation, empty-result)
+ * still run in filterAnswerOutput on the complete answer, whose result is
+ * authoritative — the client replaces streamed text with the `final` event.
+ */
+export function redactStreamedSentence(
+  sentence: string,
+): StreamedSentenceResult {
+  const normalized = stripControlChars(sentence.normalize("NFKC"));
+
+  if (PROMPT_LEAK_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return { text: "", halted: true };
+  }
+
+  let value = redactSecrets(normalized).value;
+  value = redactPii(value).value;
+  value = sanitizeHtml(value).value;
+  value = sanitizeMarkdownLinks(value).value;
+
+  return { text: value, halted: false };
 }
 
 export function filterAnswerOutput(input: {

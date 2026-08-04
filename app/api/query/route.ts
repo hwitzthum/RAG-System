@@ -172,6 +172,12 @@ function buildQueryStreamResponse(input: {
       invalidMarkerCount: number;
       fellBack: boolean;
     };
+    citationVerification: {
+      checkedCount: number;
+      supportedCount: number;
+      unsupportedCount: number;
+      unverified: boolean;
+    } | null;
   };
   webSources?: WebSource[];
   queryHistoryId?: string;
@@ -210,6 +216,10 @@ function buildQueryStreamResponse(input: {
     },
   });
 
+  return sseResponse(stream);
+}
+
+function sseResponse(stream: ReadableStream<Uint8Array>): Response {
   return new Response(stream, {
     status: 200,
     headers: {
@@ -376,6 +386,7 @@ export async function POST(request: NextRequest) {
         invalidMarkerCount: 0,
         fellBack: false,
       },
+      citationVerification: null,
     };
 
     return buildQueryStreamResponse({
@@ -428,6 +439,7 @@ export async function POST(request: NextRequest) {
         invalidMarkerCount: 0,
         fellBack: false,
       },
+      citationVerification: null,
     };
 
     logAuditEvent({
@@ -525,40 +537,17 @@ export async function POST(request: NextRequest) {
             ? scopedDocumentIds.join(",")
             : null;
 
-        const answerResult =
-          webSources.length > 0
-            ? await generateWebAugmentedAnswer({
-                query: requestBody.query,
-                language: retrievalResult.trace.language,
-                chunks: retrievalResult.chunks,
-                minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-                minRerankScore: env.RAG_MIN_RERANK_SCORE,
-                minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
-                maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                documentScopeId: explicitScopeId,
-                webSources,
-                minWebSources: env.RAG_WEB_MIN_SOURCES,
-              })
-            : await generateGroundedAnswer({
-                query: requestBody.query,
-                language: retrievalResult.trace.language,
-                chunks: retrievalResult.chunks,
-                minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-                minRerankScore: env.RAG_MIN_RERANK_SCORE,
-                minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
-                maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                documentScopeId: explicitScopeId,
-              });
-        const latencyMs = Date.now() - startedAt;
+        type AnswerResult = Awaited<ReturnType<typeof generateGroundedAnswer>>;
 
-        emitQueryLatency(latencyMs, { userId: authResult.user.id });
-        emitCacheHit(retrievalResult.trace.cacheHit, {
-          userId: authResult.user.id,
-        });
+        // Narrowing on authResult.ok does not flow into these closures once
+        // the work moves inside the stream; capture the narrowed user once.
+        const authUser = authResult.user;
 
-        const retrievalMeta = {
+        // Meta with answer-dependent fields at their defaults; the `final`
+        // event carries the authoritative values.
+        const buildRetrievalOnlyMeta = () => ({
           cacheHit: retrievalResult.trace.cacheHit,
-          latencyMs,
+          latencyMs: Date.now() - startedAt,
           selectedChunkIds: retrievalResult.chunks.map(
             (chunk) => chunk.chunkId,
           ),
@@ -566,7 +555,7 @@ export async function POST(request: NextRequest) {
             ...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId)),
           ],
           retrievalTrace: retrievalResult.trace,
-          insufficientEvidence: answerResult.insufficientEvidence,
+          insufficientEvidence: false,
           conversationId,
           documentScopeId:
             scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
@@ -575,56 +564,91 @@ export async function POST(request: NextRequest) {
             remaining: rate.remaining,
             retryAfterSeconds: rate.retryAfterSeconds,
           },
+          promptInjection: {
+            blockedUserQuery: false,
+            suspiciousChunkCount: 0,
+            blockedChunkCount: 0,
+            suspiciousWebSourceCount: 0,
+            blockedWebSourceCount: 0,
+          },
+          outputFilter: {
+            blocked: false,
+            filtered: false,
+            reasons: [] as string[],
+            redactionCount: 0,
+          },
+          queryExpansion: retrievalResult.queryExpansion,
+          citationAttribution: {
+            markerCount: 0,
+            invalidMarkerCount: 0,
+            fellBack: false,
+          },
+          citationVerification: null as
+            AnswerResult["citationVerification"] | null,
+        });
+
+        const buildFullMeta = (
+          answerResult: AnswerResult,
+          latencyMs: number,
+        ) => ({
+          ...buildRetrievalOnlyMeta(),
+          latencyMs,
+          insufficientEvidence: answerResult.insufficientEvidence,
           promptInjection: answerResult.promptInjection,
           outputFilter: answerResult.outputFilter,
-          queryExpansion: retrievalResult.queryExpansion,
           citationAttribution: answerResult.citationAttribution,
+          citationVerification: answerResult.citationVerification,
+        });
+
+        const persistQueryHistory = async (
+          answerResult: AnswerResult,
+          latencyMs: number,
+        ): Promise<string | undefined> => {
+          const supabase = getSupabaseAdminClient();
+          try {
+            const { data: historyRow, error: historyError } = await supabase
+              .from("query_history")
+              .insert({
+                user_id: authUser.id,
+                conversation_id: conversationId,
+                query: requestBody.query,
+                answer: answerResult.answer,
+                citations: answerResult.citations,
+                latency_ms: latencyMs,
+                cache_hit: retrievalResult.trace.cacheHit,
+              })
+              .select("id")
+              .single();
+
+            if (historyError) {
+              logAuditEvent({
+                action: "query.history.write",
+                actorId: authUser.id,
+                actorRole: authUser.role,
+                outcome: "failure",
+                resource: "query_history",
+                ipAddress,
+                metadata: {
+                  reason: "query_history_insert_failed",
+                  message: historyError.message,
+                },
+              });
+              return undefined;
+            }
+            return historyRow?.id;
+          } catch {
+            // Continue response path if history write fails entirely.
+            return undefined;
+          }
         };
 
-        const supabase = getSupabaseAdminClient();
-        let queryHistoryId: string | undefined;
-        try {
-          const { data: historyRow, error: historyError } = await supabase
-            .from("query_history")
-            .insert({
-              user_id: authResult.user.id,
-              conversation_id: conversationId,
-              query: requestBody.query,
-              answer: answerResult.answer,
-              citations: answerResult.citations,
-              latency_ms: latencyMs,
-              cache_hit: retrievalResult.trace.cacheHit,
-            })
-            .select("id")
-            .single();
-
-          if (historyError) {
-            logAuditEvent({
-              action: "query.history.write",
-              actorId: authResult.user.id,
-              actorRole: authResult.user.role,
-              outcome: "failure",
-              resource: "query_history",
-              ipAddress,
-              metadata: {
-                reason: "query_history_insert_failed",
-                message: historyError.message,
-              },
-            });
-          } else {
-            queryHistoryId = historyRow?.id;
-          }
-        } catch {
-          // Continue response path if history write fails entirely.
-        }
-
-        if (userOpenAiApiKey) {
-          void markUserOpenAiApiKeyUsed(authResult.user.id).catch(
-            (touchError) => {
+        const touchByokKeys = (): void => {
+          if (userOpenAiApiKey) {
+            void markUserOpenAiApiKeyUsed(authUser.id).catch((touchError) => {
               logAuditEvent({
                 action: "openai.byok.touch",
-                actorId: authResult.user.id,
-                actorRole: authResult.user.role,
+                actorId: authUser.id,
+                actorRole: authUser.role,
                 outcome: "failure",
                 resource: "openai_byok_vault",
                 ipAddress,
@@ -636,17 +660,15 @@ export async function POST(request: NextRequest) {
                       : "unknown_error",
                 },
               });
-            },
-          );
-        }
+            });
+          }
 
-        if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
-          void markUserCohereApiKeyUsed(authResult.user.id).catch(
-            (touchError) => {
+          if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
+            void markUserCohereApiKeyUsed(authUser.id).catch((touchError) => {
               logAuditEvent({
                 action: "cohere.byok.touch",
-                actorId: authResult.user.id,
-                actorRole: authResult.user.role,
+                actorId: authUser.id,
+                actorRole: authUser.role,
                 outcome: "failure",
                 resource: "cohere_byok_vault",
                 ipAddress,
@@ -658,52 +680,163 @@ export async function POST(request: NextRequest) {
                       : "unknown_error",
                 },
               });
-            },
-          );
-        }
+            });
+          }
+        };
 
-        logAuditEvent({
-          action: "query.execute",
-          actorId: authResult.user.id,
-          actorRole: authResult.user.role,
-          outcome: "success",
-          resource: "query",
-          ipAddress,
-          metadata: {
-            conversationId: requestBody.conversationId ?? null,
-            languageHint: requestBody.languageHint ?? null,
-            topK,
-            documentId:
-              scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
-            documentIds: scopedDocumentIds ?? [],
-            selectedChunkCount: retrievalResult.chunks.length,
-            selectedDocumentIds: [
-              ...new Set(
-                retrievalResult.chunks.map((chunk) => chunk.documentId),
-              ),
-            ],
-            cacheHit: retrievalResult.trace.cacheHit,
-            retrievalVersion: retrievalResult.trace.retrievalVersion,
-            insufficientEvidence: answerResult.insufficientEvidence,
-            promptInjection: answerResult.promptInjection,
-            outputFilter: answerResult.outputFilter,
-            queryExpansion: retrievalResult.queryExpansion,
-            citationAttribution: answerResult.citationAttribution,
-            citationCount: answerResult.citations.length,
-            resolvedConversationId: conversationId,
-            openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
-            cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",
+        const logSuccessAudit = (answerResult: AnswerResult): void => {
+          logAuditEvent({
+            action: "query.execute",
+            actorId: authUser.id,
+            actorRole: authUser.role,
+            outcome: "success",
+            resource: "query",
+            ipAddress,
+            metadata: {
+              conversationId: requestBody.conversationId ?? null,
+              languageHint: requestBody.languageHint ?? null,
+              topK,
+              documentId:
+                scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+              documentIds: scopedDocumentIds ?? [],
+              selectedChunkCount: retrievalResult.chunks.length,
+              selectedDocumentIds: [
+                ...new Set(
+                  retrievalResult.chunks.map((chunk) => chunk.documentId),
+                ),
+              ],
+              cacheHit: retrievalResult.trace.cacheHit,
+              retrievalVersion: retrievalResult.trace.retrievalVersion,
+              insufficientEvidence: answerResult.insufficientEvidence,
+              promptInjection: answerResult.promptInjection,
+              outputFilter: answerResult.outputFilter,
+              queryExpansion: retrievalResult.queryExpansion,
+              citationAttribution: answerResult.citationAttribution,
+              citationVerification: answerResult.citationVerification,
+              citationCount: answerResult.citations.length,
+              resolvedConversationId: conversationId,
+              openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
+              cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",
+            },
+          });
+        };
+
+        // True streaming: answer generation runs inside the SSE stream so
+        // per-sentence-redacted sentences reach the client as they are
+        // generated. The `final` event stays authoritative — its answer has
+        // passed the full output filter and the client replaces streamed
+        // text with it (which is also how a rare late retraction works).
+        // NOTE: start() is invoked synchronously at construction, inside
+        // runWithRuntimeSecrets, so BYOK runtime secrets propagate into the
+        // streamed LLM call via AsyncLocalStorage.
+        const stream = new ReadableStream<Uint8Array>({
+          start: async (controller) => {
+            let clientGone = false;
+            const emit = (event: string, data: unknown) => {
+              if (clientGone) {
+                return;
+              }
+              try {
+                controller.enqueue(encodeSseEvent(event, data));
+              } catch {
+                // Client disconnected mid-stream; keep finishing side
+                // effects (history, audit) without emitting.
+                clientGone = true;
+              }
+            };
+
+            try {
+              emit("meta", {
+                queryId,
+                retrievalMeta: buildRetrievalOnlyMeta(),
+              });
+
+              const answerResult =
+                webSources.length > 0
+                  ? await generateWebAugmentedAnswer({
+                      query: requestBody.query,
+                      language: retrievalResult.trace.language,
+                      chunks: retrievalResult.chunks,
+                      minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                      minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                      minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+                      maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                      documentScopeId: explicitScopeId,
+                      webSources,
+                      minWebSources: env.RAG_WEB_MIN_SOURCES,
+                      onSentence: (sentence) =>
+                        emit("token", { queryId, token: sentence }),
+                    })
+                  : await generateGroundedAnswer({
+                      query: requestBody.query,
+                      language: retrievalResult.trace.language,
+                      chunks: retrievalResult.chunks,
+                      minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                      minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                      minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+                      maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                      documentScopeId: explicitScopeId,
+                      onSentence: (sentence) =>
+                        emit("token", { queryId, token: sentence }),
+                    });
+              const latencyMs = Date.now() - startedAt;
+
+              emitQueryLatency(latencyMs, { userId: authUser.id });
+              emitCacheHit(retrievalResult.trace.cacheHit, {
+                userId: authUser.id,
+              });
+
+              const retrievalMeta = buildFullMeta(answerResult, latencyMs);
+              const queryHistoryId = await persistQueryHistory(
+                answerResult,
+                latencyMs,
+              );
+              touchByokKeys();
+              logSuccessAudit(answerResult);
+
+              emit("final", {
+                queryId,
+                answer: answerResult.answer,
+                citations: answerResult.citations,
+                retrievalMeta,
+                webSources: webSources.length ? webSources : undefined,
+                queryHistoryId,
+              });
+              emit("done", { queryId });
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "unknown_error";
+              logAuditEvent({
+                action: "query.execute",
+                actorId: authUser.id,
+                actorRole: authUser.role,
+                outcome: "failure",
+                resource: "query",
+                ipAddress,
+                metadata: {
+                  reason: "answer_generation_failed",
+                  message,
+                },
+              });
+              emit("final", {
+                queryId,
+                answer: "The answer could not be generated. Please retry.",
+                citations: [],
+                retrievalMeta: buildRetrievalOnlyMeta(),
+                error: "answer_generation_failed",
+              });
+              emit("done", { queryId });
+            } finally {
+              try {
+                controller.close();
+              } catch {
+                // Already closed or cancelled.
+              }
+            }
           },
         });
 
-        return buildQueryStreamResponse({
-          queryId,
-          answer: answerResult.answer,
-          citations: answerResult.citations,
-          retrievalMeta,
-          webSources,
-          queryHistoryId,
-        });
+        return sseResponse(stream);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "unknown_error";

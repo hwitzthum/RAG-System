@@ -9,6 +9,9 @@ function ensureRetrievalTestEnv(): void {
   process.env.SUPABASE_ANON_KEY ??= "anon-key";
   process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-key";
   process.env.OPENAI_API_KEY ??= "test-openai-key";
+  // Keep unit tests hermetic: the citation verifier would otherwise attempt a
+  // real OpenAI call after answer generation.
+  process.env.RAG_CITATION_VERIFICATION_ENABLED ??= "false";
 }
 
 function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {

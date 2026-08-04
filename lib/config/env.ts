@@ -88,8 +88,17 @@ const envSchema = z.object({
   // proceed without sufficient local document evidence. A single stray web hit
   // must not bypass the evidence gate.
   RAG_WEB_MIN_SOURCES: z.coerce.number().int().positive().default(2),
-  // Model used by the evaluation LLM-judge (benchmark faithfulness/relevance).
+  // Model used by the evaluation LLM-judge (benchmark faithfulness/relevance)
+  // and the production citation verifier.
   RAG_EVAL_JUDGE_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  // "ends" places the strongest evidence at the beginning AND end of the
+  // prompt (lost-in-the-middle mitigation); "score" keeps plain score order.
+  RAG_EVIDENCE_PLACEMENT: z.enum(["ends", "score"]).default("ends"),
+  // Post-generation citation verification (annotate-only, never blocks).
+  RAG_CITATION_VERIFICATION_ENABLED: z.preprocess(
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
+  ),
   // Guarded pattern (`!(falsy strings)`) rather than the truthy-check used by
   // the default-false flags: a truthy-check maps `undefined` to `false` before
   // `.default(true)` can apply, silently disabling a default-on feature when
@@ -168,6 +177,9 @@ const parsed = envSchema.safeParse({
   RAG_HYDE_ENABLED: process.env.RAG_HYDE_ENABLED,
   RAG_WEB_MIN_SOURCES: process.env.RAG_WEB_MIN_SOURCES,
   RAG_EVAL_JUDGE_MODEL: process.env.RAG_EVAL_JUDGE_MODEL,
+  RAG_EVIDENCE_PLACEMENT: process.env.RAG_EVIDENCE_PLACEMENT,
+  RAG_CITATION_VERIFICATION_ENABLED:
+    process.env.RAG_CITATION_VERIFICATION_ENABLED,
   RAG_CONTEXTUAL_GROUPING_ENABLED: process.env.RAG_CONTEXTUAL_GROUPING_ENABLED,
   RAG_WEB_SEARCH_ENABLED: process.env.RAG_WEB_SEARCH_ENABLED,
   RAG_WEB_SEARCH_PROVIDER: process.env.RAG_WEB_SEARCH_PROVIDER,

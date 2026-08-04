@@ -8,7 +8,10 @@ import type {
   JobProgress,
   ProcessJobResult,
 } from "../lib/ingestion/runtime/types";
-import type { ClaimIngestionJobsInput, IngestionRuntimeRepository } from "../lib/ingestion/runtime/repository";
+import type {
+  ClaimIngestionJobsInput,
+  IngestionRuntimeRepository,
+} from "../lib/ingestion/runtime/repository";
 
 const quietLogger = {
   info: () => undefined,
@@ -24,12 +27,18 @@ class LoopRepository implements IngestionRuntimeRepository {
     this.queuedJobs = [...queuedJobs];
   }
 
-  async claimIngestionJobs(_input: ClaimIngestionJobsInput): Promise<IngestionJob[]> {
+  async claimIngestionJobs(
+    _input: ClaimIngestionJobsInput,
+  ): Promise<IngestionJob[]> {
     void _input;
     return this.queuedJobs.shift() ?? [];
   }
 
   async getDocument(): Promise<DocumentRecord> {
+    throw new Error("not used");
+  }
+
+  async setDocumentSummary(): Promise<void> {
     throw new Error("not used");
   }
 
@@ -112,7 +121,9 @@ test("runIngestionWorker sleeps after idle poll when running continuously", asyn
   let sleepCalls = 0;
   await assert.rejects(
     runIngestionWorker({
-      settings: resolveIngestionRuntimeSettings({ workerPollIntervalSeconds: 2 }),
+      settings: resolveIngestionRuntimeSettings({
+        workerPollIntervalSeconds: 2,
+      }),
       repository,
       logger: quietLogger,
       sleep: async (milliseconds) => {

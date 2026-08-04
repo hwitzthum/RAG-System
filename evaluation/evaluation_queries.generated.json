@@ -1,5 +1,287 @@
 [
   {
+    "id": "en-32fb0a96-0",
+    "language": "EN",
+    "question": "How does the integration of AI in HR affect employee well-being and job security?",
+    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
+    "expected_section": "Page 1",
+    "expected_pages": [
+      1
+    ],
+    "acceptable_answer_points": [
+      "AI can enhance efficiency and reduce bias in HR processes.",
+      "There are concerns about job security, fairness, and privacy due to AI integration.",
+      "Transparency in AI systems is crucial for building trust among employees.",
+      "AI can have both positive and negative effects on employee well-being based on its implementation.",
+      "Organizational strategies like clear communication and employee involvement are important for improving outcomes."
+    ]
+  },
+  {
+    "id": "en-32fb0a96-5",
+    "language": "EN",
+    "question": "How does AI affect employee job satisfaction and retention?",
+    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
+    "expected_section": "Page 3",
+    "expected_pages": [
+      3
+    ],
+    "acceptable_answer_points": [
+      "AI can improve job satisfaction by automating routine tasks, allowing employees to focus on meaningful work.",
+      "Job satisfaction decreases when employees feel anxious about AI evaluations and do not understand the criteria.",
+      "Perceptions of fairness and support in AI systems can increase job satisfaction.",
+      "Employees with negative attitudes towards AI may experience reduced job satisfaction due to fears of losing human interaction.",
+      "Perceived organizational support can enhance job satisfaction by helping employees navigate AI systems."
+    ]
+  },
+  {
+    "id": "en-32fb0a96-11",
+    "language": "EN",
+    "question": "How can companies improve trust and job satisfaction regarding AI decision-making?",
+    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
+    "expected_section": "Fairness And",
+    "expected_pages": [
+      5
+    ],
+    "acceptable_answer_points": [
+      "Opaque AI decision-making leads to reduced trust and job satisfaction.",
+      "Lack of communication affects perceived fairness.",
+      "Providing clear communication on AI decision-making processes can help.",
+      "Involving employees in AI implementation is beneficial."
+    ]
+  },
+  {
+    "id": "en-32fb0a96-16",
+    "language": "EN",
+    "question": "How can organizations ensure that AI positively impacts employee well-being?",
+    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
+    "expected_section": "Page 7",
+    "expected_pages": [
+      7
+    ],
+    "acceptable_answer_points": [
+      "Organizations should enhance transparency in AI-driven evaluations to reduce stress and disengagement.",
+      "Employee involvement in AI processes can improve experiences and job satisfaction.",
+      "Balancing AI's benefits with its challenges is crucial for maintaining trust.",
+      "Perceptions of AI as a career-enhancing tool can lead to reduced turnover and increased engagement.",
+      "Ethical use of AI is essential to ensure employees feel valued and supported."
+    ]
+  },
+  {
+    "id": "de-373a9133-0",
+    "language": "DE",
+    "question": "Was ist der Zweck des Unterstützungsantrags und wer kann ihn stellen?",
+    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
+    "expected_section": "Prozess UnterstüTzungsantrag / Mandat ZüRich / Prozess UnterstüTzungsantrag / Prozess UnterstüTzungsantrag",
+    "expected_pages": [
+      1
+    ],
+    "acceptable_answer_points": [
+      "Der Unterstützungsantrag klärt die finanzielle Situation und die Unterstützungsbedürftigkeit nach Sozialhilferichtlinien.",
+      "Der Prozess gilt für alle Bewohnenden mit Status N, S, VA, B-FL und F-FL.",
+      "Personen beantragen die finanzielle Unterstützung schriftlich im Rahmen des Eintrittsgesprächs oder in einem zeitnahen Folgegespräch.",
+      "Das Erstgespräch zur Klärung der Bedürftigkeit findet innerhalb der ersten zwei Wochen des Aufenthalts statt.",
+      "Der Aufenthalt in der zugewiesenen Unterkunft ist Voraussetzung für den Erhalt von Unterstützungsleistungen."
+    ]
+  },
+  {
+    "id": "de-373a9133-3",
+    "language": "DE",
+    "question": "Welche Unterlagen sind für den Prozess Unterstützungsantrag erforderlich?",
+    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
+    "expected_section": "Mandat ZüRich / Prozess UnterstüTzungsantrag",
+    "expected_pages": [
+      2
+    ],
+    "acceptable_answer_points": [
+      "Lohnabrechnungen der letzten 6 Monate müssen eingereicht werden.",
+      "Der Arbeitsvertrag ist erforderlich.",
+      "Eine eventuelle Kündigung sollte ebenfalls vorgelegt werden.",
+      "Für selbständige Erwerbstätigkeit sind relevante Unterlagen zu Erwerbseinnahmen notwendig.",
+      "Abrechnungen oder Kontoauszüge der letzten 6 Monate sind als Nachweis für Renteneingänge erforderlich."
+    ]
+  },
+  {
+    "id": "de-373a9133-6",
+    "language": "DE",
+    "question": "Wie werden Twinteinnahmen auf dem Konto im Kanton Zürich behandelt?",
+    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
+    "expected_section": "Mandat ZüRich / Prozess UnterstüTzungsantrag",
+    "expected_pages": [
+      5
+    ],
+    "acceptable_answer_points": [
+      "Alle Einnahmen sind grundsätzlich anzurechnen.",
+      "Einnahmen über Twint, die im Monat 10% des GBL nicht übersteigen und im Einzelfall unter CHF 50.- liegen, müssen auf dem Kontoauszug vermerkt werden.",
+      "Wenn die Einnahmen über Twint im Monat 10% des GBL übersteigen oder im Einzelfall höher als CHF 50.- sind, ist eine schriftliche Begründung erforderlich.",
+      "Die Begründungen müssen plausibel sein, sonst werden die Einnahmen von der Sozialhilfe oder Asylfürsorge abgezogen."
+    ]
+  },
+  {
+    "id": "de-7b8b0ee3-0",
+    "language": "DE",
+    "question": "Was sind die Hauptthemen, die in dem Dokument über rollen-basierte Arbeit behandelt werden?",
+    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
+    "expected_section": "Page 1 / Page 2 / Page 3 / Page 4",
+    "expected_pages": [
+      1
+    ],
+    "acceptable_answer_points": [
+      "Das Dokument behandelt die Themen der heutigen Arbeitsweise.",
+      "Es erklärt, was rollen-basierte Arbeit ist.",
+      "Es diskutiert die Probleme, die durch rollen-basierte Arbeit gelöst werden können.",
+      "Der Autor des Dokuments ist Harry Witzthum.",
+      "Das Dokument wurde am 20.01.2026 veröffentlicht."
+    ]
+  },
+  {
+    "id": "de-7b8b0ee3-3",
+    "language": "DE",
+    "question": "Welche typischen Herausforderungen gibt es bei der rollenbasierten Arbeit?",
+    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
+    "expected_section": "Page 6",
+    "expected_pages": [
+      6
+    ],
+    "acceptable_answer_points": [
+      "Unklare Verantwortlichkeiten führen zu Fragen wie 'Ist das meine Aufgabe?'.",
+      "Es entstehen Bottlenecks durch Personen-Abhängigkeit.",
+      "Wissen geht verloren, beispielsweise durch Ferien, Krankheit oder Kündigungen.",
+      "Die Entscheidungsfindung ist schwierig, da oft unklar ist, 'Wer darf das entscheiden?'."
+    ]
+  },
+  {
+    "id": "de-7b8b0ee3-6",
+    "language": "DE",
+    "question": "Was bedeutet rollen-basierte Arbeit und wie ist sie strukturiert?",
+    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
+    "expected_section": "Page 9",
+    "expected_pages": [
+      9
+    ],
+    "acceptable_answer_points": [
+      "Eine Rolle hat eine klar definierte Funktion im System von Services und Service-Familien.",
+      "Eine Person kann mehrere Rollen innehaben.",
+      "Der Zweck ist die aktive Unterstützung des Business.",
+      "Die Rollen sind explizit dokumentiert."
+    ]
+  },
+  {
+    "id": "de-051209e7-3",
+    "language": "DE",
+    "question": "Welche KI-Modelle werden in dem Dokument erwähnt und welche Organisationen vertrauen darauf?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "2023 / Page 4",
+    "expected_pages": [
+      3
+    ],
+    "acceptable_answer_points": [
+      "Die erwähnten KI-Modelle sind Claude, GPT-4, Gemini, Llama und Mistral.",
+      "Es wird betont, dass keine Daten für das Training verwendet werden.",
+      "Vertraut wird von Caritas, der Mercator Stiftung und 50 Schweizer Organisationen."
+    ]
+  },
+  {
+    "id": "de-051209e7-9",
+    "language": "DE",
+    "question": "Was ist der Wettbewerbsvorteil laut dem Dokument?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Page 10 / Page 11",
+    "expected_pages": [
+      10
+    ],
+    "acceptable_answer_points": [
+      "Der Wettbewerbsvorteil liegt im Kontext.",
+      "Der Wettbewerbsvorteil basiert auf dem Domänenwissen.",
+      "Die Prozesse sind ein wichtiger Teil des Wettbewerbsvorteils.",
+      "Die Kundenkenntnis trägt zum Wettbewerbsvorteil bei.",
+      "Implizites Wissen ist ebenfalls entscheidend für den Wettbewerbsvorteil."
+    ]
+  },
+  {
+    "id": "de-051209e7-15",
+    "language": "DE",
+    "question": "Wie funktioniert der Prozess zur Erstellung eines Abstracts aus einem PDF-Dokument?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Schritt Aktion Output",
+    "expected_pages": [
+      18
+    ],
+    "acceptable_answer_points": [
+      "Zuerst wird ein PDF hochgeladen.",
+      "Der Extraktions-Prompt erzeugt strukturierte Bullet Points.",
+      "Der Output von Schritt 1 wird in einen Schreib-Prompt umgewandelt.",
+      "Das Ergebnis ist ein fertiger Abstract mit 450 bis 600 Wörtern und 3 Absätzen.",
+      "Optional kann man 'Regenerate' drücken, um Variationen basierend auf den gleichen Fakten zu erhalten."
+    ]
+  },
+  {
+    "id": "de-051209e7-21",
+    "language": "DE",
+    "question": "Wie wurde das Feedback für die Projekte gesammelt?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Page 27",
+    "expected_pages": [
+      27
+    ],
+    "acceptable_answer_points": [
+      "Es wurden 4 Beispiel-Projektabstrakte verwendet.",
+      "Zu jedem Abstract gab es strukturierte Fragen und Platz für qualitatives Feedback.",
+      "Die finale Frage wurde auf einer Skala von 1 bis 6 gestellt.",
+      "Es nahmen 16 Kollegen teil, darunter Key Users und Skeptiker.",
+      "Die Teilnehmer wurden bewusst gemischt."
+    ]
+  },
+  {
+    "id": "de-051209e7-29",
+    "language": "DE",
+    "question": "Was sind die Regeln für den Tone of Voice im Prompt?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Page 36",
+    "expected_pages": [
+      36
+    ],
+    "acceptable_answer_points": [
+      "Es gibt 9 Regeln für den Tone of Voice im Prompt.",
+      "Die Sprache sollte einfach und deklarativ sein.",
+      "Es sollte keine Dramatik oder Dringlichkeit verwendet werden.",
+      "Der Fokus liegt auf konkreten Handlungen, nicht auf narrativer Spannung.",
+      "Die Präsentation sollte informativ und nicht verkaufsorientiert sein."
+    ]
+  },
+  {
+    "id": "de-051209e7-36",
+    "language": "DE",
+    "question": "Was sollte man tun, wenn der Zwei-Schritt-Prozess nicht funktioniert?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Page 45",
+    "expected_pages": [
+      45
+    ],
+    "acceptable_answer_points": [
+      "Einen Intermediary Step einführen.",
+      "Die AI schlägt 2 bis 3 verschiedene Narrative-Ansätze vor.",
+      "Der User wählt den bevorzugten Ansatz aus.",
+      "Die AI schreibt dann in die gewählte Richtung.",
+      "Es wird jedoch eingeschätzt, dass dies wahrscheinlich nicht nötig ist."
+    ]
+  },
+  {
+    "id": "de-051209e7-43",
+    "language": "DE",
+    "question": "Was sind die Hauptpunkte, die in der Plenardiskussion behandelt werden sollten?",
+    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
+    "expected_section": "Page 53 / Page 54",
+    "expected_pages": [
+      53
+    ],
+    "acceptable_answer_points": [
+      "Die Teilnehmer sollen ihre identifizierten Use Cases teilen.",
+      "Die größte Erkenntnis beim Tone of Voice soll diskutiert werden.",
+      "Die wichtigsten Stakeholder sollen benannt werden.",
+      "Es sollen Feedback-Fragen formuliert werden."
+    ]
+  },
+  {
     "id": "en-2e51c566-0",
     "language": "EN",
     "question": "What are the details of the Cambodia Safe Migration project?",
@@ -11,114 +293,131 @@
     "acceptable_answer_points": [
       "The project is called Cambodia Safe Migration Cambodia (SaMiCa) Phase II.",
       "It is funded by the Ursula Zindel-Hilti Foundation.",
-      "The project duration is from January 2025 to December 2027, totaling 36 months.",
+      "The project duration is from January 2025 to December 2027, lasting 36 months.",
       "The total budget for the project is CHF 3,260,951.",
       "The contact person for the project is Nina Zenklusen, who can be reached at 041 419 22 87 or nzenklusen@caritas.ch."
     ]
   },
   {
-    "id": "en-2e51c566-6",
+    "id": "en-2e51c566-5",
     "language": "EN",
-    "question": "What are the main goals and strategies of CACH's migration efforts in Cambodia from 2021 to 2025?",
+    "question": "What are the key reasons for migration from Cambodia to Thailand?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "2021 - 2025",
+    "expected_section": "Page 4",
     "expected_pages": [
-      6
+      4
     ],
     "acceptable_answer_points": [
-      "CACH aims to end human trafficking by preventing it and assisting presumed victims.",
-      "The strategy focuses on increasing income for vulnerable people and promoting safe migration.",
-      "CACH targets communities affected by disaster, poverty, and migration in northwestern provinces bordering Thailand.",
-      "CACH is committed to ending discrimination and exploitation of migrants, especially women and children.",
-      "The Safe Migration Cambodia (SaMiCa) project will transition to a follow-up phase from 2025 to 2027, expanding its impact and introducing new activities."
+      "Migration is a crucial survival strategy due to agriculture and restricted educational opportunities.",
+      "About 2 million Cambodian workers are in Thailand, and remittances are vital for supporting families.",
+      "Less than 30% of migrants use official channels with proper documentation.",
+      "There has been a six-fold increase in female migrants to Thailand over the past 20 years.",
+      "Female migrants now account for at least 45% of the migrant workforce."
     ]
   },
   {
     "id": "en-2e51c566-11",
     "language": "EN",
-    "question": "What strategies are proposed to improve support for migrants and students transitioning to public schools?",
+    "question": "What initiatives are being implemented in the Samica project to support vulnerable households and promote safe migration?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "Page 11",
+    "expected_section": "Page 8",
     "expected_pages": [
-      11
+      8
     ],
     "acceptable_answer_points": [
-      "Establish regular coordination meetings with government agencies, NGOs, and community groups.",
-      "Create a stakeholder coordination committee to oversee collaboration and resolve issues.",
-      "Invest in an integrated data management system to improve data collection and sharing.",
-      "Develop structured transition programs to support students moving from non-formal education to public schools.",
-      "Engage with government authorities to advocate for policies supporting safe migration and student reintegration."
+      "The Graduation Approach pilot is integrated into Samica, targeting 80 vulnerable households.",
+      "This approach aims to help households escape poverty through various tailored interventions.",
+      "The Youth Connection pilot focuses on raising awareness about safe migration among dropout youth.",
+      "KMC expanded its outreach to all villages in Kamrieng district to ensure awareness of safe migration practices.",
+      "Collaboration with border authorities allows for directing migrants to KMC for protection services."
     ]
   },
   {
-    "id": "en-2e51c566-19",
+    "id": "en-2e51c566-17",
     "language": "EN",
-    "question": "What are the main objectives of the project regarding stakeholder coordination and capacity building?",
+    "question": "What are the main outcomes of the project and how are they measured?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "Building",
+    "expected_section": "Project Outcomes / Page 13",
     "expected_pages": [
-      13
+      12
     ],
     "acceptable_answer_points": [
-      "Strengthen coordination mechanisms between governmental actors, NGOs, and other stakeholders.",
-      "Facilitate collaboration between border authorities and migrant centers.",
-      "Promote pooling of resources and expertise among stakeholders.",
-      "Enhance the capacity of implementing partners through targeted support and coaching."
+      "The project has four main outcomes.",
+      "These outcomes are measured using specific outcome indicators.",
+      "The outcomes address various challenges faced by the target groups.",
+      "The details of the outcome indicators can be found on page 14."
     ]
   },
   {
-    "id": "en-2e51c566-24",
+    "id": "en-2e51c566-23",
     "language": "EN",
-    "question": "How does the GA program help prevent unsafe migration?",
+    "question": "What are the key indicators used to measure the outcomes of the project related to protection and reintegration?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "Page 17",
+    "expected_section": "Pacity Building",
     "expected_pages": [
-      17
+      14
     ],
     "acceptable_answer_points": [
-      "The GA offers sustainable livelihoods to prevent unsafe migration.",
-      "It provides awareness-raising on safe migration and life skills training.",
-      "Cash transfers and psychological support stabilize vulnerable households.",
-      "Vocational training and business support create long-term income opportunities.",
-      "The program particularly focuses on the needs of women and girls."
+      "The percentage of implementing partners reporting increased collaboration and information sharing due to networking efforts.",
+      "The number of project participants receiving life- and dignity-preserving services, disaggregated by gender, age, and migration status.",
+      "The percentage of vulnerable migrants and children reporting increased self-sufficiency, disaggregated by gender and age.",
+      "The percentage of targeted migrants and children reporting increased self-sufficiency, disaggregated by gender, age, and migration status.",
+      "The percentage of children and migrants who have remained with their families, in stable employment, or in improved living conditions for at least one year."
     ]
   },
   {
-    "id": "en-2e51c566-30",
+    "id": "en-2e51c566-29",
     "language": "EN",
-    "question": "What measures are being taken to support safe migration in Battambang Province?",
+    "question": "What are the main goals and developments of the SaMiCa II project related to youth inclusion?",
+    "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+    "expected_section": "Page 18",
+    "expected_pages": [
+      18
+    ],
+    "acceptable_answer_points": [
+      "The SaMiCa II project aims to facilitate youth inclusion.",
+      "Insights from the Youth Connection project will be integrated into phase II of SaMiCa II.",
+      "There is a strong focus on awareness-raising and online content from the Youth Connection project.",
+      "Strengthening the partnership with Child's Dream Foundation is a key aim of the project.",
+      "Services will be extended to Phnom Prek and Sampovlon district."
+    ]
+  },
+  {
+    "id": "en-2e51c566-34",
+    "language": "EN",
+    "question": "What measures are being taken to support migrants in Battambang Province?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
     "expected_section": "Battambang Province",
     "expected_pages": [
       21
     ],
     "acceptable_answer_points": [
-      "NCCT and KMC will establish connections with key checkpoints like Doung International and Phnom Dey International Checkpoints.",
-      "The project will provide small-scale support to checkpoints, including water, clothing, wells, and solar pumps.",
+      "NCCT and KMC will establish connections with key checkpoints like Doung International Checkpoint and Phnom Dey International Checkpoint.",
+      "The project will provide small-scale support to international and corridor checkpoints, including supplies like water and clothing.",
       "Training will be given to border police on handling vulnerable migrants.",
-      "Transportation costs for migrants referred to KMC will be covered for emergency assistance.",
-      "The project aims to engage at least 180 local authority representatives in sessions on safe migration practices over 3 years."
+      "Transportation costs for migrants referred to KMC will be covered, where they will receive emergency assistance.",
+      "The project aims to sign at least 5 MOUs to ensure collaboration between checkpoint posts and NCCT/KMC by the end of the project."
     ]
   },
   {
-    "id": "en-2e51c566-36",
+    "id": "en-2e51c566-40",
     "language": "EN",
-    "question": "What services does the Futures Office provide to support employment and business establishment for caregivers and youth?",
+    "question": "What support does KMC provide to vulnerable returning migrants for their reintegration?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "Generation Activity",
+    "expected_section": "Page 27",
     "expected_pages": [
-      26
+      27
     ],
     "acceptable_answer_points": [
-      "The Futures Office offers Technical and Vocational Education and Training (TVET) and apprenticeship programs in collaboration with local businesses.",
-      "It provides training and grants to help caregivers, families, and youth start their own businesses.",
-      "From 2025 to 2027, the office will expand its services to help beneficiaries obtain official documentation for employment.",
-      "The project aims to support job placement orientation for at least 750 caregivers and youth.",
-      "It also plans to assist at least 175 individuals in starting their own businesses and provide vocational training to at least 75 beneficiaries."
+      "KMC staff is trained and supported by MoSVY personnel to assist vulnerable returning migrants.",
+      "The reintegration process includes training for KMC staff to implement NCCT's reintegration standards.",
+      "KMC aims to reintegrate at least 1,500 migrants with their families in Battambang province.",
+      "KMC will refer at least 10 migrants per year to government-run TVET institutions, totaling 30 referrals over three years.",
+      "KMC staff will refer at least 30 returned migrants to the National Referral Mechanism for Victims of Human Trafficking."
     ]
   },
   {
-    "id": "en-2e51c566-43",
+    "id": "en-2e51c566-47",
     "language": "EN",
     "question": "What is the role of the National Committee for Counter Trafficking in Cambodia regarding migrant workers?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -129,127 +428,76 @@
     "acceptable_answer_points": [
       "The National Committee for Counter Trafficking (NCCT) coordinates efforts to combat human trafficking in Cambodia.",
       "NCCT is led by H.E. Sar Sokha and H.E. Chou Bun Eng.",
-      "In this project phase, NCCT aims to enhance the safety of migrant workers from human trafficking and exploitation.",
-      "The Kamrieng Migrant Reception Center in Battambang Province serves as a focal point for protecting vulnerable migrants.",
-      "NCCT ensures the safe reintegration of migrants into society."
+      "The committee aims to enhance the safety of migrant workers from human trafficking and exploitation.",
+      "NCCT operates the Kamrieng Migrant Reception Center in Battambang Province to protect vulnerable migrants.",
+      "The center ensures the safe reintegration of migrants into society."
     ]
   },
   {
-    "id": "en-2e51c566-48",
+    "id": "en-2e51c566-54",
     "language": "EN",
-    "question": "What are the main goals and strategies of CACH's project in Cambodia regarding migration?",
+    "question": "What events related to safe migration and job services were held in Kamrieng district?",
     "expected_document": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-    "expected_section": "Page 35",
+    "expected_section": "Page 37",
     "expected_pages": [
-      35
+      37
     ],
     "acceptable_answer_points": [
-      "CACH aims to enhance its expertise and influence at the national level in migration.",
-      "The project focuses on building partnerships with the NCCT and key ministries like MoSVY and MoLVT.",
-      "It emphasizes capacity building for government officials, local authorities, and community organizations.",
-      "The project seeks to align its initiatives with national policies to ensure relevance and adoption.",
-      "It promotes local ownership and sustainability of interventions beyond the project's lifespan."
+      "A pilot program promoting safe migration was conducted at Samseb Secondary School.",
+      "A career fair took place at Kamrieng High School.",
+      "The career fair showcased services to participants.",
+      "The events were organized by the Youth Connections Project in collaboration with the Children Dream Foundation."
     ]
   },
   {
-    "id": "de-41964cf3-4",
+    "id": "de-41964cf3-0",
     "language": "DE",
-    "question": "Was sind die Hauptziele des Projekts CA CH bis 2025?",
+    "question": "Was sind die wichtigsten Informationen zum Gesamtprojekt 'Caritas Forward'?",
     "expected_document": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
-    "expected_section": "Name",
+    "expected_section": "Page 1 / Strategische Projekte",
     "expected_pages": [
       1
     ],
     "acceptable_answer_points": [
-      "Das Projekt zielt darauf ab, die Positionierung und Agilität von CA CH als innovativen Anbieter zu stärken.",
-      "Es soll Lösungen zur Bekämpfung von Armuts- und Chancenungleichheiten entwickeln.",
-      "Die Strategie 2026+ wird bis Ende 2025 weiterentwickelt.",
-      "Es werden neue Technologien und Tools eingeführt oder weiterentwickelt.",
-      "Die Projektorganisation und Governance werden ebenfalls optimiert."
+      "Das Gesamtprojekt 'Caritas Forward' startet am 01.04.2024.",
+      "Das Projekt gehört zur Kategorie der strategischen Projekte.",
+      "Das Ende des Projekts ist für den 30.06.2026 geplant.",
+      "Die Projektleitung hat Peter Lack, der Direktor ist.",
+      "Die Workstream-Leitenden sind Harry Witzthum für digitale Transformation und Chantal für Organisationsentwicklung."
+    ]
+  },
+  {
+    "id": "de-41964cf3-3",
+    "language": "DE",
+    "question": "Was sind die wichtigsten Punkte zur Projektorganisation und den Fortschritten im Gesamtprojekt für 2024?",
+    "expected_document": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
+    "expected_section": "2024:",
+    "expected_pages": [
+      3
+    ],
+    "acceptable_answer_points": [
+      "Die Projektorganisation und Governance sind etabliert.",
+      "Das Kern-Projektteam ist operativ.",
+      "Wichtige interne und externe Stakeholder sind identifiziert und deren Einbezug ist geplant.",
+      "Die interne Kommunikation zum Projekt hat begonnen.",
+      "Die Teilprojekt-Beschreibungen und der Zeitplan liegen vor."
     ]
   },
   {
     "id": "de-41964cf3-7",
     "language": "DE",
-    "question": "Was sind die Hauptziele und Strategien des CA CH Projekts bis 2026?",
+    "question": "Was sind die Ergebnisse des Projekts in Bezug auf die unternehmerischen Schwächen und die Organisationsstruktur?",
     "expected_document": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
-    "expected_section": "Name",
+    "expected_section": "Messbare Ergebnisse",
     "expected_pages": [
-      1
+      4
     ],
     "acceptable_answer_points": [
-      "Die digitale Transformation ist Teil der normalen Arbeitsplanung.",
-      "CA CH hat die notwendigen Anpassungen in der Aufbau- und Prozessorganisation durchgeführt.",
-      "Die Organisation wird als dynamisch wahrgenommen mit attraktiven Arbeitsbedingungen.",
-      "Die Unternehmensgovernance ist geklärt und die Terminplanung für die Umsetzung liegt vor.",
-      "Die Projektziele umfassen die Verbesserung der Arbeitsbedingungen und die Prüfung alternativer Modelle."
-    ]
-  },
-  {
-    "id": "en-32fb0a96-0",
-    "language": "EN",
-    "question": "How does the integration of AI in HR processes affect employee well-being and job security?",
-    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
-    "expected_section": "Page 1",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "AI can enhance efficiency and reduce bias in HR processes.",
-      "There are concerns about job security, fairness, and privacy related to AI use.",
-      "Transparency in AI systems is crucial for building trust among employees.",
-      "AI can either support or undermine employee well-being based on its implementation and perception.",
-      "Organizational strategies like clear communication and employee involvement are important for positive outcomes."
-    ]
-  },
-  {
-    "id": "en-32fb0a96-6",
-    "language": "EN",
-    "question": "How does the perception of AI systems affect employee job satisfaction?",
-    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
-    "expected_section": "Page 3",
-    "expected_pages": [
-      3
-    ],
-    "acceptable_answer_points": [
-      "Job satisfaction increases when employees view AI systems as fair and supportive.",
-      "Employees with 'No Human Interaction' attitudes may have lower job satisfaction due to fears of AI replacing human interactions.",
-      "Those with 'Intelligent Automation' attitudes tend to appreciate AI for its efficiency and convenience.",
-      "Job satisfaction decreases if AI-driven career development is seen as unfair or intrusive.",
-      "Perceived organizational support can improve job satisfaction by helping employees navigate AI systems."
-    ]
-  },
-  {
-    "id": "en-32fb0a96-12",
-    "language": "EN",
-    "question": "How can organizations improve trust and job satisfaction regarding AI decision-making?",
-    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
-    "expected_section": "Fairness And",
-    "expected_pages": [
-      5
-    ],
-    "acceptable_answer_points": [
-      "Opaque AI decision-making reduces trust and job satisfaction.",
-      "Lack of communication leads to perceived unfairness.",
-      "Organizations should provide clear communication on AI decision-making processes.",
-      "Involving employees in AI implementation can enhance trust."
-    ]
-  },
-  {
-    "id": "en-32fb0a96-17",
-    "language": "EN",
-    "question": "How can organizations ensure that AI positively impacts employee well-being?",
-    "expected_document": "32fb0a96-461f-461d-a8f2-6306c8193753",
-    "expected_section": "Page 7",
-    "expected_pages": [
-      7
-    ],
-    "acceptable_answer_points": [
-      "Organizations must ensure AI enhances employee well-being rather than hinders it.",
-      "Transparency and employee involvement are crucial to mitigate stress and disengagement caused by AI evaluations.",
-      "Integrating AI with transparency, personalization, and employee involvement can improve job satisfaction and retention.",
-      "Perceptions of AI as a career-enhancing tool can reduce turnover intentions and increase engagement.",
-      "Organizations should prioritize ethical use of AI to ensure employees feel valued and supported."
+      "Die unternehmerischen Schwächen und Pain-Points der Mitarbeitenden wurden erfasst.",
+      "Die Aufbau- und Prozess-Organisation wurde geprüft.",
+      "Holakratie wurde als alternatives Modell getestet.",
+      "Ein Proof-of-Concept für die gesamte unternehmerische Organisation liegt vor.",
+      "Es gibt einen Umsetzungs- und Maßnahmenplan."
     ]
   },
   {
@@ -262,32 +510,32 @@
       1
     ],
     "acceptable_answer_points": [
-      "AI can improve efficiency and reduce bias in HR processes.",
-      "Concerns about job security, fairness, and privacy arise with AI integration.",
+      "AI integration in HR can enhance efficiency and reduce bias.",
+      "Concerns about job security, fairness, and privacy arise with AI use.",
       "Transparency in AI systems is crucial for building trust among employees.",
-      "AI can have both positive and negative effects on employee well-being depending on its implementation.",
-      "Organizational strategies like clear communication and employee involvement are essential for positive outcomes."
+      "AI can both support and undermine employee well-being based on its implementation.",
+      "Organizational strategies like clear communication and employee involvement are important for positive outcomes."
     ]
   },
   {
-    "id": "en-06da7a75-6",
+    "id": "en-06da7a75-5",
     "language": "EN",
-    "question": "How does the perception of AI systems affect employee job satisfaction?",
+    "question": "How does AI affect job satisfaction among employees?",
     "expected_document": "06da7a75-a140-446e-8221-40fd7cc74848",
     "expected_section": "Page 3",
     "expected_pages": [
       3
     ],
     "acceptable_answer_points": [
-      "Job satisfaction tends to increase when employees see AI systems as fair and supportive.",
-      "Employees with 'No Human Interaction' attitudes may have lower job satisfaction due to fears of AI replacing human interactions.",
-      "Conversely, those with 'Intelligent Automation' attitudes may value AI for its efficiency and convenience.",
-      "Job satisfaction decreases when AI-driven processes are viewed as unfair or intrusive, especially without human involvement.",
-      "Perceived organizational support can improve job satisfaction by helping employees navigate AI systems."
+      "AI can improve job satisfaction by automating routine tasks, allowing employees to focus on more meaningful work.",
+      "Job satisfaction decreases when employees feel anxious about how AI evaluates their work and do not understand the evaluation criteria.",
+      "Perceived fairness and support from AI systems in performance evaluations can increase job satisfaction.",
+      "Employees with negative attitudes towards AI may experience reduced job satisfaction due to concerns about losing human interactions.",
+      "Perceived organizational support can enhance job satisfaction by helping employees navigate AI systems."
     ]
   },
   {
-    "id": "en-06da7a75-12",
+    "id": "en-06da7a75-11",
     "language": "EN",
     "question": "How can organizations improve trust and fairness in AI decision-making?",
     "expected_document": "06da7a75-a140-446e-8221-40fd7cc74848",
@@ -296,324 +544,194 @@
       5
     ],
     "acceptable_answer_points": [
-      "Provide clear communication on AI decision-making processes.",
-      "Involve employees in AI implementation.",
-      "Address issues of opaque AI decision-making.",
-      "Improve job satisfaction by enhancing perceived fairness."
+      "AI decision-making is often opaque and lacks communication.",
+      "This can lead to reduced trust, job satisfaction, and perceived fairness among employees.",
+      "Organizations should provide clear communication about AI decision-making processes.",
+      "Involving employees in the implementation of AI can also help improve trust."
     ]
   },
   {
-    "id": "en-06da7a75-17",
+    "id": "en-06da7a75-16",
     "language": "EN",
-    "question": "How can organizations ensure that AI positively impacts employee well-being?",
+    "question": "How can organizations ensure that AI improves employee well-being?",
     "expected_document": "06da7a75-a140-446e-8221-40fd7cc74848",
     "expected_section": "Page 7",
     "expected_pages": [
       7
     ],
     "acceptable_answer_points": [
-      "Organizations should enhance transparency in AI use to build trust.",
-      "Employee involvement is crucial to mitigate stress and disengagement caused by AI evaluations.",
-      "Integrating AI with personalization can lead to improved job satisfaction and retention.",
-      "Balancing AI's benefits and challenges is essential to manage employees' perceptions.",
-      "Future AI advancements should focus on fairness and fostering human-AI collaboration."
-    ]
-  },
-  {
-    "id": "de-7b8b0ee3-0",
-    "language": "DE",
-    "question": "Was sind die Herausforderungen und Probleme, die mit rollenbasierter Arbeit verbunden sind?",
-    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
-    "expected_section": "Page 1",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Rollenbasierte Arbeit kann zu unklaren Verantwortlichkeiten führen.",
-      "Es gibt häufig vage oder veraltete Stellenbeschreibungen.",
-      "Mitarbeiter können sich unsicher fühlen, ob eine Aufgabe zu ihrem Verantwortungsbereich gehört.",
-      "Es können Engpässe durch personelle Abhängigkeiten entstehen.",
-      "Wissen kann verloren gehen, beispielsweise durch Abwesenheiten wie Ferien oder Krankheit."
-    ]
-  },
-  {
-    "id": "de-7b8b0ee3-1",
-    "language": "DE",
-    "question": "Welche Herausforderungen gibt es bei der rollenbasierten Arbeit im Servicebereich?",
-    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
-    "expected_section": "Page 1",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Es gibt Abhängigkeiten von Personen, die zu Engpässen führen können.",
-      "Wissen kann durch Abwesenheiten wie Ferien oder Krankheit verloren gehen.",
-      "Entscheidungen können schwierig sein, da unklar ist, wer entscheiden darf.",
-      "Die Serviceerfahrung leidet unter Fragmentierung, Verzögerungen und Unklarheiten.",
-      "Es wird ein neuer Ansatz benötigt, der Verantwortung nicht nur für Produkte, sondern auch für Services und deren Familien umfasst."
-    ]
-  },
-  {
-    "id": "de-7b8b0ee3-3",
-    "language": "DE",
-    "question": "Was sind die Vorteile eines rollenbasierten Arbeitsansatzes?",
-    "expected_document": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
-    "expected_section": "Page 1",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Rollen können schnell angepasst werden, was die Flexibilität erhöht.",
-      "Die Arbeit kann leichter umverteilt werden, was die Effizienz steigert.",
-      "Es gibt weniger Abhängigkeit von einzelnen Personen, was die Teamdynamik verbessert.",
-      "Der Ansatz fördert Empowerment und Eigenverantwortung der Mitarbeiter.",
-      "Wissenstransfer und Kontinuität werden durch klare Rollen und Verantwortungen unterstützt."
-    ]
-  },
-  {
-    "id": "de-373a9133-0",
-    "language": "DE",
-    "question": "Wie funktioniert der Prozess zur Beantragung finanzieller Unterstützung für Personen mit bestimmten Status im Kanton Zürich?",
-    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
-    "expected_section": "Prozess UnterstüTzun / Prozess Unter / Der UnterstüTzun",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Der Antrag dient dazu, die finanzielle Situation und Unterstützungsbedürftigkeit zu klären.",
-      "Der Prozess gilt für alle Bewohner mit Status N, S, VA, B-FL und F-FL.",
-      "Das Erstgespräch oder Folgegespräch zur Klärung der Bedürftigkeit findet innerhalb der ersten zwei Wochen des Aufenthalts statt.",
-      "Die betroffene Person muss den Unterstützungantrag schriftlich ausfüllen und verstehen.",
-      "Der Antrag muss innerhalb der ersten zwei Wochen nach Eintritt oder Ereignis bearbeitet und eingereicht werden."
-    ]
-  },
-  {
-    "id": "de-373a9133-5",
-    "language": "DE",
-    "question": "Welche Unterlagen sind für den Unterstützungsantrag erforderlich?",
-    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
-    "expected_section": "Prozess UnterstüTzun",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Abrechnungen der letzten 6 Monate für Unterhaltsbeiträge/Alimente sind notwendig.",
-      "Kontoauszüge der letzten 6 Monate von Bank- oder Postkonten müssen eingereicht werden.",
-      "Eine Eurotaxbewertung für das Auto ist erforderlich.",
-      "Der Fahrzeugausweis und der Versicherungsnachweis müssen vorgelegt werden.",
-      "Der Kaufvertrag oder der Kaufpreis des Fahrzeugs ist ebenfalls notwendig."
-    ]
-  },
-  {
-    "id": "de-373a9133-11",
-    "language": "DE",
-    "question": "Was muss in bestimmten Fällen mit dem Unterstützungantrag gemacht werden?",
-    "expected_document": "373a9133-b253-4956-8f81-b59039d6a994",
-    "expected_section": "6.2 Erneute üBerprüFung",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Der Unterstützungantrag muss mit den entsprechenden Unterlagen erneuert werden.",
-      "In gewissen Fällen ist eine erneute Überprüfung der Unterstützung bedürftig.",
-      "Nothilfe muss täglich neu beantragt werden.",
-      "Die Beantragung erfolgt durch die Anwesenheit im Zentrum."
-    ]
-  },
-  {
-    "id": "de-051209e7-0",
-    "language": "DE",
-    "question": "Wer ist der CEO von Peak Privacy und was ist das Hauptziel der Organisation?",
-    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
-    "expected_section": "Page 1",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Fabio Duo ist der CEO und Gründer von Peak Privacy.",
-      "Die Organisation unterstützt Schweizer Organisationen beim Aufbau von KI-Systemen.",
-      "Der Fokus liegt darauf, Menschen zu befähigen und nicht zu ersetzen.",
-      "Peak Privacy bietet 100% Schweizer Hosting an.",
-      "Es gibt keinen Datenverlust in der Schweiz."
-    ]
-  },
-  {
-    "id": "de-051209e7-6",
-    "language": "DE",
-    "question": "Was ist die Aufgabe des Kommunikationsdirektors in diesem Kontext?",
-    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
-    "expected_section": "Euer Do",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Der Kommunikationsdirektor soll trockene, faktische Projektdaten in eine fesselnde, professionelle Erzählung umwandeln.",
-      "Die Rolle wird als weltklasse NGO Kommunikationsdirektor beschrieben.",
-      "Die Vorgabe für die Erzählung beträgt 450 Wörter."
-    ]
-  },
-  {
-    "id": "de-051209e7-12",
-    "language": "DE",
-    "question": "Wie unterstützt die Initiative kleine und mittlere Unternehmen bei der Einführung nachhaltiger Geschäftspraktiken?",
-    "expected_document": "051209e7-affb-4483-94d7-045acfb76a65",
-    "expected_section": "Viele Kr",
-    "expected_pages": [
-      1
-    ],
-    "acceptable_answer_points": [
-      "Die Initiative besteht aus drei Komponenten: Bewusstseinsbildung, Kapazitätsaufbau und Innovationsunterstützung.",
-      "Es werden Schulungen und Beratungsdienste angeboten.",
-      "Die Zusammenarbeit erfolgt mit lokalen Partnern.",
-      "Ziel ist es, kleinen und mittleren Unternehmen zu helfen, nachhaltige Geschäftspraktiken zu übernehmen."
+      "Organizations must ensure AI enhances employee well-being rather than hinders it.",
+      "Transparency and employee involvement are essential to mitigate stress and disengagement caused by AI evaluations.",
+      "Integrating AI with transparency and personalization can lead to increased job satisfaction and improved retention.",
+      "Managing employees' perceptions of AI is crucial, as positive views can enhance engagement while negative views can increase turnover intentions.",
+      "Future AI advancements should focus on fairness, transparency, and fostering human-AI collaboration."
     ]
   },
   {
     "id": "de-939ca640-0",
     "language": "DE",
-    "question": "Was ist die Grundlage für die Checklisten im Handbuch DZ?",
+    "question": "Was sollte ich beachten, wenn ich die Checklisten basierend auf dem Handbuch DZ des KSA Zürich verwende?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Dz Zh",
+    "expected_section": "Page 1 / Dz Zh / Page 2",
     "expected_pages": [
       1
     ],
     "acceptable_answer_points": [
-      "Die Checklisten basieren auf dem Handbuch DZ.",
-      "Das Handbuch DZ ist die Quelle für die Checklisten.",
-      "Die Checklisten sind eine Anwendung des Handbuchs DZ.",
-      "Das Handbuch DZ enthält die relevanten Informationen für die Checklisten."
+      "Die Checklisten wurden mit Hilfe von KI generiert.",
+      "Bei Unklarheiten oder Fragen sollte das kantonale Handbuch oder andere relevante Ressourcen konsultiert werden.",
+      "Es sind nur Kapitel und Abschnitte abgebildet, bei denen die KI nützliche Ergebnisse lieferte."
     ]
   },
   {
-    "id": "de-939ca640-8",
+    "id": "de-939ca640-5",
     "language": "DE",
-    "question": "Was muss ich tun, um finanzielle Unterstützung beim Migrationsamt in Zürich zu beantragen?",
+    "question": "Was muss ich tun, um finanzielle Unterstützung beim Migrationsamt zu beantragen?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
     "expected_section": "Beim Migrationsamt",
     "expected_pages": [
-      1
+      5
     ],
     "acceptable_answer_points": [
       "Der Antragsteller muss persönlich beim Migrationsamt des Kantons Zürich vorsprechen.",
-      "Die ausländerrechtliche Situation wird vom Migrationsamt überprüft.",
-      "Nach der Überprüfung erfolgt eine Überweisung an das Kantonale Sozialamt (KSA).",
-      "Beim KSA werden die grundlegenden Voraussetzungen für die Gewährung von Nothilfe geprüft.",
-      "Der Unterstützungsantrag muss während des Eintrittsgesprächs im Rückkehrzentrum (RZ) ausgefüllt und eingereicht werden."
+      "Das Migrationsamt überprüft die ausländerrechtliche Situation.",
+      "Nach der Überprüfung wird der Antragsteller an das Kantonale Sozialamt (KSA) überwiesen.",
+      "Beim KSA werden die Voraussetzungen für Nothilfe geprüft und eine Zuweisung in ein Rückkehrzentrum (RZ) erfolgt.",
+      "Der Antragsteller muss am Folgetag nach Eintritt ins RZ an einem Eintrittsgespräch teilnehmen und einen Unterstützungsantrag ausfüllen."
     ]
   },
   {
-    "id": "de-939ca640-15",
+    "id": "de-939ca640-11",
     "language": "DE",
-    "question": "Welche Schritte sind erforderlich, um Unterstützungsleistungen zu beantragen?",
+    "question": "Was sind die Schritte, die eine Person bei der erneuten Kontaktaufnahme für einen neuen Antrag beachten muss?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Bei Beda",
+    "expected_section": "Erneute Kontaktaufnahme / Page 10",
     "expected_pages": [
-      1
+      9
     ],
     "acceptable_answer_points": [
-      "Unterstützung bei der Suche nach Unterkunft und grundlegenden Bedürfnissen anbieten.",
-      "Dokumentation der Wiederaufnahme des Verfahrens und aller relevanten Kommunikationen.",
-      "Festlegung von Terminen für die Nachverfolgung und Überprüfung des Status des neuen Antrags.",
-      "Kommunikation mit anderen Behörden."
+      "Die Person muss Kontakt mit den zuständigen Behörden aufnehmen.",
+      "Ein neuer Antrag ist erforderlich, und die notwendigen Formulare und Informationen müssen bereitgestellt werden.",
+      "Es muss überprüft werden, ob alle erforderlichen Unterlagen für den neuen Antrag vorhanden sind.",
+      "Der Antrag muss vollständig und korrekt ausgefüllt und mit allen notwendigen Begleitdokumenten eingereicht werden.",
+      "Die Person wird darüber informiert, dass sie erneut zugewiesen wird, und es wird das Zuweisungsverfahren erklärt."
     ]
   },
   {
-    "id": "de-939ca640-23",
+    "id": "de-939ca640-17",
     "language": "DE",
-    "question": "Was muss bei meldepflichtigen Vorfällen im KSA beachtet werden?",
+    "question": "Was muss die Betreiberin einer Unterkunft tun, wenn sich die Verhältnisse von Personen oder Familien ändern?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Internes Vorge",
+    "expected_section": "Dz Zh / Page 15",
     "expected_pages": [
-      1
+      14
     ],
     "acceptable_answer_points": [
-      "Meldepflichtige Vorkommnisse müssen mit dem Formular 'Vorfallsmeldung' an platzierung@sa.zh.ch geschickt werden.",
-      "Die Abteilungsleitung Asylkoordination, Leitung Steuerung und Unterbringung sowie Teamleitung Zuweisung und Unterbringung Erwachsene & Familien müssen in Kopie gesetzt werden.",
-      "Die Meldung sollte den Betreff 'Vorfallsmeldung, N-Nummer, Status, Unterkunft, Datum' enthalten.",
-      "Die Meldung dient dazu, die Aufsichtsbehörde über besondere Vorkommnisse zu informieren.",
-      "Besondere Vorkommnisse sind unter anderem psychische Krisen, Gewaltvorfälle und Hinweise auf Radikalisierung."
+      "Die Betreiberin muss unverzüglich alle veränderungsrelevanten Situationen dem KSA melden.",
+      "Die Meldung erfolgt per E-Mail an platzierung@sa.zh.ch.",
+      "Notwendige Belege sind der Meldung beizufügen.",
+      "Der Betreff der E-Mail muss 'Mutationsmeldung', gefolgt von der N-Nummer und dem Namen der Unterkunft, enthalten.",
+      "Bei Flüchtlingsstatus muss zusätzlich 'FL' im Betreff eingefügt werden."
     ]
   },
   {
-    "id": "de-939ca640-28",
+    "id": "de-939ca640-22",
     "language": "DE",
-    "question": "Was sind die Schritte zur Berechnung von Geldleistungen für Personen im offenen Verfahren?",
+    "question": "Welche Arten von Vorfällen sollten in der Dokumentation erfasst werden?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "FüR Zahnarztbeh",
+    "expected_section": "Dz Zh",
     "expected_pages": [
-      1
+      18
     ],
     "acceptable_answer_points": [
-      "Die Checkliste bietet eine allgemeine Anleitung zur Berechnung von Geld- und Sachleistungen.",
-      "Es müssen alle Einnahmen und Vermögen der unterstützten Personen berücksichtigt werden.",
-      "Die vorgesehenen Geldleistungen werden um die eingehenden Einnahmen reduziert.",
-      "Es ist wichtig, den Einkommensfreibetrag zu beachten."
+      "Gewaltvorfälle, die selbst- oder fremdverletzendes Verhalten beinhalten.",
+      "Öffentlichkeitsrelevante Vorfälle, insbesondere wenn Blaulichtorganisationen wie Polizei oder Feuerwehr involviert sind.",
+      "Hinweise auf Radikalisierungstendenzen von Bewohnern zu extremistischem Gedankengut.",
+      "Unerlaubtes Eindringen in die Unterkunft durch Dritte und Demonstrationen gegen die Unterkunft.",
+      "Vorliegende Polizeirapporte, Anzeigen und Mutationsmeldungen an das KSA."
     ]
   },
   {
-    "id": "de-939ca640-34",
+    "id": "de-939ca640-32",
     "language": "DE",
-    "question": "Wie erfolgt die Auszahlung von Geldleistungen an Flüchtlinge?",
+    "question": "Was muss ich tun, um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "8090",
+    "expected_section": "Dz Zh",
     "expected_pages": [
-      1
+      24
     ],
     "acceptable_answer_points": [
-      "Geldleistungen sollten bevorzugt per Banküberweisung erfolgen.",
-      "Die Auszahlung sollte in Form und Rhythmus der Banküberweisung erfolgen.",
-      "Es wird Unterstützung bei der Kontoeröffnung angeboten."
+      "Identifiziere die betroffene Person und notiere ihren Namen, Vornamen und Geburtsdatum.",
+      "Bestimme die vorgesehene Leistung und beschreibe sie.",
+      "Berechne die vorgesehenen Kosten und füge einen Beleg oder Kostenvoranschlag bei.",
+      "Gib eine kurze Begründung für die Notwendigkeit der Leistung an.",
+      "Erstelle und sende ein E-Mail an kogu@sa.zh.ch mit den erforderlichen Informationen und warte auf die Antwort."
     ]
   },
   {
-    "id": "de-939ca640-42",
+    "id": "de-939ca640-44",
     "language": "DE",
-    "question": "Welche Regeln gelten für die Ausübung eines Ämtlis für Personen mit Flüchtlingsstatus?",
+    "question": "Was muss ich tun, um die Zahnarztkosten erstattet zu bekommen?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Das AusüB",
+    "expected_section": "Dz Zh",
     "expected_pages": [
-      1
+      30
     ],
     "acceptable_answer_points": [
-      "Die Teilnahme an externen Angeboten zur Förderung der beruflichen Integration darf nicht beeinträchtigt werden.",
-      "Falsche Prioritätensetzung führt zum Ausschluss von der Ausübung des Ämtlis.",
-      "Die IZU Maximalbeträge pro Monat betragen Fr. 300.00 und Fr. 150.00.",
-      "Diese Maximalbeträge müssen zwingend eingehalten werden.",
-      "Überstunden, die über den Maximalbetrag hinausgehen, müssen freiwillig und unentgeltlich geleistet werden."
+      "Stelle sicher, dass du einen Kostenvoranschlag von deinem behandelnden Zahnarzt erhältst.",
+      "Fülle das Formular für Sozialzahnmedizin der VKZS vollständig aus.",
+      "Halte die Vorgaben der VKZS ein, die unter der angegebenen Webseite abgerufen werden können.",
+      "Lege aktuelle Röntgenbilder deinem Gesuch bei.",
+      "Reiche dein Kostengutsprachegesuch bei der KSA ein, entweder per E-Mail oder schriftlich."
     ]
   },
   {
-    "id": "de-939ca640-47",
+    "id": "de-939ca640-49",
     "language": "DE",
-    "question": "Was muss ich beachten, wenn ich eine Mietzinsgarantie für Flüchtlinge beantragen möchte?",
+    "question": "Was sind die Schritte, die man befolgen muss, um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Als Betreibe",
+    "expected_section": "Dz Zh / Page 35",
     "expected_pages": [
-      1
+      34
     ],
     "acceptable_answer_points": [
-      "Die Mietzinsgarantie wird vom KSA geleistet.",
-      "Du musst die Mietzinsgarantie gemäß der Vorlage des KSA erstellen.",
-      "Die Unterlagen, einschließlich des Mietvertragsentwurfs und der Korrespondenz mit den Vermietenden, müssen dem KSA vorgelegt werden.",
-      "Die Anfrage für einen höheren Mietzins sollte per E-Mail an kogu@sa.zh.ch gesendet werden.",
-      "Der Betreff der E-Mail sollte 'FL, Name der Unterkunft, N-Nummer, Mietzinsgarantie' sein."
+      "Identifiziere die betroffene Person und notiere deren Name, Vornamen und Geburtsdatum.",
+      "Bestimme die vorgesehene Leistung und beschreibe sie.",
+      "Berechne die vorgesehenen Kosten und füge einen Beleg oder Kostenvoranschlag hinzu.",
+      "Begründe die Notwendigkeit der Leistung mit einer kurzen Erklärung.",
+      "Formuliere den Antrag der Betreiberin und sende ihn per E-Mail an kogu@sa.zh.ch mit dem entsprechenden Betreff."
     ]
   },
   {
-    "id": "de-939ca640-53",
+    "id": "de-939ca640-55",
     "language": "DE",
-    "question": "Was muss ich bei der Erstellung der XML-Datei für berechtigte Klienten beachten?",
+    "question": "Was sind die Schritte, die man beachten sollte, wenn man Flüchtlinge beim Wohnungssuche coacht?",
     "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
-    "expected_section": "Aus Datensch",
+    "expected_section": "11.6.2 Coaching Wohnungssuche / Page 40",
     "expected_pages": [
-      1
+      39
     ],
     "acceptable_answer_points": [
-      "Die Zustellung der XML-Datei via E-Mail ist nicht erlaubt.",
-      "In der XML-Datei müssen alle berechtigten Klientinnen und Klienten mit Personendaten und Pauschalen aufgeführt werden.",
-      "Zusätzliche Abrechnungen sind abhängig vom Aufenthaltsstatus und der Kostenart erforderlich.",
-      "Besonders betroffen sind die effektiven Ist-Kosten der anerkannten Flüchtlinge.",
-      "Eine genaue Aufteilung und Beschreibung der zusätzlichen Abrechnungen findet sich in den folgenden Unterkapiteln."
+      "Die Zielgruppe muss identifiziert werden, wobei die Personen einen anerkannten oder vorläufigen Flüchtlingsstatus haben sollten.",
+      "Die Anmeldung beim Coaching Wohnungssuche (CWS) muss sichergestellt werden.",
+      "Regelmäßige Informationen zur Zielgruppe sollten an die Anbieterin des CWS weitergegeben werden.",
+      "Zu den Informationen gehören Stammdaten, Haushaltsgröße, Alphabetisierungsgrad, gesundheitliche Faktoren und relevante Angaben zur Wohnungssuche."
+    ]
+  },
+  {
+    "id": "de-939ca640-61",
+    "language": "DE",
+    "question": "Was sind die wichtigsten Punkte zur Abrechnung von Fallkostenpauschalen?",
+    "expected_document": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+    "expected_section": "Dz Zh / Page 46",
+    "expected_pages": [
+      45
+    ],
+    "acceptable_answer_points": [
+      "Fallkostenpauschalen werden pro Person und Nacht abgerechnet.",
+      "Alle Personen und Pauschalen müssen aufgeführt werden, unabhängig von der Kapazität.",
+      "Jede Person muss mit Beginn- und Enddatum der Platzierung aufgeführt werden.",
+      "Pro Zeitraum kann jeweils nur eine Pauschale abgerechnet werden.",
+      "Es können verschiedene Arten von Pauschalen abgerechnet werden, einschließlich regulärer Klienten und Klienten in Pflegeheimen oder Haft."
     ]
   }
 ]

@@ -27,6 +27,15 @@ export interface RerankerProvider {
 
 export interface LlmProvider {
   generateAnswer(input: LlmGenerateInput): Promise<string>;
+  /**
+   * Optional streaming variant: emits raw token deltas and resolves with the
+   * complete text. Absent on providers that cannot stream; callers fall back
+   * to generateAnswer.
+   */
+  generateAnswerStream?(
+    input: LlmGenerateInput,
+    onDelta: (text: string) => void,
+  ): Promise<string>;
 }
 
 export type ProviderRegistry = {
