@@ -2,7 +2,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { Citation, RetrievedChunk, SupportedLanguage } from "../../lib/contracts/retrieval";
+import type {
+  Citation,
+  RetrievedChunk,
+  SupportedLanguage,
+} from "../../lib/contracts/retrieval";
 import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
 import {
   computeAnswerMetrics,
@@ -30,6 +34,10 @@ type RunnerArgs = {
   sampleSize: number | null;
   languages: SupportedLanguage[] | null;
   failOnGate: boolean;
+  /** Exercise the router's "Broaden search" expansion path (default off, matching default UX). */
+  expansion: boolean;
+  /** LLM-judge metrics; defaults on for live mode, always off for dry-run. */
+  judge: boolean;
 };
 
 type RunCapture = {
@@ -54,7 +62,9 @@ type QueryExecution = {
 
 type LiveDependencies = {
   retrieveRankedCandidates: typeof import("../../lib/retrieval/service").retrieveRankedCandidates;
+  retrieveRankedCandidatesWithRouting: typeof import("../../lib/retrieval/router").retrieveRankedCandidatesWithRouting;
   generateGroundedAnswer: typeof import("../../lib/answering/service").generateGroundedAnswer;
+  judgeQueryResult: typeof import("../../lib/evaluation/llm-judge").judgeQueryResult;
   env: typeof import("../../lib/config/env").env;
 };
 
@@ -64,13 +74,26 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
   if (!liveDependenciesPromise) {
     liveDependenciesPromise = Promise.all([
       import("../../lib/retrieval/service"),
+      import("../../lib/retrieval/router"),
       import("../../lib/answering/service"),
+      import("../../lib/evaluation/llm-judge"),
       import("../../lib/config/env"),
-    ]).then(([retrievalModule, answerModule, envModule]) => ({
-      retrieveRankedCandidates: retrievalModule.retrieveRankedCandidates,
-      generateGroundedAnswer: answerModule.generateGroundedAnswer,
-      env: envModule.env,
-    }));
+    ]).then(
+      ([
+        retrievalModule,
+        routerModule,
+        answerModule,
+        judgeModule,
+        envModule,
+      ]) => ({
+        retrieveRankedCandidates: retrievalModule.retrieveRankedCandidates,
+        retrieveRankedCandidatesWithRouting:
+          routerModule.retrieveRankedCandidatesWithRouting,
+        generateGroundedAnswer: answerModule.generateGroundedAnswer,
+        judgeQueryResult: judgeModule.judgeQueryResult,
+        env: envModule.env,
+      }),
+    );
   }
 
   return liveDependenciesPromise;
@@ -86,6 +109,8 @@ function parseArgs(argv: string[]): RunnerArgs {
     sampleSize: null,
     languages: null,
     failOnGate: true,
+    expansion: false,
+    judge: true,
   };
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -122,18 +147,32 @@ function parseArgs(argv: string[]): RunnerArgs {
       const parsed = raw
         .split(",")
         .map((value) => value.trim().toUpperCase())
-        .filter((value): value is SupportedLanguage => ["EN", "DE", "FR", "IT", "ES"].includes(value));
+        .filter((value): value is SupportedLanguage =>
+          ["EN", "DE", "FR", "IT", "ES"].includes(value),
+        );
       args.languages = parsed.length > 0 ? parsed : null;
       index += 1;
     } else if (token === "--no-fail-on-gate") {
       args.failOnGate = false;
+    } else if (token === "--expansion") {
+      args.expansion = true;
+    } else if (token === "--no-judge") {
+      args.judge = false;
     }
+  }
+
+  // The judge only makes sense against real answers.
+  if (args.mode === "dry-run") {
+    args.judge = false;
   }
 
   return args;
 }
 
-function selectRecords(records: EvaluationQueryRecord[], args: RunnerArgs): EvaluationQueryRecord[] {
+function selectRecords(
+  records: EvaluationQueryRecord[],
+  args: RunnerArgs,
+): EvaluationQueryRecord[] {
   const filtered =
     args.languages && args.languages.length > 0
       ? records.filter((record) => args.languages?.includes(record.language))
@@ -166,11 +205,15 @@ function buildMockChunk(
   language: SupportedLanguage,
   relevantPage?: number,
 ): RetrievedChunk {
-  const chunkId = isRelevant ? `${query.id}-rel-${rank}` : `${query.id}-noise-${rank}`;
+  const chunkId = isRelevant
+    ? `${query.id}-rel-${rank}`
+    : `${query.id}-noise-${rank}`;
   return {
     chunkId,
     documentId: isRelevant ? query.expected_document : `noise_doc_${rank}`,
-    pageNumber: isRelevant ? relevantPage ?? query.expected_pages[0] ?? 1 : rank + 40,
+    pageNumber: isRelevant
+      ? (relevantPage ?? query.expected_pages[0] ?? 1)
+      : rank + 40,
     sectionTitle: isRelevant ? query.expected_section : "Unrelated Section",
     content: isRelevant
       ? `${query.acceptable_answer_points.join(". ")}.`
@@ -184,9 +227,16 @@ function buildMockChunk(
   };
 }
 
-function executeDryRun(query: EvaluationQueryRecord, topK: number): QueryExecution {
+function executeDryRun(
+  query: EvaluationQueryRecord,
+  topK: number,
+): QueryExecution {
   const language = query.language;
-  const uncachedLatencyMs = deterministicNumber(`${query.id}:uncached`, 900, 1900);
+  const uncachedLatencyMs = deterministicNumber(
+    `${query.id}:uncached`,
+    900,
+    1900,
+  );
   const cachedLatencyMs = deterministicNumber(`${query.id}:cached`, 180, 640);
 
   const chunks: RetrievedChunk[] = [];
@@ -247,34 +297,50 @@ function executeDryRun(query: EvaluationQueryRecord, topK: number): QueryExecuti
   };
 }
 
-async function executeLive(query: EvaluationQueryRecord, topK: number): Promise<QueryExecution> {
+async function executeLive(
+  query: EvaluationQueryRecord,
+  topK: number,
+  expansion: boolean,
+): Promise<QueryExecution> {
   const deps = await loadLiveDependencies();
 
   const uncachedStart = Date.now();
-  const uncachedRetrieval = await deps.retrieveRankedCandidates({
-    query: query.question,
-    topK,
-    languageHint: query.language,
-  }, {
-    // Force cache bypass for the first run to measure true uncached retrieval latency.
-    readCache: async () => null,
-  });
+  // Route through the router (the production entry point) so query expansion,
+  // HyDE, and branch fusion are exercised by the benchmark. The cache bypass
+  // moves into a retrieveBase override because the router itself takes no
+  // cache dependencies.
+  const uncachedRetrieval = await deps.retrieveRankedCandidatesWithRouting(
+    {
+      query: query.question,
+      topK,
+      languageHint: query.language,
+      enableQueryExpansion: expansion,
+    },
+    {
+      retrieveBase: (input) =>
+        deps.retrieveRankedCandidates(input, {
+          // Force cache bypass to measure true uncached retrieval latency.
+          readCache: async () => null,
+        }),
+    },
+  );
   const uncachedAnswer = await deps.generateGroundedAnswer({
     query: query.question,
     language: uncachedRetrieval.trace.language,
     chunks: uncachedRetrieval.chunks,
     minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
     minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
-    minHeuristicRelevance: deps.env.RAG_MIN_RERANK_SCORE,
+    minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
     maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
   });
   const uncachedLatencyMs = Date.now() - uncachedStart;
 
   const cachedStart = Date.now();
-  const cachedRetrieval = await deps.retrieveRankedCandidates({
+  const cachedRetrieval = await deps.retrieveRankedCandidatesWithRouting({
     query: query.question,
     topK,
     languageHint: query.language,
+    enableQueryExpansion: expansion,
   });
   const cachedAnswer = await deps.generateGroundedAnswer({
     query: query.question,
@@ -282,7 +348,7 @@ async function executeLive(query: EvaluationQueryRecord, topK: number): Promise<
     chunks: cachedRetrieval.chunks,
     minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
     minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
-    minHeuristicRelevance: deps.env.RAG_MIN_RERANK_SCORE,
+    minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
     maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
   });
   const cachedLatencyMs = Date.now() - cachedStart;
@@ -333,19 +399,34 @@ function deriveFailures(
 
   if (retrievalMetrics.recallAt5 < 1) {
     failures.push(
-      toFailure("retrieval", "Expected evidence was not retrieved within top-5 ranked chunks.", queryId),
+      toFailure(
+        "retrieval",
+        "Expected evidence was not retrieved within top-5 ranked chunks.",
+        queryId,
+      ),
     );
   }
 
   if (answerMetrics.citationAccuracy < 1) {
     failures.push(
-      toFailure("citation", "Citations did not consistently point to expected document/page evidence.", queryId),
+      toFailure(
+        "citation",
+        "Citations did not consistently point to expected document/page evidence.",
+        queryId,
+      ),
     );
   }
 
-  if (answerMetrics.hallucinationRate > DEFAULT_BENCHMARK_THRESHOLDS.hallucinationRateMax) {
+  if (
+    answerMetrics.hallucinationRate >
+    DEFAULT_BENCHMARK_THRESHOLDS.hallucinationRateMax
+  ) {
     failures.push(
-      toFailure("grounding", "Answer statements were insufficiently supported by retrieved evidence.", queryId),
+      toFailure(
+        "grounding",
+        "Answer statements were insufficiently supported by retrieved evidence.",
+        queryId,
+      ),
     );
   }
 
@@ -354,13 +435,21 @@ function deriveFailures(
     cachedLatencyMs >= DEFAULT_BENCHMARK_THRESHOLDS.cachedP95LatencyMs
   ) {
     failures.push(
-      toFailure("latency", "Query latency exceeded release threshold for cached or uncached execution.", queryId),
+      toFailure(
+        "latency",
+        "Query latency exceeded release threshold for cached or uncached execution.",
+        queryId,
+      ),
     );
   }
 
   if (!cacheHitOnRepeat) {
     failures.push(
-      toFailure("cache", "Repeated query did not hit retrieval cache with same retrieval version/key inputs.", queryId),
+      toFailure(
+        "cache",
+        "Repeated query did not hit retrieval cache with same retrieval version/key inputs.",
+        queryId,
+      ),
     );
   }
 
@@ -386,19 +475,31 @@ function buildMarkdownReport(input: {
     .join("\n");
 
   const thresholdRows = input.thresholdEvaluation.checks
-    .map((check) => `| ${check.metric} | ${check.target} | ${formatMetric(check.actual)} | ${check.passed ? "PASS" : "FAIL"} |`)
+    .map(
+      (check) =>
+        `| ${check.metric} | ${check.target} | ${formatMetric(check.actual)} | ${check.passed ? "PASS" : "FAIL"} |`,
+    )
     .join("\n");
 
-  const failedQueries = input.results.filter((result) => result.failures.length > 0 || result.error);
+  const failedQueries = input.results.filter(
+    (result) => result.failures.length > 0 || result.error,
+  );
   const openRisks = [
     ...input.thresholdEvaluation.checks
       .filter((check) => !check.passed)
-      .map((check) => `${check.metric} gate failed (actual ${formatMetric(check.actual)}, target ${check.target}).`),
+      .map(
+        (check) =>
+          `${check.metric} gate failed (actual ${formatMetric(check.actual)}, target ${check.target}).`,
+      ),
     ...(overall.systemErrorCount > 0
-      ? [`System errors detected for ${overall.systemErrorCount} queries (${formatMetric(overall.systemErrorRate)} rate).`]
+      ? [
+          `System errors detected for ${overall.systemErrorCount} queries (${formatMetric(overall.systemErrorRate)} rate).`,
+        ]
       : []),
     ...(failedQueries.length > 0
-      ? [`${failedQueries.length} queries include at least one failure type requiring triage.`]
+      ? [
+          `${failedQueries.length} queries include at least one failure type requiring triage.`,
+        ]
       : []),
   ];
 
@@ -443,6 +544,17 @@ Evaluated queries: ${input.queryCount}
 | Cached p50 latency (ms) | ${formatMetric(overall.cachedP50LatencyMs)} |
 | Cached p95 latency (ms) | ${formatMetric(overall.cachedP95LatencyMs)} |
 
+## LLM-Judge Metrics (report-only, not gated)
+
+| Metric | Value |
+| --- | ---: |
+| Judged queries | ${overall.judgedCount} |
+| Faithfulness | ${overall.judgedCount > 0 ? formatMetric(overall.faithfulness) : "n/a"} |
+| Answer relevance | ${overall.judgedCount > 0 ? formatMetric(overall.answerRelevance) : "n/a"} |
+| Context precision | ${overall.judgedCount > 0 ? formatMetric(overall.contextPrecision) : "n/a"} |
+| Context recall | ${overall.judgedCount > 0 ? formatMetric(overall.contextRecall) : "n/a"} |
+| Abstention rate | ${overall.judgedCount > 0 ? formatMetric(overall.abstentionRate) : "n/a"} |
+
 ## Threshold Gates
 
 | Metric | Target | Actual | Status |
@@ -471,11 +583,20 @@ ${recommendation}
 `;
 }
 
-async function evaluateQuery(args: RunnerArgs, query: EvaluationQueryRecord): Promise<QueryBenchmarkResult> {
+async function evaluateQuery(
+  args: RunnerArgs,
+  query: EvaluationQueryRecord,
+): Promise<QueryBenchmarkResult> {
   try {
-    const execution = args.mode === "dry-run" ? executeDryRun(query, args.topK) : await executeLive(query, args.topK);
+    const execution =
+      args.mode === "dry-run"
+        ? executeDryRun(query, args.topK)
+        : await executeLive(query, args.topK, args.expansion);
 
-    const retrievalMetrics = computeRetrievalMetrics(query, execution.uncached.chunks);
+    const retrievalMetrics = computeRetrievalMetrics(
+      query,
+      execution.uncached.chunks,
+    );
     const answerMetrics = computeAnswerMetrics(
       query,
       execution.uncached.answer,
@@ -484,6 +605,18 @@ async function evaluateQuery(args: RunnerArgs, query: EvaluationQueryRecord): Pr
       execution.uncached.insufficientEvidence,
     );
     const cacheHitOnRepeat = execution.cached.cacheHit;
+
+    let judgeMetrics: QueryBenchmarkResult["judge"] = null;
+    if (args.judge && args.mode === "live") {
+      const deps = await loadLiveDependencies();
+      judgeMetrics = await deps.judgeQueryResult({
+        question: query.question,
+        answer: execution.uncached.answer,
+        insufficientEvidence: execution.uncached.insufficientEvidence,
+        chunks: execution.uncached.chunks,
+        acceptableAnswerPoints: query.acceptable_answer_points,
+      });
+    }
 
     return {
       id: query.id,
@@ -514,6 +647,7 @@ async function evaluateQuery(args: RunnerArgs, query: EvaluationQueryRecord): Pr
         cachedLatencyMs: execution.cached.latencyMs,
         cacheHitOnRepeat,
       },
+      judge: judgeMetrics,
       failures: deriveFailures(
         query.id,
         retrievalMetrics,
@@ -558,6 +692,7 @@ async function evaluateQuery(args: RunnerArgs, query: EvaluationQueryRecord): Pr
         cachedLatencyMs: 0,
         cacheHitOnRepeat: false,
       },
+      judge: null,
       failures: [
         {
           failureType: "system_error",
@@ -578,8 +713,16 @@ async function run(): Promise<void> {
     throw new Error(`Dataset file not found: ${resolvedDatasetPath}`);
   }
 
-  const rawDataset = JSON.parse(fs.readFileSync(resolvedDatasetPath, "utf8")) as unknown;
-  const validated = validateEvaluationDataset(rawDataset);
+  const rawDataset = JSON.parse(
+    fs.readFileSync(resolvedDatasetPath, "utf8"),
+  ) as unknown;
+  // Relaxed floors: the benchmark accepts a corpus-derived golden set (sized
+  // to the real corpus and its languages), not only the 200-record synthetic
+  // fixture. eval:dataset:validate keeps the stricter fixture defaults.
+  const validated = validateEvaluationDataset(rawDataset, {
+    minTotalQueries: 25,
+    minPerLanguage: 5,
+  });
   const selectedRecords = selectRecords(validated.records, args);
 
   if (selectedRecords.length === 0) {
@@ -597,7 +740,9 @@ async function run(): Promise<void> {
     }
   }
 
-  console.log(`Running benchmark in mode=${args.mode} with ${selectedRecords.length} queries...`);
+  console.log(
+    `Running benchmark in mode=${args.mode} with ${selectedRecords.length} queries...`,
+  );
   const results: QueryBenchmarkResult[] = [];
 
   for (let index = 0; index < selectedRecords.length; index += 1) {
@@ -614,7 +759,10 @@ async function run(): Promise<void> {
   }
 
   const summary = summarizeBenchmark(results);
-  const thresholdEvaluation = evaluateThresholds(summary.overall, DEFAULT_BENCHMARK_THRESHOLDS);
+  const thresholdEvaluation = evaluateThresholds(
+    summary.overall,
+    DEFAULT_BENCHMARK_THRESHOLDS,
+  );
 
   const generatedAt = new Date().toISOString();
   const timestamp = generatedAt.replace(/[:.]/g, "-");
@@ -637,8 +785,16 @@ async function run(): Promise<void> {
 
   const runPath = path.join(runsDir, `benchmark-${timestamp}.json`);
   const latestRunPath = path.join(runsDir, "latest.json");
-  fs.writeFileSync(runPath, `${JSON.stringify(runArtifact, null, 2)}\n`, "utf8");
-  fs.writeFileSync(latestRunPath, `${JSON.stringify(runArtifact, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    runPath,
+    `${JSON.stringify(runArtifact, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    latestRunPath,
+    `${JSON.stringify(runArtifact, null, 2)}\n`,
+    "utf8",
+  );
 
   const reportMarkdown = buildMarkdownReport({
     mode: args.mode,

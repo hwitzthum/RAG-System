@@ -1,4 +1,8 @@
-import type { Citation, RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  Citation,
+  RetrievedChunk,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import {
   DEFAULT_BENCHMARK_THRESHOLDS,
   EVALUATION_LANGUAGES,
@@ -38,7 +42,10 @@ function computePercentile(values: number[], percentile: number): number {
   }
 
   const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((percentile / 100) * sorted.length) - 1));
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((percentile / 100) * sorted.length) - 1),
+  );
   return sorted[index] ?? 0;
 }
 
@@ -49,7 +56,10 @@ function average(values: number[]): number {
   return values.reduce((acc, value) => acc + value, 0) / values.length;
 }
 
-export function isChunkRelevant(record: EvaluationQueryRecord, chunk: Pick<RetrievedChunk, "documentId" | "pageNumber" | "sectionTitle">): boolean {
+export function isChunkRelevant(
+  record: EvaluationQueryRecord,
+  chunk: Pick<RetrievedChunk, "documentId" | "pageNumber" | "sectionTitle">,
+): boolean {
   if (chunk.documentId !== record.expected_document) {
     return false;
   }
@@ -64,10 +74,16 @@ export function isChunkRelevant(record: EvaluationQueryRecord, chunk: Pick<Retri
     return true;
   }
 
-  return observedSection.includes(expectedSection) || expectedSection.includes(observedSection);
+  return (
+    observedSection.includes(expectedSection) ||
+    expectedSection.includes(observedSection)
+  );
 }
 
-export function computeRetrievalMetrics(record: EvaluationQueryRecord, chunks: RetrievedChunk[]): QueryRetrievalMetrics {
+export function computeRetrievalMetrics(
+  record: EvaluationQueryRecord,
+  chunks: RetrievedChunk[],
+): QueryRetrievalMetrics {
   const top10 = chunks.slice(0, 10);
   const relevantRanks: number[] = [];
 
@@ -97,7 +113,15 @@ export function computeRetrievalMetrics(record: EvaluationQueryRecord, chunks: R
     }
   }
 
-  const expectedRelevantCount = Math.max(1, record.expected_pages.length);
+  // The ideal ranking must account for every relevant chunk actually found,
+  // not just one per expected page: several chunks from the same expected page
+  // each score in DCG, and normalising by expected_pages.length alone produced
+  // nDCG values above 1.
+  const expectedRelevantCount = Math.max(
+    1,
+    record.expected_pages.length,
+    relevantRanks.length,
+  );
   let idcg = 0;
   for (let index = 0; index < Math.min(expectedRelevantCount, 10); index += 1) {
     idcg += 1 / Math.log2(index + 2);
@@ -112,7 +136,10 @@ export function computeRetrievalMetrics(record: EvaluationQueryRecord, chunks: R
   };
 }
 
-export function computeCitationAccuracy(record: EvaluationQueryRecord, citations: Citation[]): number {
+export function computeCitationAccuracy(
+  record: EvaluationQueryRecord,
+  citations: Citation[],
+): number {
   if (citations.length === 0) {
     return 0;
   }
@@ -137,10 +164,15 @@ function hasInsufficientEvidenceSignal(answer: string): boolean {
   return INSUFFICIENT_EVIDENCE_PATTERNS.some((pattern) => pattern.test(answer));
 }
 
-function buildCorpusTokenSet(chunks: RetrievedChunk[], acceptableAnswerPoints: string[]): Set<string> {
+function buildCorpusTokenSet(
+  chunks: RetrievedChunk[],
+  acceptableAnswerPoints: string[],
+): Set<string> {
   const tokenSet = new Set<string>();
   const corpus = [
-    ...chunks.map((chunk) => `${chunk.sectionTitle} ${chunk.context} ${chunk.content}`),
+    ...chunks.map(
+      (chunk) => `${chunk.sectionTitle} ${chunk.context} ${chunk.content}`,
+    ),
     ...acceptableAnswerPoints,
   ];
 
@@ -153,14 +185,21 @@ function buildCorpusTokenSet(chunks: RetrievedChunk[], acceptableAnswerPoints: s
   return tokenSet;
 }
 
-function isStatementSupported(statement: string, acceptableAnswerPoints: string[], corpusTokens: Set<string>): boolean {
+function isStatementSupported(
+  statement: string,
+  acceptableAnswerPoints: string[],
+  corpusTokens: Set<string>,
+): boolean {
   const normalizedStatement = normalizeText(statement);
   for (const point of acceptableAnswerPoints) {
     const normalizedPoint = normalizeText(point);
     if (!normalizedPoint) {
       continue;
     }
-    if (normalizedStatement.includes(normalizedPoint) || normalizedPoint.includes(normalizedStatement)) {
+    if (
+      normalizedStatement.includes(normalizedPoint) ||
+      normalizedPoint.includes(normalizedStatement)
+    ) {
       return true;
     }
   }
@@ -206,9 +245,16 @@ export function computeAnswerMetrics(
     };
   }
 
-  const corpusTokens = buildCorpusTokenSet(chunks, record.acceptable_answer_points);
+  const corpusTokens = buildCorpusTokenSet(
+    chunks,
+    record.acceptable_answer_points,
+  );
   const supported = statements.filter((statement) =>
-    isStatementSupported(statement, record.acceptable_answer_points, corpusTokens),
+    isStatementSupported(
+      statement,
+      record.acceptable_answer_points,
+      corpusTokens,
+    ),
   ).length;
 
   const groundingScore = supported / statements.length;
@@ -220,7 +266,10 @@ export function computeAnswerMetrics(
   };
 }
 
-function initLanguageBuckets(): Record<SupportedLanguage, QueryBenchmarkResult[]> {
+function initLanguageBuckets(): Record<
+  SupportedLanguage,
+  QueryBenchmarkResult[]
+> {
   return {
     EN: [],
     DE: [],
@@ -251,19 +300,45 @@ export function summarizeBenchmark(results: QueryBenchmarkResult[]): {
   };
 }
 
-function summarizeBucket(results: QueryBenchmarkResult[]): BenchmarkSummaryMetrics {
+function summarizeBucket(
+  results: QueryBenchmarkResult[],
+): BenchmarkSummaryMetrics {
   const evaluated = results.filter((result) => !result.error);
   const systemErrorCount = results.length - evaluated.length;
 
   const recallValues = evaluated.map((result) => result.metrics.recallAt5);
   const ndcgValues = evaluated.map((result) => result.metrics.ndcgAt10);
   const mrrValues = evaluated.map((result) => result.metrics.mrr);
-  const citationValues = evaluated.map((result) => result.metrics.citationAccuracy);
-  const groundingValues = evaluated.map((result) => result.metrics.groundingScore);
-  const hallucinationValues = evaluated.map((result) => result.metrics.hallucinationRate);
-  const cacheHitValues = evaluated.map((result) => (result.metrics.cacheHitOnRepeat ? 1 : 0));
-  const uncachedLatencies = evaluated.map((result) => result.metrics.uncachedLatencyMs);
-  const cachedLatencies = evaluated.map((result) => result.metrics.cachedLatencyMs);
+  const citationValues = evaluated.map(
+    (result) => result.metrics.citationAccuracy,
+  );
+  const groundingValues = evaluated.map(
+    (result) => result.metrics.groundingScore,
+  );
+  const hallucinationValues = evaluated.map(
+    (result) => result.metrics.hallucinationRate,
+  );
+  const cacheHitValues = evaluated.map((result) =>
+    result.metrics.cacheHitOnRepeat ? 1 : 0,
+  );
+  const uncachedLatencies = evaluated.map(
+    (result) => result.metrics.uncachedLatencyMs,
+  );
+  const cachedLatencies = evaluated.map(
+    (result) => result.metrics.cachedLatencyMs,
+  );
+
+  // Judge averages run over successfully judged queries only; a failed judge
+  // call excludes the query from the average instead of scoring it perfect.
+  const judged = evaluated.filter((result) => result.judge?.judged);
+  const judgeAverage = (
+    pick: (judge: NonNullable<QueryBenchmarkResult["judge"]>) => number | null,
+  ): number =>
+    average(
+      judged
+        .map((result) => pick(result.judge!))
+        .filter((value): value is number => value !== null),
+    );
 
   return {
     queryCount: results.length,
@@ -281,6 +356,16 @@ function summarizeBucket(results: QueryBenchmarkResult[]): BenchmarkSummaryMetri
     cachedP50LatencyMs: computePercentile(cachedLatencies, 50),
     cachedP95LatencyMs: computePercentile(cachedLatencies, 95),
     systemErrorRate: results.length > 0 ? systemErrorCount / results.length : 0,
+    judgedCount: judged.length,
+    faithfulness: judgeAverage((judge) => judge.faithfulness),
+    answerRelevance: judgeAverage((judge) => judge.answerRelevance),
+    contextPrecision: judgeAverage((judge) => judge.contextPrecision),
+    contextRecall: judgeAverage((judge) => judge.contextRecall),
+    abstentionRate:
+      judged.length > 0
+        ? judged.filter((result) => result.judge?.abstained).length /
+          judged.length
+        : 0,
   };
 }
 
@@ -352,4 +437,3 @@ export function formatMetric(value: number): string {
 export function languageOrder(): SupportedLanguage[] {
   return [...EVALUATION_LANGUAGES];
 }
-

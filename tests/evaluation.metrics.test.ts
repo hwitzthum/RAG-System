@@ -3,8 +3,15 @@ import test from "node:test";
 import dataset from "../evaluation/evaluation_queries.json";
 import type { RetrievedChunk } from "../lib/contracts/retrieval";
 import { validateEvaluationDataset } from "../lib/evaluation/dataset";
-import { computeRetrievalMetrics, evaluateThresholds, summarizeBenchmark } from "../lib/evaluation/metrics";
-import type { EvaluationQueryRecord, QueryBenchmarkResult } from "../lib/evaluation/types";
+import {
+  computeRetrievalMetrics,
+  evaluateThresholds,
+  summarizeBenchmark,
+} from "../lib/evaluation/metrics";
+import type {
+  EvaluationQueryRecord,
+  QueryBenchmarkResult,
+} from "../lib/evaluation/types";
 
 const records = dataset as EvaluationQueryRecord[];
 
@@ -14,7 +21,8 @@ function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
     documentId: "doc_company_profile",
     pageNumber: 1,
     sectionTitle: "Company Overview",
-    content: "Ownership model is documented and leadership team responsibilities are listed.",
+    content:
+      "Ownership model is documented and leadership team responsibilities are listed.",
     context: "Expected evidence context",
     language: "EN",
     source: "hybrid",
@@ -35,12 +43,24 @@ test("evaluation dataset satisfies multilingual minimum requirements", () => {
 });
 
 test("computeRetrievalMetrics returns positive recall/ndcg/mrr when expected evidence appears", () => {
-  const record = records.find((item) => item.id === "en-doc_company_profile-01");
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
   assert.ok(record);
 
   const chunks = [
-    buildChunk({ chunkId: "noise", documentId: "noise_doc_1", pageNumber: 99, sectionTitle: "Other" }),
-    buildChunk({ chunkId: "expected", documentId: record.expected_document, pageNumber: record.expected_pages[0], sectionTitle: record.expected_section }),
+    buildChunk({
+      chunkId: "noise",
+      documentId: "noise_doc_1",
+      pageNumber: 99,
+      sectionTitle: "Other",
+    }),
+    buildChunk({
+      chunkId: "expected",
+      documentId: record.expected_document,
+      pageNumber: record.expected_pages[0],
+      sectionTitle: record.expected_section,
+    }),
   ];
 
   const retrieval = computeRetrievalMetrics(record, chunks);
@@ -50,7 +70,9 @@ test("computeRetrievalMetrics returns positive recall/ndcg/mrr when expected evi
 });
 
 test("benchmark thresholds detect pass/fail conditions from summary", () => {
-  const record = records.find((item) => item.id === "en-doc_company_profile-01");
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
   assert.ok(record);
 
   const retrieval = {
@@ -87,7 +109,13 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
     },
     answer: {
       text: "Ownership model is documented.",
-      citations: [{ documentId: record.expected_document, pageNumber: record.expected_pages[0], chunkId: "chunk-1" }],
+      citations: [
+        {
+          documentId: record.expected_document,
+          pageNumber: record.expected_pages[0],
+          chunkId: "chunk-1",
+        },
+      ],
       insufficientEvidence: false,
     },
     metrics: {
@@ -97,6 +125,7 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
       cachedLatencyMs: 400,
       cacheHitOnRepeat: true,
     },
+    judge: null,
     failures: [],
     error: null,
   };
@@ -122,4 +151,78 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
   ]).overall;
   const failing = evaluateThresholds(failingSummary);
   assert.equal(failing.passed, false);
+});
+
+test("summarizeBenchmark averages judge metrics over judged queries only", () => {
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  const base: QueryBenchmarkResult = {
+    id: record.id,
+    language: record.language,
+    question: record.question,
+    retrieval: {
+      cacheHit: false,
+      candidateCounts: { vector: 1, keyword: 1, fused: 1, reranked: 1 },
+      chunks: [],
+    },
+    answer: { text: "answer", citations: [], insufficientEvidence: false },
+    metrics: {
+      recallAt5: 1,
+      ndcgAt10: 1,
+      mrr: 1,
+      firstRelevantRank: 1,
+      relevantRanks: [1],
+      citationAccuracy: 1,
+      groundingScore: 1,
+      hallucinationRate: 0,
+      uncachedLatencyMs: 1000,
+      cachedLatencyMs: 300,
+      cacheHitOnRepeat: true,
+    },
+    judge: null,
+    failures: [],
+    error: null,
+  };
+
+  const summary = summarizeBenchmark([
+    {
+      ...base,
+      id: "judged-1",
+      judge: {
+        judged: true,
+        faithfulness: 1,
+        answerRelevance: 0.8,
+        contextPrecision: 0.5,
+        contextRecall: 1,
+        abstained: false,
+        unsupportedStatementCount: 0,
+      },
+    },
+    {
+      ...base,
+      id: "judged-2-abstained",
+      judge: {
+        judged: true,
+        faithfulness: 1,
+        answerRelevance: 0,
+        contextPrecision: null,
+        contextRecall: 0.5,
+        abstained: true,
+        unsupportedStatementCount: 0,
+      },
+    },
+    // Failed judge call: excluded from averages, not scored as perfect.
+    { ...base, id: "unjudged", judge: null },
+  ]).overall;
+
+  assert.equal(summary.judgedCount, 2);
+  assert.equal(summary.faithfulness, 1);
+  assert.equal(summary.answerRelevance, 0.4);
+  // null contextPrecision on the abstained query is excluded, not zeroed.
+  assert.equal(summary.contextPrecision, 0.5);
+  assert.equal(summary.contextRecall, 0.75);
+  assert.equal(summary.abstentionRate, 0.5);
 });

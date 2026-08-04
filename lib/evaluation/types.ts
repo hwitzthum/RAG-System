@@ -1,4 +1,8 @@
-import type { Citation, RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  Citation,
+  RetrievedChunk,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 
 export const EVALUATION_LANGUAGES = ["EN", "DE", "FR", "IT", "ES"] as const;
 
@@ -37,6 +41,26 @@ export type QueryAnswerMetrics = {
   citationAccuracy: number;
   groundingScore: number;
   hallucinationRate: number;
+};
+
+/**
+ * LLM-as-judge metrics for a single query. `judged: false` means the judge
+ * call failed or was disabled; numeric fields are then null and the query is
+ * excluded from judge averages rather than silently scored as perfect.
+ */
+export type QueryJudgeMetrics = {
+  judged: boolean;
+  /** Fraction of answer statements supported by the retrieved evidence. */
+  faithfulness: number | null;
+  /** How directly the answer addresses the question (0-1). */
+  answerRelevance: number | null;
+  /** Fraction of retrieved chunks the judge deems relevant to the question. */
+  contextPrecision: number | null;
+  /** Fraction of acceptable answer points covered by the retrieved chunks. */
+  contextRecall: number | null;
+  /** The system abstained on a query the golden set considers answerable. */
+  abstained: boolean;
+  unsupportedStatementCount: number | null;
 };
 
 export type QueryLatencyMetrics = {
@@ -80,6 +104,14 @@ export type BenchmarkSummaryMetrics = {
   cachedP50LatencyMs: number;
   cachedP95LatencyMs: number;
   systemErrorRate: number;
+  /** Number of queries with a successful LLM-judge evaluation. */
+  judgedCount: number;
+  /** Averages over judged queries only; 0 when judgedCount is 0. */
+  faithfulness: number;
+  answerRelevance: number;
+  contextPrecision: number;
+  contextRecall: number;
+  abstentionRate: number;
 };
 
 export type ThresholdResult = {
@@ -95,12 +127,7 @@ export type ThresholdEvaluation = {
 };
 
 export type BenchmarkFailureType =
-  | "retrieval"
-  | "citation"
-  | "grounding"
-  | "latency"
-  | "cache"
-  | "system_error";
+  "retrieval" | "citation" | "grounding" | "latency" | "cache" | "system_error";
 
 export type QueryFailure = {
   failureType: BenchmarkFailureType;
@@ -110,7 +137,13 @@ export type QueryFailure = {
 
 export type CandidateChunkTrace = Pick<
   RetrievedChunk,
-  "chunkId" | "documentId" | "pageNumber" | "sectionTitle" | "source" | "retrievalScore" | "rerankScore"
+  | "chunkId"
+  | "documentId"
+  | "pageNumber"
+  | "sectionTitle"
+  | "source"
+  | "retrievalScore"
+  | "rerankScore"
 >;
 
 export type QueryBenchmarkResult = {
@@ -137,7 +170,7 @@ export type QueryBenchmarkResult = {
     QueryLatencyMetrics & {
       cacheHitOnRepeat: boolean;
     };
+  judge: QueryJudgeMetrics | null;
   failures: QueryFailure[];
   error: string | null;
 };
-

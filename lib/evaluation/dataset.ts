@@ -47,7 +47,9 @@ export function validateEvaluationDataset(
 
   const records = parsed.data as EvaluationQueryRecord[];
   if (records.length < minTotalQueries) {
-    throw new Error(`Dataset must contain at least ${minTotalQueries} records. Found ${records.length}.`);
+    throw new Error(
+      `Dataset must contain at least ${minTotalQueries} records. Found ${records.length}.`,
+    );
   }
 
   const seenIds = new Set<string>();
@@ -63,8 +65,15 @@ export function validateEvaluationDataset(
     languageCounts[record.language] += 1;
   }
 
+  // The per-language minimum applies only to languages the dataset actually
+  // contains: a corpus-derived golden set covers exactly the languages of the
+  // real documents (e.g. EN+DE), and demanding 40 FR/IT/ES queries against a
+  // corpus with no FR/IT/ES text would only force fabricated records.
   for (const language of EVALUATION_LANGUAGES) {
-    if (languageCounts[language] < minPerLanguage) {
+    if (
+      languageCounts[language] > 0 &&
+      languageCounts[language] < minPerLanguage
+    ) {
       throw new Error(
         `Dataset must contain at least ${minPerLanguage} queries for language ${language}. Found ${languageCounts[language]}.`,
       );
@@ -77,4 +86,3 @@ export function validateEvaluationDataset(
     languageCounts,
   };
 }
-
