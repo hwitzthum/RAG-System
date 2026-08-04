@@ -82,51 +82,16 @@ update public.document_chunks set language = language;
 -- 3. Ranked keyword retrieval
 -- ---------------------------------------------------------------------------
 
--- Builds a keyword tsquery whose terms are OR-ed rather than AND-ed.
---
--- This is the difference between the keyword branch returning results and
--- returning nothing. Both plainto_tsquery (what the PostgREST .textSearch call
--- used) and websearch_to_tsquery combine terms with AND, so a natural-language
--- question required every one of its content words to appear in the same chunk:
---
---   websearch_to_tsquery('german', 'wie läuft der prozess für einen unterstützungsantrag ab')
---     => 'lauft' & 'prozess' & 'unterstutzungsantrag' & 'ab'   -- 0 rows
---
--- Measured against the live corpus, that returned zero keyword candidates for
--- 7 of 8 realistic questions, which made "hybrid" retrieval vector-only in
--- practice. OR-ing the terms and letting ts_rank_cd order the matches is the
--- normal shape for ranked keyword retrieval.
---
--- Lexemes shorter than three characters are dropped. ts_rank_cd applies no IDF
--- weighting, so a short high-frequency particle ('ab', 'in', 'of') otherwise
--- scores as heavily as a rare content term and floats unrelated chunks to the
--- top — with 'ab' included, the correct chunk for the query above ranked third
--- behind an English chunk; without it, first.
---
--- Lexemes come out of to_tsvector already normalised, so the result is cast
--- straight to tsquery rather than passed back through to_tsquery, which would
--- run them through the stemmer a second time.
-create or replace function public.build_keyword_tsquery(config regconfig, query_text text)
-returns tsquery
-language sql
-immutable
-as $$
-  select coalesce(
-    (
-      select string_agg(quote_literal(lexeme), ' | ')
-      from unnest(tsvector_to_array(to_tsvector(config, query_text))) as lexeme
-      where length(lexeme) >= 3
-    )::tsquery,
-    ''::tsquery
-  );
-$$;
-
 -- The tsquery is the OR of every supported configuration, so a German query
 -- term stems against German rows and an English term against English rows
 -- without the caller having to guess the query's language first (which it
--- cannot do reliably for short queries). build_keyword_tsquery returns an empty
--- tsquery when nothing survives, and ''::tsquery || 'x'::tsquery collapses to
--- 'x', so OR-ing them is safe.
+-- cannot do reliably for short queries).
+--
+-- NOTE: websearch_to_tsquery combines the terms *within* each configuration
+-- with AND. Measured against the live corpus this returned zero keyword
+-- candidates for 7 of 8 realistic questions; 20260804064303 replaces this with
+-- an OR-based builder. Kept here as applied so a fresh database replays the
+-- same history.
 create or replace function public.search_document_chunks_keyword(
   query_text text,
   match_count integer default 20,
@@ -147,12 +112,12 @@ stable
 as $$
   with parsed_query as (
     select
-      public.build_keyword_tsquery('simple'::regconfig, query_text)
-      || public.build_keyword_tsquery('english'::regconfig, query_text)
-      || public.build_keyword_tsquery('german'::regconfig, query_text)
-      || public.build_keyword_tsquery('french'::regconfig, query_text)
-      || public.build_keyword_tsquery('italian'::regconfig, query_text)
-      || public.build_keyword_tsquery('spanish'::regconfig, query_text) as tsq
+      websearch_to_tsquery('simple'::regconfig, query_text)
+      || websearch_to_tsquery('english'::regconfig, query_text)
+      || websearch_to_tsquery('german'::regconfig, query_text)
+      || websearch_to_tsquery('french'::regconfig, query_text)
+      || websearch_to_tsquery('italian'::regconfig, query_text)
+      || websearch_to_tsquery('spanish'::regconfig, query_text) as tsq
   )
   select
     dc.id as chunk_id,
@@ -247,9 +212,6 @@ $$;
 -- ---------------------------------------------------------------------------
 
 grant execute on function public.language_text_search_config(public.supported_language)
-  to authenticated, service_role;
-
-grant execute on function public.build_keyword_tsquery(regconfig, text)
   to authenticated, service_role;
 
 grant execute on function public.search_document_chunks_keyword(text, integer, uuid[])
