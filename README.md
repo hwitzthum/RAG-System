@@ -16,17 +16,72 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 
 ## Table of Contents
 
-1. [Key Features](#key-features)
-2. [Quick Start](#quick-start)
-3. [Environment Variables Reference](#environment-variables-reference)
-4. [User Guide](#user-guide)
-5. [Architecture](#architecture)
-6. [Security Architecture](#security-architecture)
-7. [API Reference](#api-reference)
-8. [Testing](#testing)
-9. [Deployment](#deployment)
-10. [Contributing](#contributing)
-11. [License](#license)
+1. [How It Works (Plain English)](#how-it-works-plain-english)
+2. [Quality Goals](#quality-goals)
+3. [Key Features](#key-features)
+4. [Quick Start](#quick-start)
+5. [Practical Usage Examples](#practical-usage-examples)
+6. [Your Options as a User](#your-options-as-a-user)
+7. [Environment Variables Reference](#environment-variables-reference)
+8. [User Guide](#user-guide)
+9. [Architecture](#architecture)
+10. [Security Architecture](#security-architecture)
+11. [API Reference](#api-reference)
+12. [Testing](#testing)
+13. [Deployment](#deployment)
+14. [Contributing](#contributing)
+15. [License](#license)
+
+---
+
+## How It Works (Plain English)
+
+Think of RAG System as a **smart document assistant** that helps you find answers buried inside your files.
+
+**The basic flow:**
+
+1. **Upload** — You give the system your PDFs (contracts, specs, policies, anything). It reads them and breaks them into small chunks so it can search effectively.
+
+2. **Ask** — You type a question in plain English (or German, French, etc.). The system doesn't just search for matching words — it understands the _meaning_ of your question.
+
+3. **Find** — The system searches your documents in multiple ways at once:
+   - **Semantic search** finds passages that _mean_ the same thing as your question, even if they use different words
+   - **Keyword search** finds exact terms, product codes, numbers, and identifiers that semantic search might miss
+   - **Web search** (optional) brings in current real-world data to supplement your documents
+
+   It fuses all three together so you get the most relevant passages, not just keyword matches.
+
+4. **Rank** — The system re-sorts all the candidates to find the absolute most relevant chunks. If you need precision over speed (e.g., "find the exact liability cap in Section 4"), it can use an AI model to read every candidate against your question and rank them for exactness.
+
+5. **Answer** — An LLM reads the top passages and generates a clear answer, citing specific page numbers and documents so you can verify it. If the system doesn't have enough good evidence, it says so rather than making something up.
+
+6. **Download** — Export the answer as a formatted Word document or PDF, ready to share with colleagues.
+
+**Why this matters:** Most systems search for keywords or use only semantic matching — but your documents have both structured data (contract terms, numbers) and conceptual content (obligations, risks). RAG System uses both, fuses them intelligently, and lets you choose precision or speed depending on your question.
+
+---
+
+## Quality Goals
+
+This system prioritizes **correctness and trustworthiness** over speed or exhaustiveness.
+
+**What we optimize for:**
+
+- **Answers grounded in evidence** — The system refuses to answer if it doesn't have enough evidence, rather than hallucinating. A system that admits "I don't know" on 5% of questions is better than one that guesses on everything.
+
+- **Exact citations** — Every answer includes page numbers and document names so you can verify it took the right passage. Citations aren't decorative; they're essential verification.
+
+- **Consistent results** — Asking the same question twice should give the same answer. No magic "luck of the draw" retrieval.
+
+- **Security by default** — Sensitive queries, API key storage, and multi-user access are hardened against injection attacks, credential leakage, and cross-user data access. This is a system you can deploy in regulated environments without re-engineering.
+
+- **Smart ranking over brute force** — Rather than indexing every document a thousand ways, the system uses a hybrid retrieval strategy (combining vector + keyword search) and intelligent re-ranking to find the right answer efficiently.
+
+**What we don't optimize for:**
+
+- Speed over accuracy — If the system needs 8 seconds to fetch the best evidence, that's better than 500ms of a wrong answer.
+- Covering everything — The system stops after finding the top few most relevant chunks, not searching for every possible mention.
+- Prettiness — The UI is functional and clear, not designed to impress.
 
 ---
 
@@ -153,6 +208,131 @@ Visit **http://localhost:3001** and create an account.
 
 - If your email **matches `ADMIN_EMAIL`**, your account is immediately promoted to `admin`.
 - Otherwise your account enters `pending` state. An admin must approve it at `/admin` before you can access the workbench.
+
+---
+
+## Practical Usage Examples
+
+### Example 1: Lawyer Reviewing a Contract
+
+**Scenario:** You're reviewing a 50-page SaaS agreement and need to find all the terms that could expose your company to liability.
+
+**Steps:**
+
+1. Upload the contract via the **Ingestion Desk** (single file, ~30 seconds to process)
+2. Query: _"What are all the liability caps and limitations of liability?"_
+3. The system retrieves relevant passages from the entire contract, even when phrased differently across sections
+4. Check the **citations panel** to see exact page numbers, then verify in the original PDF
+5. Query: _"What happens if we breach the agreement?"_ to find termination clauses
+6. Click **Download PDF** to export your findings for the legal team
+
+**Key feature used:** Exact citations — you're not trusting the system; you're verifying it.
+
+---
+
+### Example 2: Support Team Finding Policy Information
+
+**Scenario:** Your support team needs to answer "Can customers cancel mid-contract?" across your customer documentation.
+
+**Steps:**
+
+1. Upload all relevant docs: cancellation policy, terms of service, FAQ
+2. Query: _"Under what conditions can a customer request a refund?"_
+3. Optional: Enable **Web Research** if customer expectations are based on current market practices
+4. The system blends information across documents and cites each source
+5. Optional: Click **Broaden Search** if the initial answer feels incomplete — the system will expand the query to find related passages you might have missed
+6. Share the answer with the team or download as a report
+
+**Key feature used:** Multi-document scope — find patterns across related documents without manually jumping between files.
+
+---
+
+### Example 3: Analyst Extracting Structured Data
+
+**Scenario:** You need to extract financial terms from 10 vendor agreements to build a comparison spreadsheet.
+
+**Steps:**
+
+1. Batch upload all 10 PDFs at once (10 MB limit per file)
+2. Query: _"What is the annual cost, payment schedule, and renewal term?"_
+3. The system cites each answer with the vendor name and page, so copy-paste is easy
+4. Optional: Query each vendor individually (scope to one document) for precise extraction
+5. Export each turn as a DOCX report for your spreadsheet team
+6. Alternatively, use the **API** (`POST /api/query`) to automate this across hundreds of agreements
+
+**Key feature used:** Batch upload + document scope + reports — suitable for repeated structured extraction work.
+
+---
+
+### Example 4: Researcher Cross-Checking with Web Data
+
+**Scenario:** You're tracking whether a regulation applies to your product, but the regulation is new and your internal docs are older.
+
+**Steps:**
+
+1. Upload your internal documentation and architecture specs
+2. Query: _"Under GDPR Article 5, are we required to do data retention audits?"_ with **Web Research** enabled
+3. The system finds your internal practices (from docs) and current guidance (from web)
+4. Citations show which claims are sourced from documents vs. live web results
+5. You can verify both sources independently
+
+**Key feature used:** Web research toggle — supplement your documents with current real-world data without leaving the system.
+
+---
+
+## Your Options as a User
+
+When you open the workbench, here's what you can choose:
+
+### Before You Query
+
+| Option             | Default       | Why change it                                                                                     |
+| ------------------ | ------------- | ------------------------------------------------------------------------------------------------- |
+| **Document Scope** | All documents | Select one document if you want to focus on a specific contract, policy, or section               |
+| **Top K**          | 8 chunks      | Increase to 15 for broad questions that need more context; keep at 5 for narrow, specific lookups |
+| **Language Hint**  | Auto-detect   | Override if your question is very short or in a language the system might misdetect               |
+
+### During Your Query
+
+| Option                      | Default              | Why enable it                                                                                    |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| **Broaden Search**          | Off                  | Enable when the first answer feels incomplete or only covers part of your question               |
+| **Cross-Encoder Reranking** | On (if key provided) | Helps when you need the _exact_ clause, term, or definition, not just a relevant passage         |
+| **Web Research**            | Off                  | Enable when your question requires current data (regulations, interest rates, market conditions) |
+
+### After You Get an Answer
+
+| Option                    | When to use                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **View Citations**        | Click any `[Source N]` link to read the exact chunk that was used                                    |
+| **Expand Metadata**       | See retrieval statistics (vector score vs. keyword score, how long it took)                          |
+| **Download PDF / DOCX**   | Export for sharing, printing, or forwarding to colleagues                                            |
+| **Try a Follow-up Query** | Ask a related question — the system will cache results from the same documents for faster follow-ups |
+
+### API Usage (Programmatic Access)
+
+If you're building an integration or automating analysis:
+
+```bash
+# Get a session token
+curl -X POST https://your-supabase.supabase.co/auth/v1/token?grant_type=password \
+  -H "apikey: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@company.com","password":"your-password"}'
+
+# Use it to query programmatically
+curl -X POST http://localhost:3001/api/query \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is the renewal term?",
+    "topK": 10,
+    "documentId": "optional-doc-uuid",
+    "enableWebResearch": false
+  }'
+```
+
+The response streams back as SSE events — each token, plus metadata at the end.
 
 ---
 
