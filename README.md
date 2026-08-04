@@ -528,6 +528,21 @@ Query
 
 ---
 
+### Evaluation & Benchmarking
+
+Retrieval and answer quality are measured against a golden dataset with a live benchmark that exercises the production retrieval path (router, expansion, cross-encoder, evidence gate).
+
+| Command                       | What it does                                                                                                                                                                                                                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run eval:dataset:corpus` | Generates a golden dataset from the **real corpus**: an LLM drafts user-style questions and expected answer points from sampled chunks of every ready document. Writes `evaluation/evaluation_queries.generated.json` plus a human review sheet (`evaluation/reports/dataset-review.md`). |
+| `npm run eval:benchmark`      | Full live benchmark with LLM-judge metrics. Flags: `--dataset <path>`, `--expansion` (exercise "Broaden search"), `--no-judge`, `--sample N`, `--no-fail-on-gate`.                                                                                                                        |
+| `npm run eval:smoke`          | Live benchmark over the first 25 queries, non-gating.                                                                                                                                                                                                                                     |
+| `npm run eval:benchmark:dry`  | Harness self-test with fabricated results — validates the pipeline, not the system.                                                                                                                                                                                                       |
+
+**Metrics** — Classic IR metrics (recall@5, nDCG@10, MRR, citation accuracy) are computed deterministically; answer quality is additionally scored by an **LLM judge** (`RAG_EVAL_JUDGE_MODEL`, default `gpt-4o-mini`): statement-level faithfulness, answer relevance, per-chunk context precision, and answer-point context recall. Abstentions on answerable questions score 0 answer-relevance and are reported as an abstention rate — an over-cautious system cannot look perfect. Judge metrics are report-only; the seven classic threshold gates block release.
+
+---
+
 ## Security Architecture
 
 ### Defence-in-Depth
