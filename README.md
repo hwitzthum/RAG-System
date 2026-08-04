@@ -57,7 +57,7 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 </td>
 <td>
 
-**Role-Based Access Control** — Four roles: `admin`, `reader`, `pending`, `suspended`. New signups queue for admin approval unless their email matches `ADMIN_EMAIL`.
+**Role-Based Access Control** — Five roles: `admin`, `reader`, `pending`, `suspended`, `rejected`. New signups queue for admin approval unless their email matches `ADMIN_EMAIL`.
 
 **Bring-Your-Own-Key Vault** — Store your own OpenAI, Cohere, or Anthropic API keys, AES-encrypted at rest, used per-request instead of the platform default.
 
@@ -227,11 +227,11 @@ All variables are validated at startup via Zod. Missing required variables throw
 
 ### Observability
 
-| Variable                                | Required | Default | Description                                                               |
-| --------------------------------------- | -------- | ------- | ------------------------------------------------------------------------- |
-| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No       | —       | Bearer token for the metrics sink endpoint. Omit to disable the endpoint. |
-| `INGESTION_BATCH_SIZE`                  | No       | `50`    | Chunks processed per ingestion worker batch                               |
-| `INGESTION_LOCK_TIMEOUT_SECONDS`        | No       | `900`   | Distributed lock timeout for ingestion jobs                               |
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No | — | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
+| `INGESTION_BATCH_SIZE` | No | `50` | Chunks processed per ingestion worker batch |
+| `INGESTION_LOCK_TIMEOUT_SECONDS` | No | `900` | Distributed lock timeout for ingestion jobs |
 
 ---
 
@@ -591,13 +591,13 @@ The application uses the double-submit cookie pattern:
 
 ### Rate Limiting
 
-| Endpoint                | Limit  | Window | Key        |
-| ----------------------- | ------ | ------ | ---------- |
-| `POST /api/auth/login`  | 20 req | 5 min  | IP + email |
-| `POST /api/auth/signup` | 3 req  | 1 hour | IP + email |
-| `POST /api/query`       | 30 req | 1 min  | User ID    |
-| `POST /api/upload`      | 20 req | 15 min | User ID    |
-| `POST /api/reports`     | 10 req | 15 min | User ID    |
+| Endpoint | Limit | Window | Key |
+|---|---|---|---|
+| `POST /api/auth/login` | 20 req | 5 min | IP + email |
+| `POST /api/auth/signup` | 3 req | 1 hour | IP + email |
+| `POST /api/query` | 30 req | 1 min | User ID + IP |
+| `POST /api/upload` | 20 req | 15 min | User ID |
+| `POST /api/reports` | 10 req | 15 min | User ID |
 
 Rate limit state lives in the `rate_limit_buckets` Supabase table via RPC, making counters consistent across all server replicas and serverless function instances. In development, an in-memory fallback is used.
 
@@ -658,30 +658,30 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## API Reference
 
-| Method   | Path                          | Auth   | CSRF | Rate Limit            | Description                                  |
-| -------- | ----------------------------- | ------ | ---- | --------------------- | -------------------------------------------- |
-| `GET`    | `/api/health`                 | No     | No   | —                     | Health check with config summary             |
-| `POST`   | `/api/auth/login`             | No     | No   | 20/5 min per IP+email | Rate-limited server-side login               |
-| `POST`   | `/api/auth/signup`            | No     | No   | 3/hour per IP+email   | Rate-limited signup with role assignment     |
-| `POST`   | `/api/auth/session`           | No     | Yes  | —                     | Create session cookie from access token      |
-| `GET`    | `/api/auth/session`           | Cookie | No   | —                     | Return current session user                  |
-| `DELETE` | `/api/auth/session`           | Cookie | No   | —                     | Logout and clear session cookie              |
-| `POST`   | `/api/query`                  | Yes    | Yes  | 30/1 min per user     | RAG query; response streamed as SSE          |
-| `GET`    | `/api/query-history`          | Yes    | No   | —                     | List past queries for the current user       |
-| `DELETE` | `/api/query-history/:id`      | Yes    | Yes  | —                     | Delete a single query history entry          |
-| `POST`   | `/api/upload`                 | Yes    | Yes  | 20/15 min per user    | Upload and enqueue a single PDF              |
-| `GET`    | `/api/upload/:documentId`     | Yes    | No   | —                     | Poll ingestion job status                    |
-| `POST`   | `/api/upload/batch`           | Yes    | Yes  | 10/15 min per user    | Batch upload up to 10 PDFs                   |
-| `POST`   | `/api/reports`                | Yes    | Yes  | 10/15 min per user    | Generate DOCX or PDF report for a query turn |
-| `GET`    | `/api/byok/openai`            | Yes    | No   | —                     | Check whether an OpenAI BYOK key is stored   |
-| `PUT`    | `/api/byok/openai`            | Yes    | Yes  | —                     | Encrypt and store an OpenAI API key          |
-| `DELETE` | `/api/byok/openai`            | Yes    | Yes  | —                     | Remove stored OpenAI API key                 |
-| `GET`    | `/api/documents`              | Yes    | No   | —                     | List all accessible documents                |
-| `DELETE` | `/api/documents/:id`          | Admin  | Yes  | —                     | Delete a document and its chunks             |
-| `GET`    | `/api/admin/users`            | Admin  | No   | —                     | List all users with roles                    |
-| `PATCH`  | `/api/admin/users/:id`        | Admin  | Yes  | —                     | Update a user's role                         |
-| `GET`    | `/api/admin/runtime-status`   | Admin  | No   | —                     | Ingestion worker health and queue depth      |
-| `POST`   | `/api/internal/ingestion/run` | CRON   | No   | —                     | Trigger the ingestion worker (cron use only) |
+| Method | Path | Auth | CSRF | Rate Limit | Description |
+|---|---|---|---|---|---|
+| `GET` | `/api/health` | No | No | — | Health check with config summary |
+| `POST` | `/api/auth/login` | No | No | 20/5 min per IP+email | Rate-limited server-side login |
+| `POST` | `/api/auth/signup` | No | No | 3/hour per IP+email | Rate-limited signup with role assignment |
+| `POST` | `/api/auth/session` | No | Yes | — | Create session cookie from access token |
+| `GET` | `/api/auth/session` | Cookie | No | — | Return current session user |
+| `DELETE` | `/api/auth/session` | Cookie | No | — | Logout and clear session cookie |
+| `POST` | `/api/query` | Yes | Yes | 30/1 min per user | RAG query; response streamed as SSE |
+| `GET` | `/api/query-history` | Yes | No | — | List past queries for the current user |
+| `DELETE` | `/api/query-history/:id` | Yes | Yes | — | Delete a single query history entry |
+| `POST` | `/api/upload` | Yes | Yes | 20/15 min per user | Upload and enqueue a single PDF |
+| `GET` | `/api/upload/:documentId` | Yes | No | — | Poll ingestion job status |
+| `POST` | `/api/upload/batch` | Yes | Yes | 10/15 min per user | Batch upload up to 10 PDFs |
+| `POST` | `/api/reports` | Yes | Yes | 10/15 min per user | Generate DOCX or PDF report for a query turn |
+| `GET` | `/api/byok/openai` | Yes | No | — | Check whether an OpenAI BYOK key is stored |
+| `PUT` | `/api/byok/openai` | Yes | Yes | 10/15 min per user | Encrypt and store an OpenAI API key |
+| `DELETE` | `/api/byok/openai` | Yes | Yes | 10/15 min per user | Remove stored OpenAI API key |
+| `GET` | `/api/documents` | Yes | No | — | List all accessible documents |
+| `DELETE` | `/api/documents/:id` | Admin | Yes | — | Delete a document and its chunks |
+| `GET` | `/api/admin/users` | Admin | No | — | List all users with roles |
+| `PATCH` | `/api/admin/users/:id` | Admin | Yes | — | Update a user's role |
+| `GET` | `/api/admin/runtime-status` | Admin | No | — | Ingestion worker health and queue depth |
+| `POST` | `/api/internal/ingestion/run` | CRON | No | — | Trigger the ingestion worker (cron use only) |
 
 > BYOK routes follow the same shape for `cohere` and `anthropic` providers — substitute the provider name in the path.
 
