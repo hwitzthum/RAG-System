@@ -199,3 +199,37 @@ test("retrieveRankedCandidatesWithRouting expands and fuses multi-document queri
   assert.equal(result.trace.candidateCounts.keyword, 3);
   assert.equal(result.chunks.length, 2);
 });
+
+test("retrieveRankedCandidatesWithRouting marks every branch as already expanded", async () => {
+  // Each branch is itself a query variation. Without disableMultiQuery the
+  // service would expand each branch again, turning N branches into
+  // N x RAG_MULTI_QUERY_VARIATIONS embedding calls for a single request.
+  ensureRetrievalTestEnv();
+  const { retrieveRankedCandidatesWithRouting } = await import("../lib/retrieval/router");
+
+  const seenInputs: Array<{ query: string; disableMultiQuery?: boolean }> = [];
+
+  await retrieveRankedCandidatesWithRouting(
+    {
+      query: "contract renewal terms",
+      topK: 3,
+      documentIds: ["doc-1", "doc-2"],
+      enableQueryExpansion: true,
+    },
+    {
+      retrieveBase: async (input) => {
+        seenInputs.push({ query: input.query, disableMultiQuery: input.disableMultiQuery });
+        return { chunks: [buildChunk({})], trace: buildTrace(input.query) };
+      },
+      generateVariations: async (query) => [query, "renewal clause"],
+      generateHyde: async () => "A hypothetical passage about renewal terms.",
+      rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+    },
+  );
+
+  assert.ok(seenInputs.length > 1, "expected the router to fan out into branches");
+  assert.ok(
+    seenInputs.every((input) => input.disableMultiQuery === true),
+    "every branch retrieval must suppress a second round of expansion",
+  );
+});

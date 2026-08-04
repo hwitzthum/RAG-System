@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
-import { generateGroundedAnswer, generateWebAugmentedAnswer } from "@/lib/answering/service";
+import {
+  generateGroundedAnswer,
+  generateWebAugmentedAnswer,
+} from "@/lib/answering/service";
 import { INSUFFICIENT_EVIDENCE_MESSAGE } from "@/lib/answering/prompts";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
 import type { AuthUser } from "@/lib/auth/types";
@@ -9,13 +12,22 @@ import { env } from "@/lib/config/env";
 import { listAccessibleDocumentIds } from "@/lib/ingestion/runtime/effective-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
 import { emitQueryLatency, emitCacheHit } from "@/lib/observability/metrics";
-import { markUserCohereApiKeyUsed, resolveUserCohereApiKey } from "@/lib/providers/cohere-vault";
-import { markUserOpenAiApiKeyUsed, resolveUserOpenAiApiKey } from "@/lib/providers/openai-vault";
+import {
+  markUserCohereApiKeyUsed,
+  resolveUserCohereApiKey,
+} from "@/lib/providers/cohere-vault";
+import {
+  markUserOpenAiApiKeyUsed,
+  resolveUserOpenAiApiKey,
+} from "@/lib/providers/openai-vault";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { retrieveRankedCandidatesWithRouting } from "@/lib/retrieval/router";
 import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
-import { buildPromptInjectionRefusal, shouldBlockUserPrompt } from "@/lib/security/prompt-injection";
+import {
+  buildPromptInjectionRefusal,
+  shouldBlockUserPrompt,
+} from "@/lib/security/prompt-injection";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -39,7 +51,9 @@ const querySchema = z.object({
 const sseEncoder = new TextEncoder();
 
 function encodeSseEvent(event: string, data: unknown): Uint8Array {
-  return sseEncoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  return sseEncoder.encode(
+    `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+  );
 }
 
 function chunkAnswerText(answer: string): string[] {
@@ -47,10 +61,15 @@ function chunkAnswerText(answer: string): string[] {
   if (tokens.length === 0) {
     return [];
   }
-  return tokens.map((token, index) => (index === tokens.length - 1 ? token : `${token} `));
+  return tokens.map((token, index) =>
+    index === tokens.length - 1 ? token : `${token} `,
+  );
 }
 
-function normalizeDocumentScopeInput(input: { documentId?: string; documentIds?: string[] }): string[] {
+function normalizeDocumentScopeInput(input: {
+  documentId?: string;
+  documentIds?: string[];
+}): string[] {
   const scopeIds = new Set<string>();
   if (input.documentId) {
     scopeIds.add(input.documentId);
@@ -64,23 +83,37 @@ function normalizeDocumentScopeInput(input: { documentId?: string; documentIds?:
 async function resolveAccessibleQueryScope(input: {
   user: AuthUser;
   requestedDocumentIds: string[];
-}): Promise<{ documentIds: string[] | undefined; unauthorizedDocumentIds: string[] }> {
+}): Promise<{
+  documentIds: string[] | undefined;
+  unauthorizedDocumentIds: string[];
+}> {
   if (input.user.role === "admin") {
     return {
-      documentIds: input.requestedDocumentIds.length > 0 ? input.requestedDocumentIds : undefined,
+      documentIds:
+        input.requestedDocumentIds.length > 0
+          ? input.requestedDocumentIds
+          : undefined,
       unauthorizedDocumentIds: [],
     };
   }
 
-  const accessibleDocumentIds = await listAccessibleDocumentIds(getSupabaseAdminClient(), {
-    user: input.user,
-  });
+  const accessibleDocumentIds = await listAccessibleDocumentIds(
+    getSupabaseAdminClient(),
+    {
+      user: input.user,
+    },
+  );
   const accessibleSet = new Set(accessibleDocumentIds);
 
   if (input.requestedDocumentIds.length > 0) {
-    const unauthorizedDocumentIds = input.requestedDocumentIds.filter((documentId) => !accessibleSet.has(documentId));
+    const unauthorizedDocumentIds = input.requestedDocumentIds.filter(
+      (documentId) => !accessibleSet.has(documentId),
+    );
     return {
-      documentIds: unauthorizedDocumentIds.length === 0 ? input.requestedDocumentIds : undefined,
+      documentIds:
+        unauthorizedDocumentIds.length === 0
+          ? input.requestedDocumentIds
+          : undefined,
       unauthorizedDocumentIds,
     };
   }
@@ -133,6 +166,11 @@ function buildQueryStreamResponse(input: {
       variationCount: number;
       hydeUsed: boolean;
       branchCount: number;
+    };
+    citationAttribution: {
+      markerCount: number;
+      invalidMarkerCount: number;
+      fellBack: boolean;
     };
   };
   webSources?: WebSource[];
@@ -240,7 +278,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsedRequestBody = querySchema.safeParse(await request.json().catch(() => null));
+  const parsedRequestBody = querySchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsedRequestBody.success) {
     logAuditEvent({
       action: "query.execute",
@@ -252,16 +292,23 @@ export async function POST(request: NextRequest) {
       metadata: { reason: "invalid_request_body" },
     });
 
-    return NextResponse.json({ error: "Invalid query payload" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid query payload" },
+      { status: 400 },
+    );
   }
   const requestBody = parsedRequestBody.data;
   const requestedDocumentIds = normalizeDocumentScopeInput(requestBody);
-  const { documentIds: scopedDocumentIds, unauthorizedDocumentIds } = await resolveAccessibleQueryScope({
-    user: authResult.user,
-    requestedDocumentIds,
-  });
+  const { documentIds: scopedDocumentIds, unauthorizedDocumentIds } =
+    await resolveAccessibleQueryScope({
+      user: authResult.user,
+      requestedDocumentIds,
+    });
   const normalizedQuery = normalizeQuery(requestBody.query);
-  const requestLanguage = detectQueryLanguage(normalizedQuery, requestBody.languageHint);
+  const requestLanguage = detectQueryLanguage(
+    normalizedQuery,
+    requestBody.languageHint,
+  );
   const queryId = randomUUID();
   const conversationId = requestBody.conversationId ?? queryId;
 
@@ -280,10 +327,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ error: "One or more scoped documents are not accessible." }, { status: 403 });
+    return NextResponse.json(
+      { error: "One or more scoped documents are not accessible." },
+      { status: 403 },
+    );
   }
 
-  if (authResult.user.role !== "admin" && (!scopedDocumentIds || scopedDocumentIds.length === 0)) {
+  if (
+    authResult.user.role !== "admin" &&
+    (!scopedDocumentIds || scopedDocumentIds.length === 0)
+  ) {
     const retrievalMeta = {
       cacheHit: false,
       latencyMs: 0,
@@ -318,6 +371,11 @@ export async function POST(request: NextRequest) {
         hydeUsed: false,
         branchCount: 1,
       },
+      citationAttribution: {
+        markerCount: 0,
+        invalidMarkerCount: 0,
+        fellBack: false,
+      },
     };
 
     return buildQueryStreamResponse({
@@ -337,7 +395,8 @@ export async function POST(request: NextRequest) {
       selectedDocumentIds: scopedDocumentIds ?? [],
       insufficientEvidence: true,
       conversationId,
-      documentScopeId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+      documentScopeId:
+        scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
       documentScopeIds: scopedDocumentIds ?? [],
       rateLimit: {
         remaining: rate.remaining,
@@ -364,6 +423,11 @@ export async function POST(request: NextRequest) {
         hydeUsed: false,
         branchCount: 1,
       },
+      citationAttribution: {
+        markerCount: 0,
+        invalidMarkerCount: 0,
+        fellBack: false,
+      },
     };
 
     logAuditEvent({
@@ -375,7 +439,8 @@ export async function POST(request: NextRequest) {
       ipAddress,
       metadata: {
         reason: "prompt_injection_blocked",
-        documentId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+        documentId:
+          scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
         documentIds: scopedDocumentIds ?? [],
       },
     });
@@ -408,7 +473,10 @@ export async function POST(request: NextRequest) {
         message: error instanceof Error ? error.message : "unknown_error",
       },
     });
-    return NextResponse.json({ error: "Failed to resolve user provider credentials" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to resolve user provider credentials" },
+      { status: 500 },
+    );
   }
 
   return runWithRuntimeSecrets(
@@ -425,11 +493,13 @@ export async function POST(request: NextRequest) {
           query: requestBody.query,
           topK,
           languageHint: requestBody.languageHint,
-          documentIds: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds : undefined,
+          documentIds:
+            scopedDocumentIds && scopedDocumentIds.length > 0
+              ? scopedDocumentIds
+              : undefined,
           cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
           enableQueryExpansion: requestBody.enableQueryExpansion,
         });
-
 
         let webSources: WebSource[] = [];
         if (requestBody.enableWebResearch && env.RAG_WEB_SEARCH_ENABLED) {
@@ -440,40 +510,56 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const answerResult = webSources.length > 0
-          ? await generateWebAugmentedAnswer({
-              query: requestBody.query,
-              language: retrievalResult.trace.language,
-              chunks: retrievalResult.chunks,
-              minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-              minRerankScore: env.RAG_MIN_RERANK_SCORE,
-              maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
-              webSources,
-            })
-          : await generateGroundedAnswer({
-              query: requestBody.query,
-              language: retrievalResult.trace.language,
-              chunks: retrievalResult.chunks,
-              minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-              minRerankScore: env.RAG_MIN_RERANK_SCORE,
-              maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-              documentScopeId: scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : null,
-            });
+        const answerResult =
+          webSources.length > 0
+            ? await generateWebAugmentedAnswer({
+                query: requestBody.query,
+                language: retrievalResult.trace.language,
+                chunks: retrievalResult.chunks,
+                minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+                maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                documentScopeId:
+                  scopedDocumentIds && scopedDocumentIds.length > 0
+                    ? scopedDocumentIds.join(",")
+                    : null,
+                webSources,
+              })
+            : await generateGroundedAnswer({
+                query: requestBody.query,
+                language: retrievalResult.trace.language,
+                chunks: retrievalResult.chunks,
+                minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+                maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                documentScopeId:
+                  scopedDocumentIds && scopedDocumentIds.length > 0
+                    ? scopedDocumentIds.join(",")
+                    : null,
+              });
         const latencyMs = Date.now() - startedAt;
 
         emitQueryLatency(latencyMs, { userId: authResult.user.id });
-        emitCacheHit(retrievalResult.trace.cacheHit, { userId: authResult.user.id });
+        emitCacheHit(retrievalResult.trace.cacheHit, {
+          userId: authResult.user.id,
+        });
 
         const retrievalMeta = {
           cacheHit: retrievalResult.trace.cacheHit,
           latencyMs,
-          selectedChunkIds: retrievalResult.chunks.map((chunk) => chunk.chunkId),
-          selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
+          selectedChunkIds: retrievalResult.chunks.map(
+            (chunk) => chunk.chunkId,
+          ),
+          selectedDocumentIds: [
+            ...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId)),
+          ],
           retrievalTrace: retrievalResult.trace,
           insufficientEvidence: answerResult.insufficientEvidence,
           conversationId,
-          documentScopeId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+          documentScopeId:
+            scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
           documentScopeIds: scopedDocumentIds ?? [],
           rateLimit: {
             remaining: rate.remaining,
@@ -482,6 +568,7 @@ export async function POST(request: NextRequest) {
           promptInjection: answerResult.promptInjection,
           outputFilter: answerResult.outputFilter,
           queryExpansion: retrievalResult.queryExpansion,
+          citationAttribution: answerResult.citationAttribution,
         };
 
         const supabase = getSupabaseAdminClient();
@@ -509,7 +596,10 @@ export async function POST(request: NextRequest) {
               outcome: "failure",
               resource: "query_history",
               ipAddress,
-              metadata: { reason: "query_history_insert_failed", message: historyError.message },
+              metadata: {
+                reason: "query_history_insert_failed",
+                message: historyError.message,
+              },
             });
           } else {
             queryHistoryId = historyRow?.id;
@@ -519,37 +609,47 @@ export async function POST(request: NextRequest) {
         }
 
         if (userOpenAiApiKey) {
-          void markUserOpenAiApiKeyUsed(authResult.user.id).catch((touchError) => {
-            logAuditEvent({
-              action: "openai.byok.touch",
-              actorId: authResult.user.id,
-              actorRole: authResult.user.role,
-              outcome: "failure",
-              resource: "openai_byok_vault",
-              ipAddress,
-              metadata: {
-                reason: "touch_failed",
-                message: touchError instanceof Error ? touchError.message : "unknown_error",
-              },
-            });
-          });
+          void markUserOpenAiApiKeyUsed(authResult.user.id).catch(
+            (touchError) => {
+              logAuditEvent({
+                action: "openai.byok.touch",
+                actorId: authResult.user.id,
+                actorRole: authResult.user.role,
+                outcome: "failure",
+                resource: "openai_byok_vault",
+                ipAddress,
+                metadata: {
+                  reason: "touch_failed",
+                  message:
+                    touchError instanceof Error
+                      ? touchError.message
+                      : "unknown_error",
+                },
+              });
+            },
+          );
         }
 
         if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
-          void markUserCohereApiKeyUsed(authResult.user.id).catch((touchError) => {
-            logAuditEvent({
-              action: "cohere.byok.touch",
-              actorId: authResult.user.id,
-              actorRole: authResult.user.role,
-              outcome: "failure",
-              resource: "cohere_byok_vault",
-              ipAddress,
-              metadata: {
-                reason: "touch_failed",
-                message: touchError instanceof Error ? touchError.message : "unknown_error",
-              },
-            });
-          });
+          void markUserCohereApiKeyUsed(authResult.user.id).catch(
+            (touchError) => {
+              logAuditEvent({
+                action: "cohere.byok.touch",
+                actorId: authResult.user.id,
+                actorRole: authResult.user.role,
+                outcome: "failure",
+                resource: "cohere_byok_vault",
+                ipAddress,
+                metadata: {
+                  reason: "touch_failed",
+                  message:
+                    touchError instanceof Error
+                      ? touchError.message
+                      : "unknown_error",
+                },
+              });
+            },
+          );
         }
 
         logAuditEvent({
@@ -563,16 +663,23 @@ export async function POST(request: NextRequest) {
             conversationId: requestBody.conversationId ?? null,
             languageHint: requestBody.languageHint ?? null,
             topK,
-            documentId: scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
+            documentId:
+              scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
             documentIds: scopedDocumentIds ?? [],
             selectedChunkCount: retrievalResult.chunks.length,
-            selectedDocumentIds: [...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId))],
+            selectedDocumentIds: [
+              ...new Set(
+                retrievalResult.chunks.map((chunk) => chunk.documentId),
+              ),
+            ],
             cacheHit: retrievalResult.trace.cacheHit,
             retrievalVersion: retrievalResult.trace.retrievalVersion,
             insufficientEvidence: answerResult.insufficientEvidence,
             promptInjection: answerResult.promptInjection,
             outputFilter: answerResult.outputFilter,
             queryExpansion: retrievalResult.queryExpansion,
+            citationAttribution: answerResult.citationAttribution,
+            citationCount: answerResult.citations.length,
             resolvedConversationId: conversationId,
             openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
             cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",
@@ -588,7 +695,8 @@ export async function POST(request: NextRequest) {
           queryHistoryId,
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown_error";
+        const message =
+          error instanceof Error ? error.message : "unknown_error";
         logAuditEvent({
           action: "query.execute",
           actorId: authResult.user.id,
@@ -602,7 +710,10 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        return NextResponse.json({ error: "Failed to retrieve ranked chunks" }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to retrieve ranked chunks" },
+          { status: 500 },
+        );
       }
     },
   );

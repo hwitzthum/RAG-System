@@ -1,5 +1,10 @@
-import type { Citation, RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  Citation,
+  RetrievedChunk,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import { hasSufficientEvidence } from "@/lib/answering/policy";
+import { resolveCitedChunks } from "@/lib/answering/citations";
 import {
   buildGroundedAnswerUserPrompt,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
@@ -25,6 +30,7 @@ export type GenerateGroundedAnswerInput = {
   chunks: RetrievedChunk[];
   minEvidenceChunks: number;
   minRerankScore: number;
+  minHeuristicRelevance: number;
   maxOutputTokens: number;
   documentScopeId?: string | null;
 };
@@ -46,10 +52,26 @@ export type GenerateGroundedAnswerResult = {
     reasons: string[];
     redactionCount: number;
   };
+  citationAttribution: {
+    /** Distinct in-range [n] markers resolved from the answer. */
+    markerCount: number;
+    /** Markers referencing an evidence index that does not exist. */
+    invalidMarkerCount: number;
+    /** True when the model wrote no usable marker and all chunks were returned. */
+    fellBack: boolean;
+  };
 };
 
 export type AnswerServiceDependencies = {
   llmProvider: LlmProvider;
+};
+
+// Used for the early-return paths (insufficient evidence, leakage, blocked
+// output) where there is no model answer to attribute against.
+const UNATTRIBUTED: GenerateGroundedAnswerResult["citationAttribution"] = {
+  markerCount: 0,
+  invalidMarkerCount: 0,
+  fellBack: false,
 };
 
 function buildCitations(chunks: RetrievedChunk[]): Citation[] {
@@ -88,6 +110,7 @@ export async function generateGroundedAnswer(
     chunks: protectedChunks.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
+    minHeuristicRelevance: input.minHeuristicRelevance,
     documentScoped: Boolean(input.documentScopeId),
   });
 
@@ -109,6 +132,7 @@ export async function generateGroundedAnswer(
         reasons: [],
         redactionCount: 0,
       },
+      citationAttribution: UNATTRIBUTED,
     };
   }
 
@@ -143,12 +167,17 @@ export async function generateGroundedAnswer(
         reasons: ["sensitive_leakage"],
         redactionCount: 0,
       },
+      citationAttribution: UNATTRIBUTED,
     };
   }
 
+  // Attribute before filtering: the marker indices refer to the model's own
+  // output, and filterAnswerOutput may redact spans but never renumbers them.
+  const attribution = resolveCitedChunks({ answer, chunks: input.chunks });
+
   const filteredOutput = filterAnswerOutput({
     answer,
-    citations,
+    citations: attribution.citations,
     language: input.language,
   });
 
@@ -168,6 +197,11 @@ export async function generateGroundedAnswer(
       filtered: filteredOutput.filtered,
       reasons: filteredOutput.reasons,
       redactionCount: filteredOutput.redactionCount,
+    },
+    citationAttribution: {
+      markerCount: attribution.markerCount,
+      invalidMarkerCount: attribution.invalidMarkerCount,
+      fellBack: attribution.fellBack,
     },
   };
 }
@@ -189,6 +223,7 @@ export async function generateWebAugmentedAnswer(
     chunks: protectedChunks.chunks,
     minEvidenceChunks: input.minEvidenceChunks,
     minRerankScore: input.minRerankScore,
+    minHeuristicRelevance: input.minHeuristicRelevance,
     documentScoped: Boolean(input.documentScopeId),
   });
 
@@ -210,6 +245,7 @@ export async function generateWebAugmentedAnswer(
         reasons: [],
         redactionCount: 0,
       },
+      citationAttribution: UNATTRIBUTED,
     };
   }
 
@@ -245,12 +281,18 @@ export async function generateWebAugmentedAnswer(
         reasons: ["sensitive_leakage"],
         redactionCount: 0,
       },
+      citationAttribution: UNATTRIBUTED,
     };
   }
 
+  // Only the [n] document markers are resolved here. Web sources are marked
+  // [WEB-n] by buildWebAugmentedUserPrompt and travel back to the client as
+  // `webSources`, not as citations.
+  const attribution = resolveCitedChunks({ answer, chunks: input.chunks });
+
   const filteredOutput = filterAnswerOutput({
     answer,
-    citations,
+    citations: attribution.citations,
     language: input.language,
   });
 
@@ -270,6 +312,11 @@ export async function generateWebAugmentedAnswer(
       filtered: filteredOutput.filtered,
       reasons: filteredOutput.reasons,
       redactionCount: filteredOutput.redactionCount,
+    },
+    citationAttribution: {
+      markerCount: attribution.markerCount,
+      invalidMarkerCount: attribution.invalidMarkerCount,
+      fellBack: attribution.fellBack,
     },
   };
 }

@@ -1,6 +1,7 @@
 export type SupportedLanguage = "EN" | "DE" | "FR" | "IT" | "ES";
 export type DocumentStatus = "queued" | "processing" | "ready" | "failed";
-export type IngestionJobStatus = "queued" | "processing" | "completed" | "failed" | "dead_letter";
+export type IngestionJobStatus =
+  "queued" | "processing" | "completed" | "failed" | "dead_letter";
 
 export type Database = {
   public: {
@@ -488,7 +489,8 @@ export type Database = {
       replace_document_chunks: {
         Args: {
           target_document_id: string;
-          target_chunks?: Record<string, unknown> | Record<string, unknown>[] | null;
+          target_chunks?:
+            Record<string, unknown> | Record<string, unknown>[] | null;
         };
         Returns: {
           document_id: string;
@@ -499,7 +501,8 @@ export type Database = {
       append_document_chunks: {
         Args: {
           target_document_id: string;
-          target_chunks?: Record<string, unknown> | Record<string, unknown>[] | null;
+          target_chunks?:
+            Record<string, unknown> | Record<string, unknown>[] | null;
         };
         Returns: {
           document_id: string;
@@ -684,6 +687,7 @@ export type Database = {
           query_embedding: number[];
           match_count?: number;
           filter_language?: SupportedLanguage | null;
+          filter_document_ids?: string[] | null;
         };
         Returns: {
           chunk_id: string;
@@ -694,6 +698,23 @@ export type Database = {
           context: string;
           language: SupportedLanguage;
           similarity: number;
+        }[];
+      };
+      search_document_chunks_keyword: {
+        Args: {
+          query_text: string;
+          match_count?: number;
+          filter_document_ids?: string[] | null;
+        };
+        Returns: {
+          chunk_id: string;
+          document_id: string;
+          page_number: number;
+          section_title: string | null;
+          content: string;
+          context: string;
+          language: SupportedLanguage;
+          rank: number;
         }[];
       };
     };

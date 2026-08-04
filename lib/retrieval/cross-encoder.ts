@@ -12,7 +12,9 @@ export type CrossEncoderInput = {
 
 const CROSS_ENCODER_POOL_CAP = 20;
 
-export async function crossEncoderRerank(input: CrossEncoderInput): Promise<RetrievedChunk[]> {
+export async function crossEncoderRerank(
+  input: CrossEncoderInput,
+): Promise<RetrievedChunk[]> {
   if (input.chunks.length === 0) {
     return [];
   }
@@ -26,8 +28,8 @@ export async function crossEncoderRerank(input: CrossEncoderInput): Promise<Retr
 
   const cappedChunks = input.chunks.slice(0, CROSS_ENCODER_POOL_CAP);
 
-  const documents = cappedChunks.map(
-    (chunk) => `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
+  const documents = cappedChunks.map((chunk) =>
+    `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
   );
 
   try {
@@ -40,12 +42,21 @@ export async function crossEncoderRerank(input: CrossEncoderInput): Promise<Retr
       topN: input.topK,
     });
 
+    // Cohere's relevanceScore is already an absolute query-document relevance
+    // measure, so it serves as both the ordering score and the gate score. The
+    // scale marker tells lib/answering/policy.ts which threshold applies —
+    // these numbers are not comparable with the heuristic reranker's.
     return response.results.map((result) => ({
       ...cappedChunks[result.index],
       rerankScore: result.relevanceScore,
+      relevanceScore: result.relevanceScore,
+      scoreScale: "cross_encoder" as const,
     }));
   } catch (error) {
-    console.warn("Cohere rerank failed, falling back to original order:", error);
+    console.warn(
+      "Cohere rerank failed, falling back to original order:",
+      error,
+    );
     return cappedChunks.slice(0, input.topK);
   }
 }

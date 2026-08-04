@@ -1,4 +1,8 @@
-import type { RetrievedChunk, RetrievalTrace, SupportedLanguage } from "@/lib/contracts/retrieval";
+import type {
+  RetrievedChunk,
+  RetrievalTrace,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import {
@@ -30,6 +34,12 @@ export type RetrieveRankedCandidatesInput = {
   languageHint?: SupportedLanguage;
   documentIds?: string[];
   cacheNamespace?: string;
+  /**
+   * Set by the router when this call is already one branch of an expanded
+   * query. Without it the router's variations would each be expanded again
+   * here, costing branches x variations embedding calls per request.
+   */
+  disableMultiQuery?: boolean;
 };
 
 export type RetrieveRankedCandidatesResult = {
@@ -50,6 +60,7 @@ export type RetrievalServiceDependencies = {
     candidates: RetrievedChunk[];
     poolSize: number;
     topK: number;
+    language?: SupportedLanguage;
   }) => Promise<RetrievedChunk[]>;
   searchVector: typeof searchVectorCandidates;
   searchKeyword: typeof searchKeywordCandidates;
@@ -70,30 +81,13 @@ function getDefaultDependencies(): RetrievalServiceDependencies {
   };
 }
 
-function mergeUniqueChunks(primary: RetrievedChunk[], secondary: RetrievedChunk[]): RetrievedChunk[] {
-  const seen = new Set<string>();
-  const merged: RetrievedChunk[] = [];
-
-  for (const chunk of primary.concat(secondary)) {
-    if (seen.has(chunk.chunkId)) {
-      continue;
-    }
-    seen.add(chunk.chunkId);
-    merged.push(chunk);
-  }
-
-  return merged;
-}
-
 function normalizeDocumentScope(documentIds: string[] | undefined): string[] {
   if (!documentIds || documentIds.length === 0) {
     return [];
   }
 
   const uniqueIds = new Set(
-    documentIds
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0),
+    documentIds.map((item) => item.trim()).filter((item) => item.length > 0),
   );
 
   return [...uniqueIds].sort();
@@ -113,13 +107,18 @@ export async function retrieveRankedCandidates(
   const topK = Math.max(1, input.topK);
   const retrievalVersion = env.RAG_RETRIEVAL_VERSION;
   const scopedDocumentIds = normalizeDocumentScope(input.documentIds);
-  const documentOverviewQuery = isDocumentOverviewQuery(normalizedQuery, scopedDocumentIds);
+  const documentOverviewQuery = isDocumentOverviewQuery(
+    normalizedQuery,
+    scopedDocumentIds,
+  );
   const scopeKey = input.cacheNamespace?.trim()
     ? input.cacheNamespace.trim()
     : scopedDocumentIds.length > 0
       ? `docs:${scopedDocumentIds.join(",")}`
       : "scope:all";
-  const strategyScopeKey = documentOverviewQuery ? `overview-v2:${scopeKey}` : scopeKey;
+  const strategyScopeKey = documentOverviewQuery
+    ? `overview-v2:${scopeKey}`
+    : scopeKey;
   const cacheKey = buildRetrievalCacheKey({
     normalizedQuery,
     language,
@@ -130,10 +129,16 @@ export async function retrieveRankedCandidates(
 
   // Best-effort, fire-and-forget cache hygiene — avoids blocking the query path.
   void deps.pruneCache(retrievalVersion).catch((error) => {
-    console.warn("retrieval_cache_prune_failed", error instanceof Error ? error.message : String(error));
+    console.warn(
+      "retrieval_cache_prune_failed",
+      error instanceof Error ? error.message : String(error),
+    );
   });
 
-  let cached: { chunks: RetrievedChunk[]; candidateCounts: RetrievalTrace["candidateCounts"] } | null = null;
+  let cached: {
+    chunks: RetrievedChunk[];
+    candidateCounts: RetrievalTrace["candidateCounts"];
+  } | null = null;
   try {
     cached = await deps.readCache({
       cacheKey,
@@ -141,7 +146,10 @@ export async function retrieveRankedCandidates(
       topK,
     });
   } catch (error) {
-    console.warn("retrieval_cache_read_failed", error instanceof Error ? error.message : String(error));
+    console.warn(
+      "retrieval_cache_read_failed",
+      error instanceof Error ? error.message : String(error),
+    );
     cached = null;
   }
 
@@ -185,7 +193,10 @@ export async function retrieveRankedCandidates(
         ttlSeconds: env.RAG_CACHE_TTL_SECONDS,
       });
     } catch (error) {
-      console.warn("retrieval_cache_write_failed", error instanceof Error ? error.message : String(error));
+      console.warn(
+        "retrieval_cache_write_failed",
+        error instanceof Error ? error.message : String(error),
+      );
     }
 
     return {
@@ -202,23 +213,29 @@ export async function retrieveRankedCandidates(
     };
   }
 
-  const candidateLimit = Math.max(topK * 4, env.RAG_RERANK_POOL_SIZE, MIN_CANDIDATE_LIMIT);
+  const candidateLimit = Math.max(
+    topK * 4,
+    env.RAG_RERANK_POOL_SIZE,
+    MIN_CANDIDATE_LIMIT,
+  );
   const tokens = extractQueryTokens(normalizedQuery);
 
   let vectorCandidates: RetrievedChunk[];
   let keywordCandidates: RetrievedChunk[];
-  let primaryEmbedding: number[];
 
-  if (env.RAG_MULTI_QUERY_ENABLED) {
+  // Neither search is language-filtered any more, so there is no
+  // cross-language fallback pass to run: every search already covers the whole
+  // corpus. Language is applied as a ranking signal during rerank instead.
+  if (env.RAG_MULTI_QUERY_ENABLED && !input.disableMultiQuery) {
     const queries = await generateQueryVariations(normalizedQuery);
-    const embeddings = await Promise.all(queries.map((q) => deps.createEmbedding(q)));
-    primaryEmbedding = embeddings[0]!;
+    const embeddings = await Promise.all(
+      queries.map((q) => deps.createEmbedding(q)),
+    );
 
     const vectorResults = await Promise.all(
       embeddings.map((emb) =>
         deps.searchVector({
           queryEmbedding: emb,
-          language,
           limit: candidateLimit,
           documentIds: scopedDocumentIds,
         }),
@@ -240,55 +257,27 @@ export async function retrieveRankedCandidates(
     keywordCandidates = await deps.searchKeyword({
       normalizedQuery,
       tokens,
-      language,
       limit: candidateLimit,
       documentIds: scopedDocumentIds,
     });
   } else {
-    primaryEmbedding = await deps.createEmbedding(normalizedQuery);
+    const primaryEmbedding = await deps.createEmbedding(normalizedQuery);
 
     const [vc, kc] = await Promise.all([
       deps.searchVector({
         queryEmbedding: primaryEmbedding,
-        language,
         limit: candidateLimit,
         documentIds: scopedDocumentIds,
       }),
       deps.searchKeyword({
         normalizedQuery,
         tokens,
-        language,
         limit: candidateLimit,
         documentIds: scopedDocumentIds,
       }),
     ]);
     vectorCandidates = vc;
     keywordCandidates = kc;
-  }
-
-  const languageConstrainedTotal = vectorCandidates.length + keywordCandidates.length;
-  const shouldUseCrossLanguageFallback =
-    languageConstrainedTotal < topK || keywordCandidates.length === 0;
-
-  if (shouldUseCrossLanguageFallback) {
-    const [crossLanguageVectorCandidates, crossLanguageKeywordCandidates] = await Promise.all([
-      deps.searchVector({
-        queryEmbedding: primaryEmbedding,
-        language: null,
-        limit: candidateLimit,
-        documentIds: scopedDocumentIds,
-      }),
-      deps.searchKeyword({
-        normalizedQuery,
-        tokens,
-        language: null,
-        limit: candidateLimit,
-        documentIds: scopedDocumentIds,
-      }),
-    ]);
-
-    vectorCandidates = mergeUniqueChunks(vectorCandidates, crossLanguageVectorCandidates);
-    keywordCandidates = mergeUniqueChunks(keywordCandidates, crossLanguageKeywordCandidates);
   }
 
   const fusedCandidates = reciprocalRankFusion({
@@ -302,6 +291,7 @@ export async function retrieveRankedCandidates(
     candidates: fusedCandidates,
     poolSize: env.RAG_RERANK_POOL_SIZE,
     topK,
+    language,
   });
 
   if (env.RAG_CROSS_ENCODER_ENABLED) {
@@ -340,7 +330,10 @@ export async function retrieveRankedCandidates(
       ttlSeconds: env.RAG_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    console.warn("retrieval_cache_write_failed", error instanceof Error ? error.message : String(error));
+    console.warn(
+      "retrieval_cache_write_failed",
+      error instanceof Error ? error.message : String(error),
+    );
     // Continue response path if cache write fails.
   }
 

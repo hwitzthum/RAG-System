@@ -265,6 +265,7 @@ async function executeLive(query: EvaluationQueryRecord, topK: number): Promise<
     chunks: uncachedRetrieval.chunks,
     minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
     minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
+    minHeuristicRelevance: deps.env.RAG_MIN_RERANK_SCORE,
     maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
   });
   const uncachedLatencyMs = Date.now() - uncachedStart;
@@ -281,6 +282,7 @@ async function executeLive(query: EvaluationQueryRecord, topK: number): Promise<
     chunks: cachedRetrieval.chunks,
     minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
     minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
+    minHeuristicRelevance: deps.env.RAG_MIN_RERANK_SCORE,
     maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
   });
   const cachedLatencyMs = Date.now() - cachedStart;

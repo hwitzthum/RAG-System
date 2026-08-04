@@ -123,3 +123,116 @@ test("rerankCandidates prefers lexical matches in rerank pool", () => {
   assert.equal(reranked[0]?.chunkId, "match");
   assert.ok((reranked[0]?.rerankScore ?? 0) > (reranked[1]?.rerankScore ?? 0));
 });
+
+test("rerankCandidates emits an absolute relevance score independent of the pool", () => {
+  // A pool of uniformly weak candidates. rerankScore normalises against the
+  // pool leader so it stays high; relevanceScore must stay low, because that is
+  // the number the evidence gate reads.
+  const weakPool = [
+    buildChunk({
+      chunkId: "weak-1",
+      retrievalScore: 0.016,
+      vectorScore: 0.07,
+      content: "Completely unrelated boilerplate.",
+      context: "unrelated",
+      sectionTitle: "Appendix",
+    }),
+    buildChunk({
+      chunkId: "weak-2",
+      retrievalScore: 0.015,
+      vectorScore: 0.05,
+      content: "Also unrelated.",
+      context: "unrelated",
+      sectionTitle: "Appendix",
+    }),
+  ];
+
+  const reranked = rerankCandidates({
+    normalizedQuery: "solar financing",
+    candidates: weakPool,
+    poolSize: 20,
+    topK: 2,
+  });
+
+  assert.equal(reranked[0]?.scoreScale, "heuristic");
+  assert.ok(
+    (reranked[0]?.rerankScore ?? 0) > 0.5,
+    "pool leader should still order near the top",
+  );
+  assert.ok(
+    (reranked[0]?.relevanceScore ?? 1) < 0.15,
+    "absolute relevance must reflect that nothing in the pool is relevant",
+  );
+});
+
+test("rerankCandidates scores a genuinely relevant chunk highly in absolute terms", () => {
+  const reranked = rerankCandidates({
+    normalizedQuery: "solar financing",
+    candidates: [
+      buildChunk({
+        chunkId: "match",
+        retrievalScore: 0.016,
+        vectorScore: 0.62,
+        sectionTitle: "Solar Financing",
+        content: "Solar financing options for schools.",
+        context: "loan and subsidy comparisons",
+      }),
+    ],
+    poolSize: 20,
+    topK: 1,
+  });
+
+  assert.ok((reranked[0]?.relevanceScore ?? 0) > 0.5);
+});
+
+test("rerankCandidates applies a language match boost to ordering only", () => {
+  const candidates = [
+    buildChunk({
+      chunkId: "en",
+      language: "EN",
+      retrievalScore: 0.016,
+      vectorScore: 0.4,
+      content: "shared body text",
+      context: "shared",
+      sectionTitle: "Shared",
+    }),
+    buildChunk({
+      chunkId: "de",
+      language: "DE",
+      retrievalScore: 0.016,
+      vectorScore: 0.4,
+      content: "shared body text",
+      context: "shared",
+      sectionTitle: "Shared",
+    }),
+  ];
+
+  const reranked = rerankCandidates({
+    normalizedQuery: "vertragslaufzeit",
+    candidates,
+    poolSize: 20,
+    topK: 2,
+    language: "DE",
+  });
+
+  assert.equal(reranked[0]?.chunkId, "de", "same-language chunk should order first");
+  // The boost must not leak into the gate score: both chunks are equally
+  // (ir)relevant to the query regardless of which language they are in.
+  assert.equal(reranked[0]?.relevanceScore, reranked[1]?.relevanceScore);
+});
+
+test("detectQueryLanguage keeps EN when no language keyword matches", () => {
+  // Regression: bestScore seeded at -1 let a zero-scoring query be won by the
+  // first key in LANGUAGE_KEYWORDS (DE), so English questions containing none
+  // of the tracked stopwords were answered in German.
+  assert.equal(
+    detectQueryLanguage("how does artificial intelligence affect employee wellbeing"),
+    "EN",
+  );
+  assert.equal(detectQueryLanguage("melting point tungsten carbide"), "EN");
+});
+
+test("detectQueryLanguage still detects a language from its keywords", () => {
+  assert.equal(detectQueryLanguage("was ist der inhalt und die struktur"), "DE");
+  assert.equal(detectQueryLanguage("what is the content and the structure"), "EN");
+});

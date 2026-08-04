@@ -23,6 +23,7 @@ test("hasSufficientEvidence fails when no chunks are available", () => {
     chunks: [],
     minEvidenceChunks: 1,
     minRerankScore: 0.1,
+    minHeuristicRelevance: 0.1,
   });
 
   assert.equal(result, false);
@@ -33,6 +34,7 @@ test("hasSufficientEvidence fails when scores are below threshold", () => {
     chunks: [buildChunk({ rerankScore: 0.03 }), buildChunk({ chunkId: "chunk-2", rerankScore: 0.05 })],
     minEvidenceChunks: 1,
     minRerankScore: 0.1,
+    minHeuristicRelevance: 0.1,
   });
 
   assert.equal(result, false);
@@ -43,6 +45,7 @@ test("hasSufficientEvidence passes when rerank score meets threshold", () => {
     chunks: [buildChunk({ rerankScore: 0.12 })],
     minEvidenceChunks: 1,
     minRerankScore: 0.1,
+    minHeuristicRelevance: 0.1,
   });
 
   assert.equal(result, true);
@@ -62,6 +65,7 @@ test("generateGroundedAnswer returns insufficient-evidence fallback when evidenc
       chunks: [buildChunk({ rerankScore: 0.02 })],
       minEvidenceChunks: 1,
       minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
       maxOutputTokens: 200,
     },
     {
@@ -83,6 +87,7 @@ test("hasSufficientEvidence allows a single strong chunk for document-scoped que
     chunks: [buildChunk({ rerankScore: 0.18 })],
     minEvidenceChunks: 2,
     minRerankScore: 0.1,
+    minHeuristicRelevance: 0.1,
     documentScoped: true,
   });
 
@@ -104,6 +109,7 @@ test("generateGroundedAnswer uses the LLM when a document-scoped query has one s
       chunks: [buildChunk({ rerankScore: 0.18, content: "The document explains retrieval-augmented generation fundamentals." })],
       minEvidenceChunks: 2,
       minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
       maxOutputTokens: 200,
     },
     {
@@ -143,6 +149,7 @@ test("generateGroundedAnswer sanitizes prompt-injection text before sending evid
       ],
       minEvidenceChunks: 2,
       minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
       maxOutputTokens: 200,
     },
     {
@@ -176,6 +183,7 @@ test("generateGroundedAnswer falls back when the LLM output appears to leak hidd
       chunks: [buildChunk({ rerankScore: 0.18, content: "The document explains retrieval safeguards." })],
       minEvidenceChunks: 2,
       minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
       maxOutputTokens: 200,
     },
     {
@@ -206,6 +214,7 @@ test("generateGroundedAnswer filters unsafe markdown links and secret-like token
       chunks: [buildChunk({ rerankScore: 0.18, content: "The document explains retrieval safeguards." })],
       minEvidenceChunks: 2,
       minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
       maxOutputTokens: 200,
     },
     {
@@ -222,4 +231,96 @@ test("generateGroundedAnswer filters unsafe markdown links and secret-like token
   assert.ok(result.answer.includes("[here](#)"));
   assert.equal(result.outputFilter.filtered, true);
   assert.ok(result.outputFilter.reasons.includes("secret_redaction"));
+});
+
+// --- Score-scale separation -------------------------------------------------
+//
+// Regression coverage for the defect these tests previously could not catch:
+// hasSufficientEvidence read `rerankScore`, which the heuristic reranker
+// normalises against the pool maximum. The best candidate of any pool therefore
+// scored near the top of the range no matter how irrelevant it was, so the
+// insufficient-evidence gate never fired in the default configuration.
+
+test("hasSufficientEvidence rejects a pool whose ordering scores are high but relevance is low", () => {
+  // Exactly the shape the heuristic reranker produces for a pool of weak
+  // candidates: the pool leader is normalised to ~1.0 while its absolute
+  // relevance is near zero.
+  const result = hasSufficientEvidence({
+    chunks: [
+      buildChunk({ rerankScore: 0.95, relevanceScore: 0.08, scoreScale: "heuristic" }),
+      buildChunk({
+        chunkId: "chunk-2",
+        rerankScore: 0.71,
+        relevanceScore: 0.05,
+        scoreScale: "heuristic",
+      }),
+    ],
+    minEvidenceChunks: 2,
+    minRerankScore: 0.25,
+    minHeuristicRelevance: 0.3,
+  });
+
+  assert.equal(result, false);
+});
+
+test("hasSufficientEvidence accepts genuinely relevant heuristic-scored chunks", () => {
+  const result = hasSufficientEvidence({
+    chunks: [
+      buildChunk({ rerankScore: 0.95, relevanceScore: 0.52, scoreScale: "heuristic" }),
+      buildChunk({
+        chunkId: "chunk-2",
+        rerankScore: 0.71,
+        relevanceScore: 0.41,
+        scoreScale: "heuristic",
+      }),
+    ],
+    minEvidenceChunks: 2,
+    minRerankScore: 0.25,
+    minHeuristicRelevance: 0.3,
+  });
+
+  assert.equal(result, true);
+});
+
+test("hasSufficientEvidence applies the cross-encoder threshold to cross-encoder scores", () => {
+  // 0.28 clears the cross-encoder threshold (0.25) but not the heuristic one
+  // (0.4). Picking the threshold by scale is what stops RAG_CROSS_ENCODER_ENABLED
+  // from silently changing what the gate means.
+  const chunks = [
+    buildChunk({ relevanceScore: 0.28, scoreScale: "cross_encoder" as const }),
+    buildChunk({ chunkId: "chunk-2", relevanceScore: 0.26, scoreScale: "cross_encoder" as const }),
+  ];
+
+  assert.equal(
+    hasSufficientEvidence({
+      chunks,
+      minEvidenceChunks: 2,
+      minRerankScore: 0.25,
+      minHeuristicRelevance: 0.4,
+    }),
+    true,
+  );
+
+  assert.equal(
+    hasSufficientEvidence({
+      chunks,
+      minEvidenceChunks: 2,
+      minRerankScore: 0.35,
+      minHeuristicRelevance: 0.1,
+    }),
+    false,
+  );
+});
+
+test("hasSufficientEvidence falls back to rerankScore for chunks without a relevance score", () => {
+  // Retrieval-cache entries written before relevanceScore existed must keep
+  // working rather than being treated as zero-relevance and refused.
+  const result = hasSufficientEvidence({
+    chunks: [buildChunk({ rerankScore: 0.4 })],
+    minEvidenceChunks: 1,
+    minRerankScore: 0.9,
+    minHeuristicRelevance: 0.3,
+  });
+
+  assert.equal(result, true);
 });

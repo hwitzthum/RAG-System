@@ -113,7 +113,12 @@ test("retrieveRankedCandidates reads from cache before retrieval/rerank on repea
   assert.equal(keywordCalls, 1);
 });
 
-test("retrieveRankedCandidates falls back to cross-language retrieval when language-constrained pool is sparse", async () => {
+test("retrieveRankedCandidates never language-filters the searches", async () => {
+  // Replaces two former "falls back to cross-language retrieval" tests. There
+  // is no fallback pass any more because there is nothing to fall back from:
+  // both searches always cover the whole corpus. text-embedding-3-large is
+  // multilingual, so filtering by a heuristically detected query language
+  // discarded recall for no gain.
   ensureRetrievalTestEnv();
   const { retrieveRankedCandidates } = await import("../lib/retrieval/service");
 
@@ -127,9 +132,6 @@ test("retrieveRankedCandidates falls back to cross-language retrieval when langu
     createEmbedding: async () => [0.1, 0.2, 0.3],
     searchVector: async ({ language }) => {
       vectorLanguages.push(language);
-      if (language) {
-        return [];
-      }
       return [
         buildChunk({
           chunkId: "de-chunk-1",
@@ -142,7 +144,7 @@ test("retrieveRankedCandidates falls back to cross-language retrieval when langu
     },
     searchKeyword: async ({ language }) => {
       keywordLanguages.push(language);
-      return language ? [] : [];
+      return [];
     },
     rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
   };
@@ -157,82 +159,52 @@ test("retrieveRankedCandidates falls back to cross-language retrieval when langu
   );
 
   assert.equal(result.trace.cacheHit, false);
+  // A German chunk is reachable from a query detected as English, in a single
+  // pass rather than only via a conditional second round trip.
   assert.equal(result.chunks.length, 1);
   assert.equal(result.chunks[0]?.documentId, "doc-de-1");
-  assert.deepEqual(vectorLanguages, ["EN", null]);
-  assert.deepEqual(keywordLanguages, ["EN", null]);
+  assert.equal(vectorLanguages.length, 1, "vector search should run exactly once");
+  assert.equal(keywordLanguages.length, 1, "keyword search should run exactly once");
+  assert.equal(vectorLanguages[0], undefined);
+  assert.equal(keywordLanguages[0], undefined);
 });
 
-test("retrieveRankedCandidates falls back to cross-language retrieval when keyword pool is empty", async () => {
+test("retrieveRankedCandidates passes the detected language to the reranker", async () => {
+  // Language survives as a ranking signal even though it no longer filters.
   ensureRetrievalTestEnv();
   const { retrieveRankedCandidates } = await import("../lib/retrieval/service");
 
-  const vectorLanguages: Array<string | null | undefined> = [];
-  const keywordLanguages: Array<string | null | undefined> = [];
+  const rerankLanguages: Array<string | undefined> = [];
 
-  const deps: Partial<RetrievalServiceDependencies> = {
-    pruneCache: async () => undefined,
-    readCache: async () => null,
-    writeCache: async () => undefined,
-    createEmbedding: async () => [0.1, 0.2, 0.3],
-    searchVector: async ({ language }) => {
-      vectorLanguages.push(language);
-      if (language) {
-        return [
-          buildChunk({
-            chunkId: "en-vec-1",
-            documentId: "doc-en",
-            language: "EN",
-            retrievalScore: 0.8,
-            source: "vector",
-          }),
-          buildChunk({
-            chunkId: "en-vec-2",
-            documentId: "doc-en",
-            language: "EN",
-            retrievalScore: 0.79,
-            source: "vector",
-          }),
-          buildChunk({
-            chunkId: "en-vec-3",
-            documentId: "doc-en",
-            language: "EN",
-            retrievalScore: 0.78,
-            source: "vector",
-          }),
-        ];
-      }
-      return [
-        buildChunk({
-          chunkId: "de-cross-1",
-          documentId: "doc-de",
-          language: "DE",
-          retrievalScore: 0.85,
-          source: "vector",
-        }),
-      ];
-    },
-    searchKeyword: async ({ language }) => {
-      keywordLanguages.push(language);
-      return [];
-    },
-    rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
-  };
-
-  const result = await retrieveRankedCandidates(
+  await retrieveRankedCandidates(
     {
       query: "Wie lautet der Sentinel-Wert?",
       topK: 3,
       languageHint: "DE",
     },
-    deps,
+    {
+      pruneCache: async () => undefined,
+      readCache: async () => null,
+      writeCache: async () => undefined,
+      createEmbedding: async () => [0.1, 0.2, 0.3],
+      searchVector: async () => [
+        buildChunk({
+          chunkId: "de-vec-1",
+          documentId: "doc-de",
+          language: "DE",
+          retrievalScore: 0.85,
+          source: "vector",
+        }),
+      ],
+      searchKeyword: async () => [],
+      rerankCandidates: async ({ candidates, topK, language }) => {
+        rerankLanguages.push(language);
+        return candidates.slice(0, topK);
+      },
+    },
   );
 
-  assert.equal(result.trace.cacheHit, false);
-  assert.equal(result.chunks.length >= 1, true);
-  assert.equal(result.trace.candidateCounts.vector >= 4, true);
-  assert.deepEqual(vectorLanguages, ["DE", null]);
-  assert.deepEqual(keywordLanguages, ["DE", null]);
+  assert.deepEqual(rerankLanguages, ["DE"]);
 });
 
 test("retrieveRankedCandidates forwards document scope to vector and keyword retrieval", async () => {
@@ -277,8 +249,8 @@ test("retrieveRankedCandidates forwards document scope to vector and keyword ret
 
   assert.equal(result.trace.cacheHit, false);
   assert.equal(result.chunks.length, 1);
-  assert.deepEqual(vectorDocumentScopes, [["doc-scope-1", "doc-scope-2"], ["doc-scope-1", "doc-scope-2"]]);
-  assert.deepEqual(keywordDocumentScopes, [["doc-scope-1", "doc-scope-2"], ["doc-scope-1", "doc-scope-2"]]);
+  assert.deepEqual(vectorDocumentScopes, [["doc-scope-1", "doc-scope-2"]]);
+  assert.deepEqual(keywordDocumentScopes, [["doc-scope-1", "doc-scope-2"]]);
 });
 
 test("retrieveRankedCandidates uses overview retrieval for generic single-document summary queries", async () => {

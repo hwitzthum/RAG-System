@@ -1,4 +1,7 @@
-import { chunkSections, splitIntoSections } from "@/lib/ingestion/runtime/chunking";
+import {
+  chunkSections,
+  splitIntoSections,
+} from "@/lib/ingestion/runtime/chunking";
 import { ContextGenerator } from "@/lib/ingestion/runtime/context-generator";
 import { EmbeddingProvider } from "@/lib/ingestion/runtime/embedding-provider";
 import { extractPages } from "@/lib/ingestion/runtime/pdf-extractor";
@@ -14,41 +17,69 @@ import type {
 } from "@/lib/ingestion/runtime/types";
 import type { IngestionRuntimeRepository } from "@/lib/ingestion/runtime/repository";
 import type { SupportedLanguage } from "@/lib/supabase/database.types";
+import { detectLanguageWithConfidence } from "@/lib/retrieval/language";
 
-function detectLanguage(text: string, languageHint: SupportedLanguage | null): SupportedLanguage {
+/**
+ * Assigns a language to every section of a document.
+ *
+ * Per-section detection on its own is unreliable, in two ways that both used to
+ * resolve silently to German:
+ *
+ *  - A heading like "COORDINATION & CAPACITY" matches no keyword in any
+ *    language. Every language scored 0 and, with the accumulator seeded at -1,
+ *    whichever language was declared first in the table won — German. English
+ *    headings were labelled German.
+ *  - Several keywords are shared between languages (" des " is both German and
+ *    French), so a tie is a genuine "don't know". Two unmistakably German
+ *    chunks were labelled French this way.
+ *
+ * Sections without clear evidence now inherit the document's language rather
+ * than being guessed at. When the document has no language yet (first
+ * ingestion), the majority verdict of the sections that *were* confident stands
+ * in — a far better prior for a short fragment than the fragment itself.
+ * Confident sections keep their own language, so genuinely multilingual
+ * documents still chunk per language.
+ */
+export function assignSectionLanguages(
+  sections: { text: string }[],
+  languageHint: SupportedLanguage | null,
+): SupportedLanguage[] {
   if (languageHint) {
-    return languageHint;
+    return sections.map(() => languageHint);
   }
 
-  const lowered = text.toLowerCase();
-  if (!lowered) {
-    return "EN";
-  }
+  const detections = sections.map((section) =>
+    detectLanguageWithConfidence(section.text),
+  );
 
-  const keywordMap: Record<SupportedLanguage, string[]> = {
-    DE: [" und ", " der ", " die ", " das ", " fuer ", " für "],
-    FR: [" le ", " la ", " les ", " des ", " pour "],
-    IT: [" il ", " lo ", " gli ", " per ", " con "],
-    ES: [" el ", " la ", " los ", " para ", " con "],
-    EN: [" the ", " and ", " for ", " with ", " from "],
-  };
-
-  let bestLanguage: SupportedLanguage = "EN";
-  let bestScore = -1;
-  const padded = ` ${lowered} `;
-
-  for (const language of Object.keys(keywordMap) as SupportedLanguage[]) {
-    const score = keywordMap[language].reduce((sum, keyword) => sum + padded.split(keyword).length - 1, 0);
-    if (score > bestScore) {
-      bestScore = score;
-      bestLanguage = language;
+  const confidentCounts = new Map<SupportedLanguage, number>();
+  for (const detection of detections) {
+    if (detection.confident) {
+      confidentCounts.set(
+        detection.language,
+        (confidentCounts.get(detection.language) ?? 0) + 1,
+      );
     }
   }
 
-  return bestLanguage;
+  let fallbackLanguage: SupportedLanguage = "EN";
+  let fallbackCount = 0;
+  for (const [language, count] of confidentCounts.entries()) {
+    if (count > fallbackCount) {
+      fallbackCount = count;
+      fallbackLanguage = language;
+    }
+  }
+
+  return detections.map((detection) =>
+    detection.confident ? detection.language : fallbackLanguage,
+  );
 }
 
-function determineDocumentLanguage(chunkLanguages: SupportedLanguage[], fallback: SupportedLanguage | null): SupportedLanguage {
+function determineDocumentLanguage(
+  chunkLanguages: SupportedLanguage[],
+  fallback: SupportedLanguage | null,
+): SupportedLanguage {
   if (fallback) {
     return fallback;
   }
@@ -108,14 +139,25 @@ function buildRelaxedDocumentFallbackChunk(
     pageNumber: sections[0]?.pageNumber ?? 1,
     sectionTitle: "Document",
     content: combinedContent,
-    language: detectLanguage(combinedContent, languageHint),
+    language: assignSectionLanguages([{ text: combinedContent }], languageHint)[0]!,
   };
 }
 
 function groupSectionsByLanguage(
-  sections: { pageNumber: number; sectionTitle: string; text: string; language: SupportedLanguage }[],
-): Array<{ language: SupportedLanguage; sections: { pageNumber: number; sectionTitle: string; text: string }[] }> {
-  const groups: Array<{ language: SupportedLanguage; sections: { pageNumber: number; sectionTitle: string; text: string }[] }> = [];
+  sections: {
+    pageNumber: number;
+    sectionTitle: string;
+    text: string;
+    language: SupportedLanguage;
+  }[],
+): Array<{
+  language: SupportedLanguage;
+  sections: { pageNumber: number; sectionTitle: string; text: string }[];
+}> {
+  const groups: Array<{
+    language: SupportedLanguage;
+    sections: { pageNumber: number; sectionTitle: string; text: string }[];
+  }> = [];
 
   for (const section of sections) {
     const currentGroup = groups[groups.length - 1];
@@ -146,8 +188,14 @@ function groupSectionsByLanguage(
 type ExtractPagesFn = typeof extractPages;
 type ContextGeneratorPort = Pick<ContextGenerator, "enrich">;
 type EmbeddingProviderPort = Pick<EmbeddingProvider, "embedTexts">;
-type ContextGeneratorFactory = (settings: IngestionRuntimeSettings, logger: RuntimeLogger) => ContextGeneratorPort;
-type EmbeddingProviderFactory = (settings: IngestionRuntimeSettings, logger: RuntimeLogger) => EmbeddingProviderPort;
+type ContextGeneratorFactory = (
+  settings: IngestionRuntimeSettings,
+  logger: RuntimeLogger,
+) => ContextGeneratorPort;
+type EmbeddingProviderFactory = (
+  settings: IngestionRuntimeSettings,
+  logger: RuntimeLogger,
+) => EmbeddingProviderPort;
 type ResolveJobSecrets = (document: DocumentRecord) => Promise<{
   openAiApiKey: string | null;
   anthropicApiKey: string | null;
@@ -181,25 +229,29 @@ export class IngestionPipeline {
     this.embeddingProviderFactory = input.embeddingProvider
       ? () => input.embeddingProvider as EmbeddingProviderPort
       : (settings, logger) => new EmbeddingProvider(settings, logger);
-    this.resolveJobSecrets = input.resolveJobSecrets ?? (async (document) => {
-      if (!document.userId) {
-        return {
-          openAiApiKey: this.settings.openAiApiKey,
-          anthropicApiKey: this.settings.anthropicApiKey,
-        };
-      }
-      const { resolveDocumentProviderSecrets } = await import("@/lib/providers/document-provider-secrets");
-      return resolveDocumentProviderSecrets({
-        userId: document.userId,
-        fallbackOpenAiApiKey: this.settings.openAiApiKey,
-        fallbackAnthropicApiKey: this.settings.anthropicApiKey,
+    this.resolveJobSecrets =
+      input.resolveJobSecrets ??
+      (async (document) => {
+        if (!document.userId) {
+          return {
+            openAiApiKey: this.settings.openAiApiKey,
+            anthropicApiKey: this.settings.anthropicApiKey,
+          };
+        }
+        const { resolveDocumentProviderSecrets } =
+          await import("@/lib/providers/document-provider-secrets");
+        return resolveDocumentProviderSecrets({
+          userId: document.userId,
+          fallbackOpenAiApiKey: this.settings.openAiApiKey,
+          fallbackAnthropicApiKey: this.settings.anthropicApiKey,
+        });
       });
-    });
   }
 
   async processJob(job: IngestionJob): Promise<ProcessJobResult> {
     const pipelineStart = Date.now();
-    const elapsed = () => `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;
+    const elapsed = () =>
+      `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;
     const setStage = async (stage: string) => {
       if (job.currentStage === stage) {
         return;
@@ -215,8 +267,14 @@ export class IngestionPipeline {
       openAiApiKey: jobSecrets.openAiApiKey,
       anthropicApiKey: jobSecrets.anthropicApiKey,
     };
-    const contextGenerator = this.contextGeneratorFactory(jobSettings, this.logger);
-    const embeddingProvider = this.embeddingProviderFactory(jobSettings, this.logger);
+    const contextGenerator = this.contextGeneratorFactory(
+      jobSettings,
+      this.logger,
+    );
+    const embeddingProvider = this.embeddingProviderFactory(
+      jobSettings,
+      this.logger,
+    );
 
     // Load incremental state
     let progress: JobProgress = await this.repository.loadJobProgress(job.id);
@@ -224,13 +282,32 @@ export class IngestionPipeline {
     // Phase 1: Extract (first invocation only — no candidates saved yet)
     if (!progress.candidates) {
       await setStage("extracting");
-      this.logger.info("pipeline_step", { step: "extraction_start", elapsed: elapsed(), jobId: job.id, documentId: document.id });
+      this.logger.info("pipeline_step", {
+        step: "extraction_start",
+        elapsed: elapsed(),
+        jobId: job.id,
+        documentId: document.id,
+      });
 
-      const pdfBytes = await this.repository.downloadDocument(document.storagePath);
-      this.logger.info("pipeline_step", { step: "pdf_downloaded", elapsed: elapsed(), bytes: pdfBytes.length });
+      const pdfBytes = await this.repository.downloadDocument(
+        document.storagePath,
+      );
+      this.logger.info("pipeline_step", {
+        step: "pdf_downloaded",
+        elapsed: elapsed(),
+        bytes: pdfBytes.length,
+      });
 
-      const pages = await this.extractPagesFn(pdfBytes, this.settings.ocrFallbackEnabled, this.logger);
-      this.logger.info("pipeline_step", { step: "pages_extracted", elapsed: elapsed(), pageCount: pages.length });
+      const pages = await this.extractPagesFn(
+        pdfBytes,
+        this.settings.ocrFallbackEnabled,
+        this.logger,
+      );
+      this.logger.info("pipeline_step", {
+        step: "pages_extracted",
+        elapsed: elapsed(),
+        pageCount: pages.length,
+      });
 
       await setStage("chunking");
       const sections = [];
@@ -244,9 +321,10 @@ export class IngestionPipeline {
         throw new Error("No extractable text found in document");
       }
 
-      const sectionsWithLanguage = sections.map((section) => ({
+      const sectionLanguages = assignSectionLanguages(sections, document.language);
+      const sectionsWithLanguage = sections.map((section, index) => ({
         ...section,
-        language: detectLanguage(section.text, document.language),
+        language: sectionLanguages[index]!,
       }));
 
       let chunkCandidates: ChunkCandidate[] = [];
@@ -264,7 +342,10 @@ export class IngestionPipeline {
       chunkCandidates = reindexChunks(chunkCandidates);
 
       if (chunkCandidates.length === 0) {
-        const relaxedFallbackChunk = buildRelaxedDocumentFallbackChunk(sections, document.language);
+        const relaxedFallbackChunk = buildRelaxedDocumentFallbackChunk(
+          sections,
+          document.language,
+        );
         if (!relaxedFallbackChunk) {
           throw new Error("No chunks generated from extracted sections");
         }
@@ -277,8 +358,16 @@ export class IngestionPipeline {
         });
       }
 
-      await this.repository.saveChunkCandidates(job.id, chunkCandidates, chunkCandidates.length);
-      this.logger.info("pipeline_step", { step: "candidates_saved", elapsed: elapsed(), total: chunkCandidates.length });
+      await this.repository.saveChunkCandidates(
+        job.id,
+        chunkCandidates,
+        chunkCandidates.length,
+      );
+      this.logger.info("pipeline_step", {
+        step: "candidates_saved",
+        elapsed: elapsed(),
+        total: chunkCandidates.length,
+      });
 
       progress = {
         candidates: chunkCandidates,
@@ -304,54 +393,83 @@ export class IngestionPipeline {
     if (chunksProcessed === 0) {
       await setStage("clearing_chunks");
       await this.repository.replaceDocumentChunks(document.id, []);
-      this.logger.info("pipeline_step", { step: "existing_chunks_cleared", elapsed: elapsed(), documentId: document.id });
+      this.logger.info("pipeline_step", {
+        step: "existing_chunks_cleared",
+        elapsed: elapsed(),
+        documentId: document.id,
+      });
     }
 
     const batchStart = chunksProcessed;
-    const batchEnd = Math.min(batchStart + this.settings.chunksPerRun, chunksTotal);
+    const batchEnd = Math.min(
+      batchStart + this.settings.chunksPerRun,
+      chunksTotal,
+    );
     const batch = candidates.slice(batchStart, batchEnd);
 
-    this.logger.info("pipeline_step", { step: "batch_start", elapsed: elapsed(), batchStart, batchEnd, total: chunksTotal });
+    this.logger.info("pipeline_step", {
+      step: "batch_start",
+      elapsed: elapsed(),
+      batchStart,
+      batchEnd,
+      total: chunksTotal,
+    });
 
     // Enrich batch with context
     await setStage("contextualizing");
     const batchWithContext = await contextGenerator.enrich(batch);
-    this.logger.info("pipeline_step", { step: "batch_context_enriched", elapsed: elapsed(), count: batchWithContext.length });
+    this.logger.info("pipeline_step", {
+      step: "batch_context_enriched",
+      elapsed: elapsed(),
+      count: batchWithContext.length,
+    });
 
     // Generate embeddings for batch
     await setStage("embedding");
-    const embeddingInputs = batchWithContext.map((item) => `${item.context}\n\n${item.content}`);
+    const embeddingInputs = batchWithContext.map(
+      (item) => `${item.context}\n\n${item.content}`,
+    );
     const embeddings = await embeddingProvider.embedTexts(embeddingInputs);
-    this.logger.info("pipeline_step", { step: "batch_embeddings_generated", elapsed: elapsed(), count: embeddings.length });
+    this.logger.info("pipeline_step", {
+      step: "batch_embeddings_generated",
+      elapsed: elapsed(),
+      count: embeddings.length,
+    });
 
     if (embeddings.length !== batchWithContext.length) {
       throw new Error("Embedding response size mismatch");
     }
 
-    const preparedChunks: PreparedChunkRecord[] = batchWithContext.map((chunk, index) => {
-      const embedding = embeddings[index];
-      if (!embedding || embedding.length !== this.settings.embeddingDim) {
-        throw new Error(
-          `Embedding dimension mismatch for chunk ${chunk.chunkIndex}: expected ${this.settings.embeddingDim}, got ${embedding?.length ?? 0}`,
-        );
-      }
+    const preparedChunks: PreparedChunkRecord[] = batchWithContext.map(
+      (chunk, index) => {
+        const embedding = embeddings[index];
+        if (!embedding || embedding.length !== this.settings.embeddingDim) {
+          throw new Error(
+            `Embedding dimension mismatch for chunk ${chunk.chunkIndex}: expected ${this.settings.embeddingDim}, got ${embedding?.length ?? 0}`,
+          );
+        }
 
-      return {
-        documentId: document.id,
-        chunkIndex: chunk.chunkIndex,
-        pageNumber: chunk.pageNumber,
-        sectionTitle: chunk.sectionTitle,
-        content: chunk.content,
-        context: chunk.context,
-        language: chunk.language,
-        embedding,
-      };
-    });
+        return {
+          documentId: document.id,
+          chunkIndex: chunk.chunkIndex,
+          pageNumber: chunk.pageNumber,
+          sectionTitle: chunk.sectionTitle,
+          content: chunk.content,
+          context: chunk.context,
+          language: chunk.language,
+          embedding,
+        };
+      },
+    );
 
     // Insert batch (append)
     await setStage("storing");
     await this.repository.insertChunkBatch(document.id, preparedChunks);
-    this.logger.info("pipeline_step", { step: "batch_stored", elapsed: elapsed(), count: preparedChunks.length });
+    this.logger.info("pipeline_step", {
+      step: "batch_stored",
+      elapsed: elapsed(),
+      count: preparedChunks.length,
+    });
 
     // Update progress
     const newChunksProcessed = batchEnd;
@@ -399,6 +517,10 @@ export class IngestionPipeline {
       remaining: chunksTotal - newChunksProcessed,
     });
 
-    return { status: "partial", chunksProcessed: newChunksProcessed, chunksTotal };
+    return {
+      status: "partial",
+      chunksProcessed: newChunksProcessed,
+      chunksTotal,
+    };
   }
 }
