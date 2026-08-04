@@ -10,6 +10,8 @@
     "ingestion:worker:once": "node -r dotenv/config --import tsx scripts/ingestion/run-worker.ts --once dotenv_config_path=.env.local",
     "ingestion:reconcile": "node -r dotenv/config --import tsx scripts/ingestion/reconcile-state.ts dotenv_config_path=.env.local",
     "ingestion:reconcile:apply": "node -r dotenv/config --import tsx scripts/ingestion/reconcile-state.ts --apply dotenv_config_path=.env.local",
+    "ingestion:backfill-language": "node -r dotenv/config --import tsx scripts/ingestion/backfill-chunk-language.ts dotenv_config_path=.env.local",
+    "ingestion:backfill-language:apply": "node -r dotenv/config --import tsx scripts/ingestion/backfill-chunk-language.ts --apply dotenv_config_path=.env.local",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
