@@ -2,7 +2,7 @@
 
 Version: 1.0
 Date: 2026-08-04
-Status: proposed — no work started
+Status: Wave 0 complete (merged 2026-08-04, PR #57) — Waves 1-3 not started
 
 ## Objective
 
@@ -51,21 +51,44 @@ The remaining items are cited but were not re-executed; confirm each citation be
 
 Fix the ruler before measuring anything. Nothing in Wave 1 can be honestly A/B'd until this lands. Take a fresh baseline at the end of this wave and treat it as the new zero.
 
+**Outcome (merged 2026-08-04, PR #57).** 12 of 13 items shipped; the multiplicative contextual-grouping boost was withdrawn after measurement (see 0.1). The new zero is `evaluation/runs/benchmark-2026-08-04T21-15-47-237Z.json`, 10/10 gates pass:
+
+|                          |            Before Wave 0 |                 New zero |
+| ------------------------ | -----------------------: | -----------------------: |
+| recall@5 / nDCG@10 / MRR | 0.8636 / 0.8168 / 0.8049 | 0.8636 / 0.8168 / 0.8049 |
+| faithfulness             |                  ungated | **0.9910 (gated ≥ 0.9)** |
+| contextPrecision         |                   0.5625 |                   0.7159 |
+| contextRecall            |                   0.9364 |                   0.9625 |
+
+Retrieval metrics are unchanged, as expected once 0.1's ranking change was reverted — Wave 0 shipped no ranking change. The judge metrics moved because the judge now reads full chunk text plus `chunk.context` rather than a 1,500-char excerpt.
+
+**Two carry-overs for Wave 1:**
+
+1. **This baseline is not a production-config number.** It was measured at `rerankPoolSize: 20` / `crossEncoderTimeoutMs: 3000` from `.env.local`; production runs 60 / 6000 after the 0.1 down payment. Re-measure locally at production values before reading item 1.2's sweep against it.
+2. **Item 1.1's predicted gain is not there.** The plan expects fixing the PII redaction bug to raise judge `faithfulness` and `answerRelevance`. Faithfulness is already 0.9910 and answerRelevance 0.9543 — under 0.01 of headroom on both, measured with the bug still present. The bug is real and still worth fixing (it ships wrong figures to users, which no metric here captures), but do not schedule it expecting a metric to move. The measurable headroom is EN: recall 0.6667 / nDCG 0.6195 against DE's 1.0 / 0.9534, which is what items 1.2, 1.4 and 2.1 target.
+
+**A note on confidence labels.** Item 0.1's multiplicative boost carried a concrete, plausible justification and still cost 0.044 EN nDCG, because the justification reasoned about raw cross-encoder scores when `rerankScore` is pool-normalised. Lint, typecheck, 250 unit tests and a green build all passed it; only the live benchmark caught it. Items 1.2 and 1.5 are marked "verified" on the same basis — a read of the code, not a measurement. Verify each premise against a run before implementing.
+
 ### 0.1 Quick wins
 
-- [ ] Set `RAG_RERANK_POOL_SIZE=60` in `.env.vercel.production` (currently `20`). Env-var-only down payment on item 2; raise `RAG_CROSS_ENCODER_TIMEOUT_MS` alongside it and watch the Cohere fallback-warning rate.
-- [ ] Refuse to write `evaluation/runs/latest.json` and `latest.md` when `mode === "dry-run"` (`scripts/evaluation/run-benchmark.ts:826-837`) — write `latest-dry-run.json` instead — and drop `allow-dry` from `scripts/production/generate-release-readiness.ts:161`. `executeDryRun` fabricates chunks that always contain the expected page (recall 1.000, grounding 1.000), and `npm run release:readiness:precutover` currently accepts that as release-gate input.
-- [ ] Point `eval:benchmark` at `evaluation/evaluation_queries.generated.json`, or change the default `datasetPath` at `scripts/evaluation/run-benchmark.ts:111`. It currently defaults to the 200-record synthetic fixture whose `expected_document` values (`doc_company_profile`, …) exist nowhere in the corpus.
-- [ ] Strip out-of-range `[n]` markers from answer prose in `lib/answering/citations.ts:71-75`. The marker is counted and discarded but never removed from the text, so an answer citing `[9]` against 8 chunks ships `[9]` to the user with nothing in the Evidence Navigator to match.
-- [ ] Make the contextual-grouping boost multiplicative: `rerankScore: baseScore * (1 + 0.08 * adjacentNeighbourCount)` at `lib/retrieval/contextual-grouping.ts:42`. A flat +0.05/+0.10 is enormous against Cohere's skewed distribution — a chunk scored 0.02 ends at 0.12 and overtakes one the cross-encoder rated 0.11 as genuinely relevant.
-- [ ] Sort the multi-query merge before RRF: `vectorCandidates = [...chunkMap.values()].sort((a, b) => b.retrievalScore - a.retrievalScore)` at `lib/retrieval/service.ts:254`. The best-score-per-chunk computed at line 249 is stored and then ignored, because `reciprocalRankFusion` derives rank purely from array index (`lib/retrieval/rrf.ts:16`). Latent today (the flag is off in production) but it means `RAG_MULTI_QUERY_ENABLED=true` cannot currently be A/B'd honestly.
-- [ ] Require at least one alphabetic character in `HEADING_UPPERCASE` (`lib/ingestion/runtime/chunking.ts:11-12`). It matches purely numeric all-caps lines, so a table header row like `2024 2025 2026` is consumed as a section title and silently deleted from the chunk body.
-- [ ] Delete the unused `prompts/grounded-answer-system.md` (no TypeScript file imports it) and fix `docs/DEVELOPMENT_RUNBOOK.md:203`, which claims the grounded answer templates live in `prompts/`. Two divergent copies of the system prompt is a trap for whoever edits the wrong one.
-- [ ] Add a `config` block (all `RAG_*` flags, both model names, embedding model and dimensions, retrieval version, topK) to the benchmark run artifact at `scripts/evaluation/run-benchmark.ts:815`. Ten stored runs are currently indistinguishable by configuration.
+- [x] Set `RAG_RERANK_POOL_SIZE=60` in `.env.vercel.production` (currently `20`). Env-var-only down payment on item 2; raise `RAG_CROSS_ENCODER_TIMEOUT_MS` alongside it and watch the Cohere fallback-warning rate.
+- [x] Refuse to write `evaluation/runs/latest.json` and `latest.md` when `mode === "dry-run"` (`scripts/evaluation/run-benchmark.ts:826-837`) — write `latest-dry-run.json` instead — and drop `allow-dry` from `scripts/production/generate-release-readiness.ts:161`. `executeDryRun` fabricates chunks that always contain the expected page (recall 1.000, grounding 1.000), and `npm run release:readiness:precutover` currently accepts that as release-gate input.
+- [x] Point `eval:benchmark` at `evaluation/evaluation_queries.generated.json`, or change the default `datasetPath` at `scripts/evaluation/run-benchmark.ts:111`. It currently defaults to the 200-record synthetic fixture whose `expected_document` values (`doc_company_profile`, …) exist nowhere in the corpus.
+- [x] Strip out-of-range `[n]` markers from answer prose in `lib/answering/citations.ts:71-75`. The marker is counted and discarded but never removed from the text, so an answer citing `[9]` against 8 chunks ships `[9]` to the user with nothing in the Evidence Navigator to match.
+- **WITHDRAWN — implemented, measured, reverted. Do not re-attempt without an nDCG@10 sweep.** ~~Make the contextual-grouping boost multiplicative:~~ `rerankScore: baseScore * (1 + 0.08 * adjacentNeighbourCount)` at `lib/retrieval/contextual-grouping.ts:42`. A flat +0.05/+0.10 is enormous against Cohere's skewed distribution — a chunk scored 0.02 ends at 0.12 and overtakes one the cross-encoder rated 0.11 as genuinely relevant.
+
+  **Measured outcome (2026-08-04):** nDCG@10 fell 0.8168 → 0.7989 and EN 0.6195 → 0.5757; an EN-only re-run after reverting restored both values exactly (recall@5 and DE unchanged throughout). The premise above is wrong for this codebase: `rerankScore` is **pool-normalised** (`lib/contracts/retrieval.ts:27-32`), so top-of-pool candidates sit near 0.95 and an 8% boost is worth ~0.076 there — _larger_ than the flat 0.05 it replaced, and applied exactly where nDCG@10 is measured. The 0.02-scored chunks the item describes sit deep in the pool, not in the ranked output. Artifacts: `evaluation/runs/benchmark-2026-08-04T20-47-41-690Z.json` (multiplicative) vs `-T12-35-17-329Z.json` (before). Reasoning is recorded in `lib/retrieval/contextual-grouping.ts`.
+
+  **What this did expose:** page gaps are compared with `<= 1`, so several chunks retrieved from the _same page_ all boost each other and interior ones in the sort order boost twice. That is the deferred `chunk_index` adjacency-key item at the bottom of this document — no longer speculative. `tests/retrieval.contextual-grouping.test.ts` pins the current behaviour so a fix fails loudly.
+
+- [x] Sort the multi-query merge before RRF: `vectorCandidates = [...chunkMap.values()].sort((a, b) => b.retrievalScore - a.retrievalScore)` at `lib/retrieval/service.ts:254`. The best-score-per-chunk computed at line 249 is stored and then ignored, because `reciprocalRankFusion` derives rank purely from array index (`lib/retrieval/rrf.ts:16`). Latent today (the flag is off in production) but it means `RAG_MULTI_QUERY_ENABLED=true` cannot currently be A/B'd honestly.
+- [x] Require at least one alphabetic character in `HEADING_UPPERCASE` (`lib/ingestion/runtime/chunking.ts:11-12`). It matches purely numeric all-caps lines, so a table header row like `2024 2025 2026` is consumed as a section title and silently deleted from the chunk body.
+- [x] Delete the unused `prompts/grounded-answer-system.md` (no TypeScript file imports it) and fix `docs/DEVELOPMENT_RUNBOOK.md:203`, which claims the grounded answer templates live in `prompts/`. Two divergent copies of the system prompt is a trap for whoever edits the wrong one.
+- [x] Add a `config` block (all `RAG_*` flags, both model names, embedding model and dimensions, retrieval version, topK) to the benchmark run artifact at `scripts/evaluation/run-benchmark.ts:815`. Ten stored runs are currently indistinguishable by configuration.
 
 ### 0.2 Config fingerprint in the retrieval cache key
 
-**Impact:** medium · **Effort:** 3h · **Confidence:** verified
+**Impact:** medium · **Effort:** 3h · **Confidence:** verified · **STATUS: DONE**
 
 `buildRetrievalCacheKey` hashes exactly `${normalizedQuery}::${language}::v${retrievalVersion}::k${topK}::scope${scopeKey}::schema${CACHE_KEY_SCHEMA_VERSION}` (`lib/retrieval/trace.ts:14-17`). The ACL dimension is correctly carried by `scopeKey`, but nothing reflects `RAG_CROSS_ENCODER_ENABLED`, `RAG_CROSS_ENCODER_MODEL`, `RAG_RERANK_POOL_SIZE`, `RAG_RRF_K`, `RAG_CONTEXTUAL_GROUPING_ENABLED`, `RAG_MULTI_QUERY_ENABLED`, `RAG_QUERY_EMBEDDING_MODEL` or `RAG_QUERY_EMBEDDING_DIMENSIONS`. The only lever is `RAG_RETRIEVAL_VERSION`, a manually-bumped integer sitting at `1` everywhere, against `RAG_CACHE_TTL_SECONDS=86400`.
 
@@ -75,7 +98,7 @@ Fix the ruler before measuring anything. Nothing in Wave 1 can be honestly A/B'd
 
 ### 0.3 Make the grounding gate able to fail
 
-**Impact:** high · **Effort:** 10h · **Confidence:** verified
+**Impact:** high · **Effort:** 10h · **Confidence:** verified · **STATUS: DONE**
 
 Three compounding defects:
 
@@ -85,10 +108,10 @@ Three compounding defects:
 
 **Change:**
 
-- [ ] Set `RAG_EVAL_JUDGE_MODEL` to a different, stronger family than the generator. `@anthropic-ai/sdk` is already a dependency and a full Anthropic BYOK vault exists at `lib/providers/anthropic-vault.ts`. Assert judge ≠ generator at benchmark start and print both model ids into the report header.
-- [ ] Give the judge the same rendered evidence the answerer saw (`lib/evaluation/llm-judge.ts:42-63`) — reuse `formatEvidenceChunk` from `lib/answering/prompts.ts` and budget by tokens, not chars.
-- [ ] Demote `groundingScore` and `hallucinationRate` to report-only, mirroring what was already done for strict `citationAccuracy`. Add `faithfulnessMin` to `BenchmarkThresholds` and a `faithfulness` check to `thresholdChecks`, failing closed when `judgedCount` is 0 — the same pattern already used for `verifiedQueryCount > 0` at `lib/evaluation/metrics.ts:450-454`.
-- [ ] Stop returning `groundingScore: 1` for abstentions; return null and exclude.
+- [x] Set `RAG_EVAL_JUDGE_MODEL` to a different, stronger family than the generator. `@anthropic-ai/sdk` is already a dependency and a full Anthropic BYOK vault exists at `lib/providers/anthropic-vault.ts`. Assert judge ≠ generator at benchmark start and print both model ids into the report header.
+- [x] Give the judge the same rendered evidence the answerer saw (`lib/evaluation/llm-judge.ts:42-63`) — reuse `formatEvidenceChunk` from `lib/answering/prompts.ts` and budget by tokens, not chars.
+- [x] Demote `groundingScore` and `hallucinationRate` to report-only, mirroring what was already done for strict `citationAccuracy`. Add `faithfulnessMin` to `BenchmarkThresholds` and a `faithfulness` check to `thresholdChecks`, failing closed when `judgedCount` is 0 — the same pattern already used for `verifiedQueryCount > 0` at `lib/evaluation/metrics.ts:450-454`.
+- [x] Stop returning `groundingScore: 1` for abstentions; return null and exclude.
 
 **Measure:** self-measuring. After the change, a prompt regression or model swap that produces unsupported sentences blocks the build instead of shipping green. Expect the first runs to fail while the real faithfulness level is discovered — **do not lower the threshold to fit**. The judge-model swap makes historical judge numbers non-comparable; record it as a baseline reset.
 
