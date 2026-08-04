@@ -53,6 +53,13 @@ type RunCapture = {
   citations: Citation[];
   insufficientEvidence: boolean;
   latencyMs: number;
+  /** Production citation-verifier result; null when disabled or blocked. */
+  citationVerification: {
+    checkedCount: number;
+    supportedCount: number;
+    unsupportedCount: number;
+    unverified: boolean;
+  } | null;
 };
 
 type QueryExecution = {
@@ -279,6 +286,12 @@ function executeDryRun(
       citations,
       insufficientEvidence: false,
       latencyMs: uncachedLatencyMs,
+      citationVerification: {
+        checkedCount: 3,
+        supportedCount: 3,
+        unsupportedCount: 0,
+        unverified: false,
+      },
     },
     cached: {
       chunks,
@@ -293,6 +306,12 @@ function executeDryRun(
       citations,
       insufficientEvidence: false,
       latencyMs: cachedLatencyMs,
+      citationVerification: {
+        checkedCount: 3,
+        supportedCount: 3,
+        unsupportedCount: 0,
+        unverified: false,
+      },
     },
   };
 }
@@ -362,6 +381,7 @@ async function executeLive(
       citations: uncachedAnswer.citations,
       insufficientEvidence: uncachedAnswer.insufficientEvidence,
       latencyMs: uncachedLatencyMs,
+      citationVerification: uncachedAnswer.citationVerification,
     },
     cached: {
       chunks: cachedRetrieval.chunks,
@@ -371,6 +391,7 @@ async function executeLive(
       citations: cachedAnswer.citations,
       insufficientEvidence: cachedAnswer.insufficientEvidence,
       latencyMs: cachedLatencyMs,
+      citationVerification: cachedAnswer.citationVerification,
     },
   };
 }
@@ -407,11 +428,25 @@ function deriveFailures(
     );
   }
 
-  if (answerMetrics.citationAccuracy < 1) {
+  if (answerMetrics.citationEvidenceHit < 1) {
     failures.push(
       toFailure(
         "citation",
-        "Citations did not consistently point to expected document/page evidence.",
+        "No citation pointed to the expected document/page evidence.",
+        queryId,
+      ),
+    );
+  }
+
+  if (
+    answerMetrics.verifiedCitationRate !== null &&
+    answerMetrics.verifiedCitationRate <
+      DEFAULT_BENCHMARK_THRESHOLDS.verifiedCitationRate
+  ) {
+    failures.push(
+      toFailure(
+        "citation",
+        "Citation verifier judged one or more cited sentences unsupported by their sources.",
         queryId,
       ),
     );
@@ -535,7 +570,9 @@ Evaluated queries: ${input.queryCount}
 | Recall@5 | ${formatMetric(overall.recallAt5)} |
 | nDCG@10 | ${formatMetric(overall.ndcgAt10)} |
 | MRR | ${formatMetric(overall.mrr)} |
-| Citation accuracy | ${formatMetric(overall.citationAccuracy)} |
+| Citation evidence hit rate | ${formatMetric(overall.citationEvidenceHitRate)} |
+| Verified citation rate | ${overall.verifiedQueryCount > 0 ? formatMetric(overall.verifiedCitationRate) : "n/a"} (${overall.verifiedQueryCount} verified) |
+| Citation accuracy (strict, report-only) | ${formatMetric(overall.citationAccuracy)} |
 | Grounding score | ${formatMetric(overall.groundingScore)} |
 | Hallucination rate | ${formatMetric(overall.hallucinationRate)} |
 | Cache hit rate | ${formatMetric(overall.cacheHitRate)} |
@@ -603,6 +640,7 @@ async function evaluateQuery(
       execution.uncached.citations,
       execution.uncached.chunks,
       execution.uncached.insufficientEvidence,
+      execution.uncached.citationVerification,
     );
     const cacheHitOnRepeat = execution.cached.cacheHit;
 
@@ -686,6 +724,8 @@ async function evaluateQuery(
         firstRelevantRank: null,
         relevantRanks: [],
         citationAccuracy: 0,
+        citationEvidenceHit: 0,
+        verifiedCitationRate: null,
         groundingScore: 0,
         hallucinationRate: 1,
         uncachedLatencyMs: 0,

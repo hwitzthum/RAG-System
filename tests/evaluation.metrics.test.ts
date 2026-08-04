@@ -84,6 +84,8 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
   };
   const answer = {
     citationAccuracy: 1,
+    citationEvidenceHit: 1,
+    verifiedCitationRate: 1,
     groundingScore: 1,
     hallucinationRate: 0,
   };
@@ -142,15 +144,86 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
         recallAt5: 0,
         ndcgAt10: 0,
         citationAccuracy: 0,
+        citationEvidenceHit: 0,
+        verifiedCitationRate: 0.5,
         hallucinationRate: 0.8,
         cacheHitOnRepeat: false,
-        uncachedLatencyMs: 9000,
-        cachedLatencyMs: 3000,
+        uncachedLatencyMs: 16000,
+        cachedLatencyMs: 13000,
       },
     },
   ]).overall;
   const failing = evaluateThresholds(failingSummary);
   assert.equal(failing.passed, false);
+});
+
+test("citationEvidenceHit does not penalise extra citations from multi-chunk synthesis", async () => {
+  const { computeCitationEvidenceHit, computeCitationAccuracy } =
+    await import("../lib/evaluation/metrics");
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  // One citation hits the golden evidence; two more cite other (legitimate)
+  // supporting pages. The strict metric scores 1/3; the hit metric scores 1.
+  const citations = [
+    {
+      documentId: record.expected_document,
+      pageNumber: record.expected_pages[0]!,
+      chunkId: "golden",
+    },
+    {
+      documentId: record.expected_document,
+      pageNumber: 999,
+      chunkId: "extra1",
+    },
+    { documentId: "other-doc", pageNumber: 1, chunkId: "extra2" },
+  ];
+
+  assert.equal(computeCitationEvidenceHit(record, citations), 1);
+  assert.ok(computeCitationAccuracy(record, citations) < 0.5);
+  assert.equal(computeCitationEvidenceHit(record, [citations[1]!]), 0);
+});
+
+test("verified citation rate excludes unverified queries and fails the gate with zero verified", async () => {
+  const { computeAnswerMetrics, evaluateThresholds, summarizeBenchmark } =
+    await import("../lib/evaluation/metrics");
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  // Verifier ran: rate = supported/checked.
+  const verified = computeAnswerMetrics(
+    record,
+    "Ownership model is documented [1].",
+    [],
+    [],
+    false,
+    { checkedCount: 4, supportedCount: 3, unverified: false },
+  );
+  assert.equal(verified.verifiedCitationRate, 0.75);
+
+  // Verifier failed: null, never a perfect score.
+  const unverified = computeAnswerMetrics(
+    record,
+    "Ownership model is documented [1].",
+    [],
+    [],
+    false,
+    { checkedCount: 0, supportedCount: 0, unverified: true },
+  );
+  assert.equal(unverified.verifiedCitationRate, null);
+
+  // A summary with zero verified queries must fail the verified-citation gate.
+  const summary = summarizeBenchmark([]).overall;
+  const evaluation = evaluateThresholds(summary);
+  const gate = evaluation.checks.find(
+    (check) => check.metric === "Verified citation rate",
+  );
+  assert.ok(gate);
+  assert.equal(gate.passed, false);
 });
 
 test("summarizeBenchmark averages judge metrics over judged queries only", () => {
@@ -176,6 +249,8 @@ test("summarizeBenchmark averages judge metrics over judged queries only", () =>
       firstRelevantRank: 1,
       relevantRanks: [1],
       citationAccuracy: 1,
+      citationEvidenceHit: 1,
+      verifiedCitationRate: null,
       groundingScore: 1,
       hallucinationRate: 0,
       uncachedLatencyMs: 1000,

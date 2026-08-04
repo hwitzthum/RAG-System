@@ -153,6 +153,25 @@ export function computeCitationAccuracy(
   return matches / citations.length;
 }
 
+/**
+ * 1 when any citation points to the golden evidence (expected document +
+ * expected page). Unlike the strict accuracy above, an answer that also
+ * cites additional supporting chunks — legitimate multi-chunk synthesis —
+ * is not penalised for it.
+ */
+export function computeCitationEvidenceHit(
+  record: EvaluationQueryRecord,
+  citations: Citation[],
+): number {
+  return citations.some(
+    (citation) =>
+      citation.documentId === record.expected_document &&
+      record.expected_pages.includes(citation.pageNumber),
+  )
+    ? 1
+    : 0;
+}
+
 function splitStatements(answer: string): string[] {
   return answer
     .split(/(?<=[.!?])\s+/)
@@ -225,12 +244,27 @@ export function computeAnswerMetrics(
   citations: Citation[],
   chunks: RetrievedChunk[],
   insufficientEvidence: boolean,
+  verification?: {
+    checkedCount: number;
+    supportedCount: number;
+    unverified: boolean;
+  } | null,
 ): QueryAnswerMetrics {
   const citationAccuracy = computeCitationAccuracy(record, citations);
+  const citationEvidenceHit = computeCitationEvidenceHit(record, citations);
+  // Content-level citation quality from the production verifier. Null (and
+  // excluded from averages) when verification did not run or no sentence
+  // carried a marker — a failed verifier must not read as a perfect score.
+  const verifiedCitationRate =
+    verification && !verification.unverified && verification.checkedCount > 0
+      ? verification.supportedCount / verification.checkedCount
+      : null;
 
   if (insufficientEvidence || hasInsufficientEvidenceSignal(answer)) {
     return {
       citationAccuracy,
+      citationEvidenceHit,
+      verifiedCitationRate,
       groundingScore: 1,
       hallucinationRate: 0,
     };
@@ -240,6 +274,8 @@ export function computeAnswerMetrics(
   if (statements.length === 0) {
     return {
       citationAccuracy,
+      citationEvidenceHit,
+      verifiedCitationRate,
       groundingScore: 0,
       hallucinationRate: 1,
     };
@@ -261,6 +297,8 @@ export function computeAnswerMetrics(
 
   return {
     citationAccuracy,
+    citationEvidenceHit,
+    verifiedCitationRate,
     groundingScore,
     hallucinationRate: 1 - groundingScore,
   };
@@ -327,6 +365,15 @@ function summarizeBucket(
   const cachedLatencies = evaluated.map(
     (result) => result.metrics.cachedLatencyMs,
   );
+  const evidenceHitValues = evaluated.map(
+    (result) => result.metrics.citationEvidenceHit,
+  );
+  // Verified-citation averages run over queries where the verifier produced
+  // verdicts; failed/absent verification excludes the query rather than
+  // silently scoring it perfect.
+  const verifiedRates = evaluated
+    .map((result) => result.metrics.verifiedCitationRate)
+    .filter((value): value is number => value !== null);
 
   // Judge averages run over successfully judged queries only; a failed judge
   // call excludes the query from the average instead of scoring it perfect.
@@ -356,6 +403,9 @@ function summarizeBucket(
     cachedP50LatencyMs: computePercentile(cachedLatencies, 50),
     cachedP95LatencyMs: computePercentile(cachedLatencies, 95),
     systemErrorRate: results.length > 0 ? systemErrorCount / results.length : 0,
+    citationEvidenceHitRate: average(evidenceHitValues),
+    verifiedCitationRate: average(verifiedRates),
+    verifiedQueryCount: verifiedRates.length,
     judgedCount: judged.length,
     faithfulness: judgeAverage((judge) => judge.faithfulness),
     answerRelevance: judgeAverage((judge) => judge.answerRelevance),
@@ -387,10 +437,21 @@ function thresholdChecks(
       passed: summary.ndcgAt10 >= thresholds.ndcgAt10,
     },
     {
-      metric: "Citation accuracy",
-      actual: summary.citationAccuracy,
-      target: `>= ${thresholds.citationAccuracy}`,
-      passed: summary.citationAccuracy >= thresholds.citationAccuracy,
+      metric: "Citation evidence hit rate",
+      actual: summary.citationEvidenceHitRate,
+      target: `>= ${thresholds.citationEvidenceHitRate}`,
+      passed:
+        summary.citationEvidenceHitRate >= thresholds.citationEvidenceHitRate,
+    },
+    {
+      metric: "Verified citation rate",
+      actual: summary.verifiedCitationRate,
+      target: `>= ${thresholds.verifiedCitationRate}`,
+      // A run with zero verified queries must fail this gate loudly rather
+      // than pass on an empty average.
+      passed:
+        summary.verifiedQueryCount > 0 &&
+        summary.verifiedCitationRate >= thresholds.verifiedCitationRate,
     },
     {
       metric: "Hallucination rate",
@@ -405,10 +466,22 @@ function thresholdChecks(
       passed: summary.cacheHitRate >= thresholds.cacheHitRate,
     },
     {
+      metric: "Uncached p50 latency (ms)",
+      actual: summary.uncachedP50LatencyMs,
+      target: `< ${thresholds.uncachedP50LatencyMs}`,
+      passed: summary.uncachedP50LatencyMs < thresholds.uncachedP50LatencyMs,
+    },
+    {
       metric: "Uncached p95 latency (ms)",
       actual: summary.uncachedP95LatencyMs,
       target: `< ${thresholds.uncachedP95LatencyMs}`,
       passed: summary.uncachedP95LatencyMs < thresholds.uncachedP95LatencyMs,
+    },
+    {
+      metric: "Cached p50 latency (ms)",
+      actual: summary.cachedP50LatencyMs,
+      target: `< ${thresholds.cachedP50LatencyMs}`,
+      passed: summary.cachedP50LatencyMs < thresholds.cachedP50LatencyMs,
     },
     {
       metric: "Cached p95 latency (ms)",
