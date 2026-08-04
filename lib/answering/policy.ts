@@ -77,3 +77,23 @@ export function hasSufficientEvidence(input: EvidencePolicyInput): boolean {
 
   return avgScore >= avgThreshold * AVG_SCORE_THRESHOLD_RATIO;
 }
+
+/**
+ * Indexes of chunks that individually meet their evidence threshold.
+ *
+ * Used by the web-augmented path when local evidence fails the gate: the
+ * answer may proceed on web sources, but sub-threshold document chunks must
+ * not travel into the prompt, where they would lend false authority to
+ * irrelevant text. Returned as indexes so callers can filter parallel arrays
+ * (sanitized prompt chunks vs. original attribution chunks) consistently.
+ */
+export function selectChunkIndexesMeetingThreshold(
+  input: EvidencePolicyInput,
+): number[] {
+  return input.chunks.reduce<number[]>((kept, chunk, index) => {
+    if (resolveRelevance(chunk) >= resolveThreshold(chunk.scoreScale, input)) {
+      kept.push(index);
+    }
+    return kept;
+  }, []);
+}

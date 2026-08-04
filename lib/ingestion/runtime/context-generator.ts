@@ -34,7 +34,10 @@ export class ContextGenerator {
     this.apiKey = settings.openAiApiKey;
     this.anthropicApiKey = settings.anthropicApiKey;
     this.anthropicClient = this.anthropicApiKey
-      ? new Anthropic({ apiKey: this.anthropicApiKey, timeout: this.settings.openAiTimeoutSeconds * 1000 })
+      ? new Anthropic({
+          apiKey: this.anthropicApiKey,
+          timeout: this.settings.openAiTimeoutSeconds * 1000,
+        })
       : null;
   }
 
@@ -84,7 +87,9 @@ export class ContextGenerator {
 
     const payload = (await response.json()) as OpenAiChatCompletionResponse;
     if (!response.ok) {
-      const message = payload.error?.message ?? `Context generation request failed (status=${response.status})`;
+      const message =
+        payload.error?.message ??
+        `Context generation request failed (status=${response.status})`;
       throw new Error(message);
     }
 
@@ -135,8 +140,14 @@ export class ContextGenerator {
       try {
         context = await this.claudeContext(chunk);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown_claude_context_error";
-        this.logger.warn("claude_context_failed_trying_openai", { chunkIndex: chunk.chunkIndex, message });
+        const message =
+          error instanceof Error
+            ? error.message
+            : "unknown_claude_context_error";
+        this.logger.warn("claude_context_failed_trying_openai", {
+          chunkIndex: chunk.chunkIndex,
+          message,
+        });
         try {
           context = await this.openAiContext(chunk);
         } catch {
@@ -147,21 +158,25 @@ export class ContextGenerator {
       try {
         context = await this.openAiContext(chunk);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown_context_generation_error";
-        this.logger.warn("context_generation_failed", { chunkIndex: chunk.chunkIndex, message });
+        const message =
+          error instanceof Error
+            ? error.message
+            : "unknown_context_generation_error";
+        this.logger.warn("context_generation_failed", {
+          chunkIndex: chunk.chunkIndex,
+          message,
+        });
         context = this.heuristicContext(chunk);
       }
     } else {
       context = this.heuristicContext(chunk);
     }
 
+    // Spread rather than field-by-field so optional provenance fields
+    // (extractionMethod, tokenCount) survive enrichment.
     return {
-      chunkIndex: chunk.chunkIndex,
-      pageNumber: chunk.pageNumber,
-      sectionTitle: chunk.sectionTitle,
-      content: chunk.content,
+      ...chunk,
       context,
-      language: chunk.language,
     };
   }
 
@@ -172,7 +187,9 @@ export class ContextGenerator {
 
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(batch.map((chunk) => this.enrichSingle(chunk)));
+      const results = await Promise.all(
+        batch.map((chunk) => this.enrichSingle(chunk)),
+      );
       enriched.push(...results);
     }
 

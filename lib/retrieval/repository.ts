@@ -126,15 +126,25 @@ function buildOverviewChunk(
     hasLowReadability(row.content) && contextQuality >= contentQuality;
   const content = useContextAsContent ? row.context : row.content;
 
-  return buildRetrievedChunk(
-    {
-      ...row,
-      content,
-      context: row.context,
-    },
-    "hybrid",
-    retrievalScore,
-  );
+  return {
+    ...buildRetrievedChunk(
+      {
+        ...row,
+        content,
+        context: row.context,
+      },
+      "hybrid",
+      retrievalScore,
+    ),
+    // Overview queries are an explicit user request to summarise one scoped
+    // document, so the evidence gate passes by design. The gate fields are set
+    // explicitly rather than left to resolveRelevance's retrievalScore
+    // fallback, which made the bypass an accident of the fallback chain
+    // instead of a decision.
+    rerankScore: retrievalScore,
+    relevanceScore: retrievalScore,
+    scoreScale: "heuristic" as const,
+  };
 }
 
 function selectRepresentativeRows(

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RetrievedChunk, RetrievalTrace } from "../lib/contracts/retrieval";
+import type {
+  RetrievedChunk,
+  RetrievalTrace,
+} from "../lib/contracts/retrieval";
 import type { RetrievalServiceDependencies } from "../lib/retrieval/service";
 
 function ensureRetrievalTestEnv(): void {
@@ -73,11 +76,23 @@ test("retrieveRankedCandidates reads from cache before retrieval/rerank on repea
     },
     searchVector: async () => {
       vectorCalls += 1;
-      return [buildChunk({ chunkId: "vector-a", source: "vector", retrievalScore: 0.91 })];
+      return [
+        buildChunk({
+          chunkId: "vector-a",
+          source: "vector",
+          retrievalScore: 0.91,
+        }),
+      ];
     },
     searchKeyword: async () => {
       keywordCalls += 1;
-      return [buildChunk({ chunkId: "vector-a", source: "keyword", retrievalScore: 0.72 })];
+      return [
+        buildChunk({
+          chunkId: "vector-a",
+          source: "keyword",
+          retrievalScore: 0.72,
+        }),
+      ];
     },
   };
 
@@ -146,7 +161,7 @@ test("retrieveRankedCandidates never language-filters the searches", async () =>
       keywordLanguages.push(language);
       return [];
     },
-    rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+    rerankCandidates: async ({ candidates }) => candidates,
   };
 
   const result = await retrieveRankedCandidates(
@@ -163,8 +178,16 @@ test("retrieveRankedCandidates never language-filters the searches", async () =>
   // pass rather than only via a conditional second round trip.
   assert.equal(result.chunks.length, 1);
   assert.equal(result.chunks[0]?.documentId, "doc-de-1");
-  assert.equal(vectorLanguages.length, 1, "vector search should run exactly once");
-  assert.equal(keywordLanguages.length, 1, "keyword search should run exactly once");
+  assert.equal(
+    vectorLanguages.length,
+    1,
+    "vector search should run exactly once",
+  );
+  assert.equal(
+    keywordLanguages.length,
+    1,
+    "keyword search should run exactly once",
+  );
   assert.equal(vectorLanguages[0], undefined);
   assert.equal(keywordLanguages[0], undefined);
 });
@@ -197,9 +220,9 @@ test("retrieveRankedCandidates passes the detected language to the reranker", as
         }),
       ],
       searchKeyword: async () => [],
-      rerankCandidates: async ({ candidates, topK, language }) => {
+      rerankCandidates: async ({ candidates, language }) => {
         rerankLanguages.push(language);
-        return candidates.slice(0, topK);
+        return candidates;
       },
     },
   );
@@ -234,7 +257,7 @@ test("retrieveRankedCandidates forwards document scope to vector and keyword ret
       keywordDocumentScopes.push(documentIds ?? []);
       return [];
     },
-    rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+    rerankCandidates: async ({ candidates }) => candidates,
   };
 
   const result = await retrieveRankedCandidates(
@@ -266,7 +289,9 @@ test("retrieveRankedCandidates uses overview retrieval for generic single-docume
     readCache: async () => null,
     writeCache: async () => undefined,
     createEmbedding: async () => {
-      throw new Error("Embedding retrieval should not run for overview queries");
+      throw new Error(
+        "Embedding retrieval should not run for overview queries",
+      );
     },
     searchVector: async () => {
       vectorCalls += 1;
@@ -286,14 +311,16 @@ test("retrieveRankedCandidates uses overview retrieval for generic single-docume
           documentId: "doc-scope-1",
           source: "hybrid",
           retrievalScore: 1,
-          content: "This handbook explains the operating checklist and process overview.",
+          content:
+            "This handbook explains the operating checklist and process overview.",
         }),
         buildChunk({
           chunkId: "overview-2",
           documentId: "doc-scope-1",
           source: "hybrid",
           retrievalScore: 0.99,
-          content: "It covers responsibilities, controls, and documentation requirements.",
+          content:
+            "It covers responsibilities, controls, and documentation requirements.",
         }),
       ];
     },
@@ -351,7 +378,7 @@ test("retrieveRankedCandidates keeps standard retrieval for specific single-docu
       overviewCalls += 1;
       return [];
     },
-    rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+    rerankCandidates: async ({ candidates }) => candidates,
   };
 
   const result = await retrieveRankedCandidates(

@@ -1,4 +1,7 @@
-import type { ExtractedPage, RuntimeLogger } from "@/lib/ingestion/runtime/types";
+import type {
+  ExtractedPage,
+  RuntimeLogger,
+} from "@/lib/ingestion/runtime/types";
 import { inflateRawSync, inflateSync } from "node:zlib";
 
 // Upper bound on the decompressed size of a single /FlateDecode stream when
@@ -180,7 +183,8 @@ async function ensurePdfJsNodePolyfills(logger: RuntimeLogger): Promise<void> {
 
   globalScope.DOMMatrix = MinimalDOMMatrix as unknown;
   logger.info("pdfjs_dommatrix_polyfill_applied", {
-    message: "Applied in-process DOMMatrix polyfill for pdfjs runtime compatibility.",
+    message:
+      "Applied in-process DOMMatrix polyfill for pdfjs runtime compatibility.",
   });
 }
 
@@ -298,7 +302,8 @@ function sanitizeExtractedText(value: string): string {
 function extractTextOperatorsFromContent(content: string): string[] {
   const extracted: string[] = [];
   const textScopes = content.match(/BT[\s\S]*?ET/g) ?? [content];
-  const operatorRegex = /(\[(?:\\.|[^\]])*?\]\s*TJ)|((?:\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>)\s*(?:Tj|'|"))/g;
+  const operatorRegex =
+    /(\[(?:\\.|[^\]])*?\]\s*TJ)|((?:\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>)\s*(?:Tj|'|"))/g;
 
   for (const scope of textScopes) {
     operatorRegex.lastIndex = 0;
@@ -321,7 +326,9 @@ function extractTextOperatorsFromContent(content: string): string[] {
           operandMatch = operandRegex.exec(body);
         }
       } else if (singleOperator) {
-        const token = singleOperator.match(/\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>/)?.[0] ?? "";
+        const token =
+          singleOperator.match(/\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>/)?.[0] ??
+          "";
         if (token.startsWith("(") && token.endsWith(")")) {
           extracted.push(decodePdfLiteralString(token.slice(1, -1)));
         } else if (token.startsWith("<") && token.endsWith(">")) {
@@ -333,7 +340,9 @@ function extractTextOperatorsFromContent(content: string): string[] {
     }
   }
 
-  return extracted.map((value) => sanitizeExtractedText(value)).filter((value) => value.length > 0);
+  return extracted
+    .map((value) => sanitizeExtractedText(value))
+    .filter((value) => value.length > 0);
 }
 
 function tryInflateStream(streamBytes: Uint8Array): string {
@@ -344,13 +353,20 @@ function tryInflateStream(streamBytes: Uint8Array): string {
   // stream degrades gracefully to missing text for that one stream instead of
   // crashing the worker.
   try {
-    return inflateSync(streamBytes, { maxOutputLength: MAX_INFLATED_STREAM_BYTES }).toString("latin1");
+    return inflateSync(streamBytes, {
+      maxOutputLength: MAX_INFLATED_STREAM_BYTES,
+    }).toString("latin1");
   } catch {
-    return inflateRawSync(streamBytes, { maxOutputLength: MAX_INFLATED_STREAM_BYTES }).toString("latin1");
+    return inflateRawSync(streamBytes, {
+      maxOutputLength: MAX_INFLATED_STREAM_BYTES,
+    }).toString("latin1");
   }
 }
 
-function extractTextFromPdfOperators(pdfBytes: Uint8Array, binaryText: string): string {
+function extractTextFromPdfOperators(
+  pdfBytes: Uint8Array,
+  binaryText: string,
+): string {
   const extracted: string[] = [];
   extracted.push(...extractTextOperatorsFromContent(binaryText));
 
@@ -360,14 +376,20 @@ function extractTextFromPdfOperators(pdfBytes: Uint8Array, binaryText: string): 
 
   while (streamMatch) {
     const dictionary = streamMatch[0];
-    const hasFlateFilter = /\/Filter\s*(?:\[\s*)?\/FlateDecode\b/.test(dictionary);
+    const hasFlateFilter = /\/Filter\s*(?:\[\s*)?\/FlateDecode\b/.test(
+      dictionary,
+    );
 
     if (hasFlateFilter) {
       const streamStart = streamMatch.index + streamMatch[0].length;
       const streamEndToken = binaryText.indexOf("endstream", streamStart);
       if (streamEndToken > streamStart) {
         let streamEnd = streamEndToken;
-        while (streamEnd > streamStart && (binaryText[streamEnd - 1] === "\r" || binaryText[streamEnd - 1] === "\n")) {
+        while (
+          streamEnd > streamStart &&
+          (binaryText[streamEnd - 1] === "\r" ||
+            binaryText[streamEnd - 1] === "\n")
+        ) {
           streamEnd -= 1;
         }
 
@@ -401,9 +423,22 @@ function assemblePageText(items: PdfJsTextItem[]): string {
       continue;
     }
 
-    const y = Array.isArray(item.transform) && item.transform.length > 5 ? item.transform[5] : null;
-    if (lastY !== null && y !== null && Math.abs(y - lastY) > 2 && current.length > 0) {
-      lines.push(current.join(" ").replace(/[ \t]+/g, " ").trim());
+    const y =
+      Array.isArray(item.transform) && item.transform.length > 5
+        ? item.transform[5]
+        : null;
+    if (
+      lastY !== null &&
+      y !== null &&
+      Math.abs(y - lastY) > 2 &&
+      current.length > 0
+    ) {
+      lines.push(
+        current
+          .join(" ")
+          .replace(/[ \t]+/g, " ")
+          .trim(),
+      );
       current = [];
     }
 
@@ -414,13 +449,21 @@ function assemblePageText(items: PdfJsTextItem[]): string {
   }
 
   if (current.length > 0) {
-    lines.push(current.join(" ").replace(/[ \t]+/g, " ").trim());
+    lines.push(
+      current
+        .join(" ")
+        .replace(/[ \t]+/g, " ")
+        .trim(),
+    );
   }
 
   return lines.join("\n").trim();
 }
 
-async function extractPagesWithPdfJs(pdfBytes: Uint8Array, logger: RuntimeLogger): Promise<ExtractedPage[]> {
+async function extractPagesWithPdfJs(
+  pdfBytes: Uint8Array,
+  logger: RuntimeLogger,
+): Promise<ExtractedPage[]> {
   await ensurePdfJsNodePolyfills(logger);
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const documentInitParams: Record<string, unknown> = {
@@ -431,7 +474,9 @@ async function extractPagesWithPdfJs(pdfBytes: Uint8Array, logger: RuntimeLogger
     useSystemFonts: true,
     verbosity: 0,
   };
-  const loadingTask = pdfjs.getDocument(documentInitParams as never) as PdfJsLoadingTask;
+  const loadingTask = pdfjs.getDocument(
+    documentInitParams as never,
+  ) as PdfJsLoadingTask;
 
   try {
     const document = await loadingTask.promise;
@@ -462,14 +507,15 @@ export async function extractPages(
   try {
     const pages = await extractPagesWithPdfJs(new Uint8Array(pdfBytes), logger);
     if (pages.some((page) => page.text.trim().length > 0)) {
-      return pages;
+      return pages.map((page) => ({ ...page, method: "pdfjs" as const }));
     }
 
     logger.warn("pdfjs_extraction_empty_result", {
       pageCount: pages.length,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown_pdfjs_error";
+    const message =
+      error instanceof Error ? error.message : "unknown_pdfjs_error";
     logger.warn("pdfjs_extraction_failed", { message });
   }
 
@@ -482,6 +528,7 @@ export async function extractPages(
       {
         pageNumber: 1,
         text: extracted,
+        method: "byte_scrape",
       },
     ];
   }
@@ -494,6 +541,7 @@ export async function extractPages(
     {
       pageNumber: 1,
       text: "",
+      method: "byte_scrape",
     },
   ];
 }

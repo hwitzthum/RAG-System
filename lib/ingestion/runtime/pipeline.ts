@@ -1,5 +1,6 @@
 import {
   chunkSections,
+  countTokens,
   splitIntoSections,
 } from "@/lib/ingestion/runtime/chunking";
 import { ContextGenerator } from "@/lib/ingestion/runtime/context-generator";
@@ -139,7 +140,10 @@ function buildRelaxedDocumentFallbackChunk(
     pageNumber: sections[0]?.pageNumber ?? 1,
     sectionTitle: "Document",
     content: combinedContent,
-    language: assignSectionLanguages([{ text: combinedContent }], languageHint)[0]!,
+    language: assignSectionLanguages(
+      [{ text: combinedContent }],
+      languageHint,
+    )[0]!,
   };
 }
 
@@ -303,10 +307,14 @@ export class IngestionPipeline {
         this.settings.ocrFallbackEnabled,
         this.logger,
       );
+      // The extractor uses one method for the whole document (pdfjs, or the
+      // byte-scrape fallback which collapses everything to a single page).
+      const extractionMethod = pages[0]?.method;
       this.logger.info("pipeline_step", {
         step: "pages_extracted",
         elapsed: elapsed(),
         pageCount: pages.length,
+        extractionMethod: extractionMethod ?? null,
       });
 
       await setStage("chunking");
@@ -321,7 +329,10 @@ export class IngestionPipeline {
         throw new Error("No extractable text found in document");
       }
 
-      const sectionLanguages = assignSectionLanguages(sections, document.language);
+      const sectionLanguages = assignSectionLanguages(
+        sections,
+        document.language,
+      );
       const sectionsWithLanguage = sections.map((section, index) => ({
         ...section,
         language: sectionLanguages[index]!,
@@ -357,6 +368,15 @@ export class IngestionPipeline {
           fallbackChars: relaxedFallbackChunk.content.length,
         });
       }
+
+      // Stamp provenance once, after every candidate path (regular, merged,
+      // relaxed fallback) has produced its final content. Survives the
+      // chunk_candidates JSONB checkpoint.
+      chunkCandidates = chunkCandidates.map((candidate) => ({
+        ...candidate,
+        extractionMethod,
+        tokenCount: countTokens(candidate.content),
+      }));
 
       await this.repository.saveChunkCandidates(
         job.id,
@@ -458,6 +478,9 @@ export class IngestionPipeline {
           context: chunk.context,
           language: chunk.language,
           embedding,
+          extractionMethod: chunk.extractionMethod ?? null,
+          embeddingModel: `${this.settings.embeddingModel}@${this.settings.embeddingDimensions ?? this.settings.embeddingDim}`,
+          tokenCount: chunk.tokenCount ?? null,
         };
       },
     );

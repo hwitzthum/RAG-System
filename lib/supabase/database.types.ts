@@ -58,6 +58,9 @@ export type Database = {
           embedding: number[];
           tsv: string;
           created_at: string;
+          extraction_method: string | null;
+          embedding_model: string | null;
+          token_count: number | null;
         };
         Insert: {
           id?: string;
@@ -71,6 +74,9 @@ export type Database = {
           embedding: number[];
           tsv?: string;
           created_at?: string;
+          extraction_method?: string | null;
+          embedding_model?: string | null;
+          token_count?: number | null;
         };
         Update: {
           id?: string;
@@ -84,6 +90,9 @@ export type Database = {
           embedding?: number[];
           tsv?: string;
           created_at?: string;
+          extraction_method?: string | null;
+          embedding_model?: string | null;
+          token_count?: number | null;
         };
         Relationships: [];
       };

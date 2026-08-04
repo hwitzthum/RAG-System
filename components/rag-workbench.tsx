@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Toaster, toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -44,7 +51,11 @@ type ParsedSseEvent =
 const QUERY_SCOPE_STORAGE_KEY = "rag.queryDocumentScopeIds";
 
 function normalizeScopedDocumentIds(input: string[]): string[] {
-  return [...new Set(input.map((value) => value.trim()).filter((value) => value.length > 0))];
+  return [
+    ...new Set(
+      input.map((value) => value.trim()).filter((value) => value.length > 0),
+    ),
+  ];
 }
 
 function parsePersistedScopeIds(rawValue: string | null): string[] {
@@ -55,7 +66,9 @@ function parsePersistedScopeIds(rawValue: string | null): string[] {
   try {
     const parsed = JSON.parse(rawValue) as unknown;
     if (Array.isArray(parsed)) {
-      return normalizeScopedDocumentIds(parsed.filter((value): value is string => typeof value === "string"));
+      return normalizeScopedDocumentIds(
+        parsed.filter((value): value is string => typeof value === "string"),
+      );
     }
   } catch {
     return normalizeScopedDocumentIds([rawValue]);
@@ -69,12 +82,18 @@ function restoreQueryHistoryItem(
   item: QueryHistoryItem,
 ): QueryHistoryItem[] {
   const next = [...history.filter((entry) => entry.id !== item.id), item];
-  next.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  next.sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
   return next;
 }
 
 function newUuid(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -99,10 +118,14 @@ function parseSseEventBlock(rawBlock: string): ParsedSseEvent {
 
   try {
     const payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
-    if (eventName === "meta") return { event: "meta", payload: payload as QuerySseMetaEvent };
-    if (eventName === "token") return { event: "token", payload: payload as QuerySseTokenEvent };
-    if (eventName === "final") return { event: "final", payload: payload as QuerySseFinalEvent };
-    if (eventName === "done") return { event: "done", payload: payload as { queryId: string } };
+    if (eventName === "meta")
+      return { event: "meta", payload: payload as QuerySseMetaEvent };
+    if (eventName === "token")
+      return { event: "token", payload: payload as QuerySseTokenEvent };
+    if (eventName === "final")
+      return { event: "final", payload: payload as QuerySseFinalEvent };
+    if (eventName === "done")
+      return { event: "done", payload: payload as { queryId: string } };
     return null;
   } catch {
     return null;
@@ -114,13 +137,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [token, setToken] = useState("");
   const [openAiByokInput, setOpenAiByokInput] = useState("");
-  const [openAiByokStatus, setOpenAiByokStatus] = useState<ProviderByokStatusResponse | null>(null);
+  const [openAiByokStatus, setOpenAiByokStatus] =
+    useState<ProviderByokStatusResponse | null>(null);
   const [openAiByokLoading, setOpenAiByokLoading] = useState(false);
   const [cohereByokInput, setCohereByokInput] = useState("");
-  const [cohereByokStatus, setCohereByokStatus] = useState<ProviderByokStatusResponse | null>(null);
+  const [cohereByokStatus, setCohereByokStatus] =
+    useState<ProviderByokStatusResponse | null>(null);
   const [cohereByokLoading, setCohereByokLoading] = useState(false);
   const [anthropicByokInput, setAnthropicByokInput] = useState("");
-  const [anthropicByokStatus, setAnthropicByokStatus] = useState<ProviderByokStatusResponse | null>(null);
+  const [anthropicByokStatus, setAnthropicByokStatus] =
+    useState<ProviderByokStatusResponse | null>(null);
   const [anthropicByokLoading, setAnthropicByokLoading] = useState(false);
   const [conversationId, setConversationId] = useState(newUuid);
   const [query, setQuery] = useState("");
@@ -133,18 +159,26 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const [workspaceMessage, setWorkspaceMessage] = useState("Ready.");
   const [enableWebResearch, setEnableWebResearch] = useState(false);
   const [enableQueryExpansion, setEnableQueryExpansion] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<"none" | "left" | "right">("none");
+  const [mobilePanel, setMobilePanel] = useState<"none" | "left" | "right">(
+    "none",
+  );
 
-  const [batchFiles, setBatchFiles] = useState<Array<{ file: File; status: string; error?: string; documentId?: string }>>([]);
+  const [batchFiles, setBatchFiles] = useState<
+    Array<{ file: File; status: string; error?: string; documentId?: string }>
+  >([]);
   const batchFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadLanguageHint, setUploadLanguageHint] = useState("");
-  const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatusSnapshot | null>(
+    null,
+  );
   const [uploading, setUploading] = useState(false);
   const uploadFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [queryDocumentScopeIds, setQueryDocumentScopeIds] = useState<string[]>([]);
+  const [queryDocumentScopeIds, setQueryDocumentScopeIds] = useState<string[]>(
+    [],
+  );
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const queryInFlightRef = useRef(false);
@@ -164,7 +198,6 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }, [activeTurnId, turns]);
 
   const effectiveQueryScopeIds = queryDocumentScopeIds;
-  const canUseQueryExpansion = effectiveQueryScopeIds.length > 1;
 
   const scopeSummary = useMemo(() => {
     if (effectiveQueryScopeIds.length === 0) {
@@ -192,11 +225,17 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   // --- Data loading ---
 
   const loadHistory = useCallback(async (): Promise<void> => {
-    if (!user) { setQueryHistory([]); return; }
+    if (!user) {
+      setQueryHistory([]);
+      return;
+    }
     setHistoryLoading(true);
     try {
       const response = await fetch(`/api/query-history?limit=25`);
-      if (!response.ok) { setWorkspaceMessage("Failed to load query history."); return; }
+      if (!response.ok) {
+        setWorkspaceMessage("Failed to load query history.");
+        return;
+      }
       const payload = (await response.json()) as QueryHistoryResponse;
       setQueryHistory(payload.items ?? []);
     } finally {
@@ -204,7 +243,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
   }, [user]);
 
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -215,23 +256,23 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (queryDocumentScopeIds.length > 0) {
-      window.localStorage.setItem(QUERY_SCOPE_STORAGE_KEY, JSON.stringify(queryDocumentScopeIds));
+      window.localStorage.setItem(
+        QUERY_SCOPE_STORAGE_KEY,
+        JSON.stringify(queryDocumentScopeIds),
+      );
     } else {
       window.localStorage.removeItem(QUERY_SCOPE_STORAGE_KEY);
     }
   }, [queryDocumentScopeIds]);
 
-  useEffect(() => {
-    if (!canUseQueryExpansion && enableQueryExpansion) {
-      setEnableQueryExpansion(false);
-    }
-  }, [canUseQueryExpansion, enableQueryExpansion]);
-
   async function fetchDocuments(): Promise<void> {
     setDocumentsLoading(true);
     try {
       const res = await fetch("/api/documents");
-      if (!res.ok) { setWorkspaceMessage("Failed to load documents."); return; }
+      if (!res.ok) {
+        setWorkspaceMessage("Failed to load documents.");
+        return;
+      }
       const json = (await res.json()) as { documents: DocumentListItem[] };
       setDocuments(json.documents);
     } finally {
@@ -257,8 +298,13 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   }, []);
 
   const clearSession = useCallback(async (): Promise<void> => {
-    await fetch("/api/auth/session", { method: "DELETE", headers: csrfHeaders() });
-    await getSupabaseBrowserClient().auth.signOut().catch(() => null);
+    await fetch("/api/auth/session", {
+      method: "DELETE",
+      headers: csrfHeaders(),
+    });
+    await getSupabaseBrowserClient()
+      .auth.signOut()
+      .catch(() => null);
     setUser(null);
     setOpenAiByokInput("");
     setOpenAiByokStatus(null);
@@ -279,9 +325,18 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => { void clearSession(); }, INACTIVITY_MS);
+      timer = setTimeout(() => {
+        void clearSession();
+      }, INACTIVITY_MS);
     };
-    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"] as const;
+    const events = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+      "click",
+    ] as const;
     events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
     reset();
     return () => {
@@ -290,31 +345,38 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     };
   }, [user, clearSession]);
 
-  const loadProviderByokStatus = useCallback(async (
-    providerSlug: "openai" | "cohere" | "anthropic",
-    setters: {
-      setStatus: (status: ProviderByokStatusResponse | null) => void;
-      setLoading: (loading: boolean) => void;
-    },
-  ): Promise<void> => {
-    if (!user) {
-      setters.setStatus(null);
-      return;
-    }
-    setters.setLoading(true);
-    try {
-      const response = await fetch(`/api/byok/${providerSlug}`);
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        setWorkspaceMessage(payload.error ?? `Unable to load ${providerSlug} BYOK status.`);
+  const loadProviderByokStatus = useCallback(
+    async (
+      providerSlug: "openai" | "cohere" | "anthropic",
+      setters: {
+        setStatus: (status: ProviderByokStatusResponse | null) => void;
+        setLoading: (loading: boolean) => void;
+      },
+    ): Promise<void> => {
+      if (!user) {
+        setters.setStatus(null);
         return;
       }
-      const payload = (await response.json()) as ProviderByokStatusResponse;
-      setters.setStatus(payload);
-    } finally {
-      setters.setLoading(false);
-    }
-  }, [user]);
+      setters.setLoading(true);
+      try {
+        const response = await fetch(`/api/byok/${providerSlug}`);
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setWorkspaceMessage(
+            payload.error ?? `Unable to load ${providerSlug} BYOK status.`,
+          );
+          return;
+        }
+        const payload = (await response.json()) as ProviderByokStatusResponse;
+        setters.setStatus(payload);
+      } finally {
+        setters.setLoading(false);
+      }
+    },
+    [user],
+  );
 
   const loadOpenAiByokStatus = useCallback(async (): Promise<void> => {
     return loadProviderByokStatus("openai", {
@@ -346,7 +408,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   // --- Actions ---
 
   function patchTurn(turnId: string, updater: (turn: Turn) => Turn): void {
-    setTurns((current) => current.map((turn) => (turn.id === turnId ? updater(turn) : turn)));
+    setTurns((current) =>
+      current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
+    );
   }
 
   async function createSession(): Promise<void> {
@@ -355,7 +419,10 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ accessToken: token }),
     });
-    const payload = (await response.json()) as { user?: AuthUser; error?: string };
+    const payload = (await response.json()) as {
+      user?: AuthUser;
+      error?: string;
+    };
     if (!response.ok || !payload.user) {
       setWorkspaceMessage(payload.error ?? "Session creation failed.");
       toast.error(payload.error ?? "Session creation failed.");
@@ -366,80 +433,115 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     toast.success(`Session created for role=${payload.user.role}.`);
   }
 
-  const saveProviderByokKey = useCallback(async (input: {
-    providerSlug: "openai" | "cohere" | "anthropic";
-    providerLabel: string;
-    apiKey: string;
-    setStatus: (status: ProviderByokStatusResponse | null) => void;
-    setInput: (value: string) => void;
-    setLoading: (loading: boolean) => void;
-  }): Promise<void> => {
-    if (!user) {
-      setWorkspaceMessage(`Create a session before configuring ${input.providerLabel} BYOK.`);
-      return;
-    }
-    if (!input.apiKey.trim()) {
-      setWorkspaceMessage(`Enter a ${input.providerLabel} API key first.`);
-      return;
-    }
-    input.setLoading(true);
-    try {
-      const response = await fetch(`/api/byok/${input.providerSlug}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ apiKey: input.apiKey }),
-      });
-      const payload = (await response.json()) as ProviderByokStatusResponse & { error?: string };
-      if (!response.ok) {
-        setWorkspaceMessage(payload.error ?? `Failed to save ${input.providerLabel} API key.`);
-        toast.error(payload.error ?? `Failed to save ${input.providerLabel} API key.`);
+  const saveProviderByokKey = useCallback(
+    async (input: {
+      providerSlug: "openai" | "cohere" | "anthropic";
+      providerLabel: string;
+      apiKey: string;
+      setStatus: (status: ProviderByokStatusResponse | null) => void;
+      setInput: (value: string) => void;
+      setLoading: (loading: boolean) => void;
+    }): Promise<void> => {
+      if (!user) {
+        setWorkspaceMessage(
+          `Create a session before configuring ${input.providerLabel} BYOK.`,
+        );
         return;
       }
-      input.setStatus(payload);
-      input.setInput("");
-      setWorkspaceMessage(`${input.providerLabel} BYOK key stored in encrypted vault.`);
-      toast.success(`${input.providerLabel} BYOK key stored in encrypted vault.`);
-    } finally {
-      input.setLoading(false);
-    }
-  }, [user]);
-
-  const deleteProviderByokKey = useCallback(async (input: {
-    providerSlug: "openai" | "cohere" | "anthropic";
-    providerLabel: string;
-    setStatus: (status: ProviderByokStatusResponse | null) => void;
-    setLoading: (loading: boolean) => void;
-  }): Promise<void> => {
-    if (!user) return;
-    input.setLoading(true);
-    try {
-      const response = await fetch(`/api/byok/${input.providerSlug}`, {
-        method: "DELETE",
-        headers: csrfHeaders(),
-      });
-      const payload = (await response.json()) as ProviderByokStatusResponse & { error?: string };
-      if (!response.ok) {
-        setWorkspaceMessage(payload.error ?? `Failed to remove ${input.providerLabel} API key.`);
-        toast.error(payload.error ?? `Failed to remove ${input.providerLabel} API key.`);
+      if (!input.apiKey.trim()) {
+        setWorkspaceMessage(`Enter a ${input.providerLabel} API key first.`);
         return;
       }
-      input.setStatus(payload);
-      setWorkspaceMessage(`${input.providerLabel} BYOK key removed from vault.`);
-      toast.success(`${input.providerLabel} BYOK key removed from vault.`);
-    } finally {
-      input.setLoading(false);
-    }
-  }, [user]);
+      input.setLoading(true);
+      try {
+        const response = await fetch(`/api/byok/${input.providerSlug}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...csrfHeaders() },
+          body: JSON.stringify({ apiKey: input.apiKey }),
+        });
+        const payload =
+          (await response.json()) as ProviderByokStatusResponse & {
+            error?: string;
+          };
+        if (!response.ok) {
+          setWorkspaceMessage(
+            payload.error ?? `Failed to save ${input.providerLabel} API key.`,
+          );
+          toast.error(
+            payload.error ?? `Failed to save ${input.providerLabel} API key.`,
+          );
+          return;
+        }
+        input.setStatus(payload);
+        input.setInput("");
+        setWorkspaceMessage(
+          `${input.providerLabel} BYOK key stored in encrypted vault.`,
+        );
+        toast.success(
+          `${input.providerLabel} BYOK key stored in encrypted vault.`,
+        );
+      } finally {
+        input.setLoading(false);
+      }
+    },
+    [user],
+  );
 
-  async function refreshUploadStatus(documentId: string): Promise<UploadStatusSnapshot | null> {
+  const deleteProviderByokKey = useCallback(
+    async (input: {
+      providerSlug: "openai" | "cohere" | "anthropic";
+      providerLabel: string;
+      setStatus: (status: ProviderByokStatusResponse | null) => void;
+      setLoading: (loading: boolean) => void;
+    }): Promise<void> => {
+      if (!user) return;
+      input.setLoading(true);
+      try {
+        const response = await fetch(`/api/byok/${input.providerSlug}`, {
+          method: "DELETE",
+          headers: csrfHeaders(),
+        });
+        const payload =
+          (await response.json()) as ProviderByokStatusResponse & {
+            error?: string;
+          };
+        if (!response.ok) {
+          setWorkspaceMessage(
+            payload.error ?? `Failed to remove ${input.providerLabel} API key.`,
+          );
+          toast.error(
+            payload.error ?? `Failed to remove ${input.providerLabel} API key.`,
+          );
+          return;
+        }
+        input.setStatus(payload);
+        setWorkspaceMessage(
+          `${input.providerLabel} BYOK key removed from vault.`,
+        );
+        toast.success(`${input.providerLabel} BYOK key removed from vault.`);
+      } finally {
+        input.setLoading(false);
+      }
+    },
+    [user],
+  );
+
+  async function refreshUploadStatus(
+    documentId: string,
+  ): Promise<UploadStatusSnapshot | null> {
     const response = await fetch(`/api/upload/${documentId}`);
-    if (!response.ok) { setWorkspaceMessage("Unable to fetch upload status."); return null; }
+    if (!response.ok) {
+      setWorkspaceMessage("Unable to fetch upload status.");
+      return null;
+    }
     const payload = (await response.json()) as UploadStatusSnapshot;
     setUploadStatus(payload);
     return payload;
   }
 
-  async function waitForUploadTerminalStatus(documentId: string): Promise<void> {
+  async function waitForUploadTerminalStatus(
+    documentId: string,
+  ): Promise<void> {
     const MAX_POLLS = 60; // 60 × 3s = 3 minutes
     for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
       const snapshot = await refreshUploadStatus(documentId);
@@ -447,12 +549,18 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       const documentStatus = snapshot.document.status;
       const jobStatus = snapshot.latestIngestionJob?.status ?? "unknown";
       if (documentStatus === "ready") {
-        setWorkspaceMessage(`Upload indexed and ready. documentId=${documentId}`);
+        setWorkspaceMessage(
+          `Upload indexed and ready. documentId=${documentId}`,
+        );
         toast.success("Document indexed and ready.");
         void fetchDocuments();
         return;
       }
-      if (documentStatus === "failed" || jobStatus === "dead_letter" || jobStatus === "failed") {
+      if (
+        documentStatus === "failed" ||
+        jobStatus === "dead_letter" ||
+        jobStatus === "failed"
+      ) {
         const errorMsg = snapshot.latestIngestionJob?.last_error
           ? `Upload failed: ${snapshot.latestIngestionJob.last_error}`
           : `Upload failed. document status=${documentStatus}, job status=${jobStatus}`;
@@ -462,20 +570,35 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         return;
       }
       if (attempt > 0 && attempt % 10 === 0) {
-        setWorkspaceMessage(`Still processing PDF... (${attempt * 3}s elapsed)`);
+        setWorkspaceMessage(
+          `Still processing PDF... (${attempt * 3}s elapsed)`,
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
-    setWorkspaceMessage("Processing is taking longer than expected. Check back shortly.");
+    setWorkspaceMessage(
+      "Processing is taking longer than expected. Check back shortly.",
+    );
     void fetchDocuments();
   }
 
   async function uploadPdf(selectedFile?: File): Promise<void> {
-    if (!user) { setWorkspaceMessage("Create a session before uploading documents."); return; }
-    if (uploadInFlightRef.current) { return; }
+    if (!user) {
+      setWorkspaceMessage("Create a session before uploading documents.");
+      return;
+    }
+    if (uploadInFlightRef.current) {
+      return;
+    }
     const fileToUpload = selectedFile ?? uploadFile;
-    if (!fileToUpload) { setWorkspaceMessage("Select a PDF file first."); return; }
-    if (fileToUpload.type !== "application/pdf" && !fileToUpload.name.toLowerCase().endsWith(".pdf")) {
+    if (!fileToUpload) {
+      setWorkspaceMessage("Select a PDF file first.");
+      return;
+    }
+    if (
+      fileToUpload.type !== "application/pdf" &&
+      !fileToUpload.name.toLowerCase().endsWith(".pdf")
+    ) {
       setWorkspaceMessage("Only PDF files are supported.");
       return;
     }
@@ -485,16 +608,26 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     const formData = new FormData();
     formData.append("file", fileToUpload);
     formData.append("title", uploadTitle.trim() || fileToUpload.name);
-    if (uploadLanguageHint) formData.append("language_hint", uploadLanguageHint);
+    if (uploadLanguageHint)
+      formData.append("language_hint", uploadLanguageHint);
     try {
-      const response = await fetch("/api/upload", { method: "POST", headers: csrfHeaders(), body: formData });
-      const payload = (await response.json()) as { documentId?: string; error?: string };
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: formData,
+      });
+      const payload = (await response.json()) as {
+        documentId?: string;
+        error?: string;
+      };
       if (!response.ok || !payload.documentId) {
         setWorkspaceMessage(payload.error ?? "Upload failed.");
         toast.error(payload.error ?? "Upload failed.");
         return;
       }
-      setWorkspaceMessage(`Upload accepted. documentId=${payload.documentId}. Indexing started...`);
+      setWorkspaceMessage(
+        `Upload accepted. documentId=${payload.documentId}. Indexing started...`,
+      );
       toast.success("Upload accepted. Indexing started...");
       setQueryDocumentScopeIds([payload.documentId]);
       await waitForUploadTerminalStatus(payload.documentId);
@@ -525,33 +658,80 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
   function handleUploadButtonClick(): void {
     if (uploading || uploadInFlightRef.current) return;
-    if (!uploadFile) { uploadFileInputRef.current?.click(); return; }
+    if (!uploadFile) {
+      uploadFileInputRef.current?.click();
+      return;
+    }
     void uploadPdf();
   }
 
-  async function handleBatchUpload(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+  async function handleBatchUpload(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
     const files = event.target.files;
     if (!files || files.length === 0 || !user) return;
-    const entries = Array.from(files).map((file) => ({ file, status: "pending" as string }));
+    const entries = Array.from(files).map((file) => ({
+      file,
+      status: "pending" as string,
+    }));
     setBatchFiles(entries);
     for (let i = 0; i < entries.length; i++) {
-      setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "uploading" } : e)));
+      setBatchFiles((prev) =>
+        prev.map((e, j) => (j === i ? { ...e, status: "uploading" } : e)),
+      );
       const formData = new FormData();
       formData.append("files", entries[i].file);
       try {
-        const response = await fetch("/api/upload/batch", { method: "POST", headers: csrfHeaders(), body: formData });
-        const payload = (await response.json()) as { results?: Array<{ documentId?: string; status: string; error?: string }> };
+        const response = await fetch("/api/upload/batch", {
+          method: "POST",
+          headers: csrfHeaders(),
+          body: formData,
+        });
+        const payload = (await response.json()) as {
+          results?: Array<{
+            documentId?: string;
+            status: string;
+            error?: string;
+          }>;
+        };
         const first = payload.results?.[0];
-        if (!response.ok || !first || first.status !== "accepted" || !first.documentId) {
-          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "failed", error: first?.error ?? "Upload failed" } : e)));
+        if (
+          !response.ok ||
+          !first ||
+          first.status !== "accepted" ||
+          !first.documentId
+        ) {
+          setBatchFiles((prev) =>
+            prev.map((e, j) =>
+              j === i
+                ? {
+                    ...e,
+                    status: "failed",
+                    error: first?.error ?? "Upload failed",
+                  }
+                : e,
+            ),
+          );
         } else {
-          setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "queued", documentId: first.documentId } : e)));
+          setBatchFiles((prev) =>
+            prev.map((e, j) =>
+              j === i
+                ? { ...e, status: "queued", documentId: first.documentId }
+                : e,
+            ),
+          );
         }
       } catch {
-        setBatchFiles((prev) => prev.map((e, j) => (j === i ? { ...e, status: "failed", error: "Network error" } : e)));
+        setBatchFiles((prev) =>
+          prev.map((e, j) =>
+            j === i ? { ...e, status: "failed", error: "Network error" } : e,
+          ),
+        );
       }
     }
-    setWorkspaceMessage(`Batch upload complete: ${entries.length} files processed.`);
+    setWorkspaceMessage(
+      `Batch upload complete: ${entries.length} files processed.`,
+    );
     toast.success(`Batch upload complete: ${entries.length} files processed.`);
     await fetchDocuments();
   }
@@ -566,11 +746,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
     deletingDocumentIdsRef.current.add(docId);
     try {
-      const res = await fetch(`/api/documents/${docId}`, { method: "DELETE", headers: csrfHeaders() });
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: "DELETE",
+        headers: csrfHeaders(),
+      });
       if (res.ok) {
         if (uploadStatus?.document.id === docId) setUploadStatus(null);
         if (queryDocumentScopeIds.includes(docId)) {
-          setQueryDocumentScopeIds((current) => current.filter((id) => id !== docId));
+          setQueryDocumentScopeIds((current) =>
+            current.filter((id) => id !== docId),
+          );
         }
         await fetchDocuments();
         setWorkspaceMessage("Document deleted.");
@@ -587,37 +772,43 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
   }
 
-  const downloadReportCb = useCallback(async (queryHistoryId: string, format: "docx" | "pdf"): Promise<void> => {
-    setWorkspaceMessage(`Generating ${format.toUpperCase()} report...`);
-    try {
-      const response = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ queryHistoryId, format }),
-      });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        setWorkspaceMessage(payload.error ?? "Report generation failed.");
-        toast.error(payload.error ?? "Report generation failed.");
-        return;
+  const downloadReportCb = useCallback(
+    async (queryHistoryId: string, format: "docx" | "pdf"): Promise<void> => {
+      setWorkspaceMessage(`Generating ${format.toUpperCase()} report...`);
+      try {
+        const response = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...csrfHeaders() },
+          body: JSON.stringify({ queryHistoryId, format }),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setWorkspaceMessage(payload.error ?? "Report generation failed.");
+          toast.error(payload.error ?? "Report generation failed.");
+          return;
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `report-${queryHistoryId.slice(0, 8)}.${format}`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setWorkspaceMessage(`${format.toUpperCase()} report downloaded.`);
+        toast.success(`${format.toUpperCase()} report downloaded.`);
+      } catch {
+        setWorkspaceMessage("Report download failed.");
+        toast.error("Report download failed.");
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `report-${queryHistoryId.slice(0, 8)}.${format}`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setWorkspaceMessage(`${format.toUpperCase()} report downloaded.`);
-      toast.success(`${format.toUpperCase()} report downloaded.`);
-    } catch {
-      setWorkspaceMessage("Report download failed.");
-      toast.error("Report download failed.");
-    }
-  }, []);
+    },
+    [],
+  );
 
   async function executeQuery(): Promise<void> {
-    if (!canQuery || !query.trim() || isStreaming || queryInFlightRef.current) return;
+    if (!canQuery || !query.trim() || isStreaming || queryInFlightRef.current)
+      return;
 
     const question = query.trim();
     queryInFlightRef.current = true;
@@ -648,18 +839,20 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           query: question,
           conversationId,
           documentIds:
-            (queryDocumentScopeIds.length > 0
+            queryDocumentScopeIds.length > 0
               ? queryDocumentScopeIds
               : uploadStatus?.document.id
                 ? [uploadStatus.document.id]
-                : undefined),
+                : undefined,
           enableWebResearch: enableWebResearch || undefined,
-          enableQueryExpansion: canUseQueryExpansion && enableQueryExpansion ? true : undefined,
+          enableQueryExpansion: enableQueryExpansion ? true : undefined,
         }),
       });
 
       if (!response.ok || !response.body) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
         throw new Error(payload.error ?? "Query failed");
       }
 
@@ -683,11 +876,18 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
             patchTurn(turnId, (turn) => ({
               ...turn,
               retrievalMeta: parsed.payload.retrievalMeta,
-              conversationId: parsed.payload.retrievalMeta.conversationId ?? turn.conversationId,
+              conversationId:
+                parsed.payload.retrievalMeta.conversationId ??
+                turn.conversationId,
             }));
-            setConversationId(parsed.payload.retrievalMeta.conversationId ?? conversationId);
+            setConversationId(
+              parsed.payload.retrievalMeta.conversationId ?? conversationId,
+            );
           } else if (parsed.event === "token") {
-            patchTurn(turnId, (turn) => ({ ...turn, answer: `${turn.answer}${parsed.payload.token}` }));
+            patchTurn(turnId, (turn) => ({
+              ...turn,
+              answer: `${turn.answer}${parsed.payload.token}`,
+            }));
           } else if (parsed.event === "final") {
             patchTurn(turnId, (turn) => ({
               ...turn,
@@ -725,7 +925,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   function handleRestoreHistory(item: QueryHistoryItem): void {
     setConversationId(item.conversationId ?? newUuid());
     setQuery(item.query);
-    const scopedDocumentIds = normalizeScopedDocumentIds(item.citations.map((citation) => citation.documentId));
+    const scopedDocumentIds = normalizeScopedDocumentIds(
+      item.citations.map((citation) => citation.documentId),
+    );
     setQueryDocumentScopeIds(scopedDocumentIds);
   }
 
@@ -739,7 +941,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     }
 
     setDeletingHistoryIds((current) => [...current, historyId]);
-    setQueryHistory((current) => current.filter((item) => item.id !== historyId));
+    setQueryHistory((current) =>
+      current.filter((item) => item.id !== historyId),
+    );
 
     void (async () => {
       try {
@@ -749,19 +953,26 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         });
 
         if (!response.ok && response.status !== 404) {
-          const payload = (await response.json().catch(() => ({}))) as { error?: string };
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
           throw new Error(payload.error ?? "Failed to delete chat.");
         }
 
         setWorkspaceMessage("Chat deleted.");
         toast.success("Chat deleted.");
       } catch (error) {
-        setQueryHistory((current) => restoreQueryHistoryItem(current, itemToDelete));
-        const message = error instanceof Error ? error.message : "Failed to delete chat.";
+        setQueryHistory((current) =>
+          restoreQueryHistoryItem(current, itemToDelete),
+        );
+        const message =
+          error instanceof Error ? error.message : "Failed to delete chat.";
         setWorkspaceMessage(message);
         toast.error(message);
       } finally {
-        setDeletingHistoryIds((current) => current.filter((itemId) => itemId !== historyId));
+        setDeletingHistoryIds((current) =>
+          current.filter((itemId) => itemId !== historyId),
+        );
       }
     })();
   }
@@ -773,99 +984,108 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     setQuery("");
   }
 
-  const providerVaults = useMemo<ProviderKeyVaultProps[]>(() => [
-    {
-      providerLabel: "OpenAI",
-      providerSlug: "openai",
-      placeholder: "OpenAI API key (sk-...)",
-      user,
-      inputValue: openAiByokInput,
-      setInputValue: setOpenAiByokInput,
-      status: openAiByokStatus,
-      loading: openAiByokLoading,
-      saveKey: () => void saveProviderByokKey({
-        providerSlug: "openai",
+  const providerVaults = useMemo<ProviderKeyVaultProps[]>(
+    () => [
+      {
         providerLabel: "OpenAI",
-        apiKey: openAiByokInput,
-        setStatus: setOpenAiByokStatus,
-        setInput: setOpenAiByokInput,
-        setLoading: setOpenAiByokLoading,
-      }),
-      deleteKey: () => void deleteProviderByokKey({
         providerSlug: "openai",
-        providerLabel: "OpenAI",
-        setStatus: setOpenAiByokStatus,
-        setLoading: setOpenAiByokLoading,
-      }),
-      loadStatus: () => void loadOpenAiByokStatus(),
-    },
-    {
-      providerLabel: "Cohere",
-      providerSlug: "cohere",
-      placeholder: "Cohere API key",
-      user,
-      inputValue: cohereByokInput,
-      setInputValue: setCohereByokInput,
-      status: cohereByokStatus,
-      loading: cohereByokLoading,
-      saveKey: () => void saveProviderByokKey({
-        providerSlug: "cohere",
+        placeholder: "OpenAI API key (sk-...)",
+        user,
+        inputValue: openAiByokInput,
+        setInputValue: setOpenAiByokInput,
+        status: openAiByokStatus,
+        loading: openAiByokLoading,
+        saveKey: () =>
+          void saveProviderByokKey({
+            providerSlug: "openai",
+            providerLabel: "OpenAI",
+            apiKey: openAiByokInput,
+            setStatus: setOpenAiByokStatus,
+            setInput: setOpenAiByokInput,
+            setLoading: setOpenAiByokLoading,
+          }),
+        deleteKey: () =>
+          void deleteProviderByokKey({
+            providerSlug: "openai",
+            providerLabel: "OpenAI",
+            setStatus: setOpenAiByokStatus,
+            setLoading: setOpenAiByokLoading,
+          }),
+        loadStatus: () => void loadOpenAiByokStatus(),
+      },
+      {
         providerLabel: "Cohere",
-        apiKey: cohereByokInput,
-        setStatus: setCohereByokStatus,
-        setInput: setCohereByokInput,
-        setLoading: setCohereByokLoading,
-      }),
-      deleteKey: () => void deleteProviderByokKey({
         providerSlug: "cohere",
-        providerLabel: "Cohere",
-        setStatus: setCohereByokStatus,
-        setLoading: setCohereByokLoading,
-      }),
-      loadStatus: () => void loadCohereByokStatus(),
-    },
-    {
-      providerLabel: "Anthropic",
-      providerSlug: "anthropic",
-      placeholder: "Anthropic API key",
+        placeholder: "Cohere API key",
+        user,
+        inputValue: cohereByokInput,
+        setInputValue: setCohereByokInput,
+        status: cohereByokStatus,
+        loading: cohereByokLoading,
+        saveKey: () =>
+          void saveProviderByokKey({
+            providerSlug: "cohere",
+            providerLabel: "Cohere",
+            apiKey: cohereByokInput,
+            setStatus: setCohereByokStatus,
+            setInput: setCohereByokInput,
+            setLoading: setCohereByokLoading,
+          }),
+        deleteKey: () =>
+          void deleteProviderByokKey({
+            providerSlug: "cohere",
+            providerLabel: "Cohere",
+            setStatus: setCohereByokStatus,
+            setLoading: setCohereByokLoading,
+          }),
+        loadStatus: () => void loadCohereByokStatus(),
+      },
+      {
+        providerLabel: "Anthropic",
+        providerSlug: "anthropic",
+        placeholder: "Anthropic API key",
+        user,
+        inputValue: anthropicByokInput,
+        setInputValue: setAnthropicByokInput,
+        status: anthropicByokStatus,
+        loading: anthropicByokLoading,
+        saveKey: () =>
+          void saveProviderByokKey({
+            providerSlug: "anthropic",
+            providerLabel: "Anthropic",
+            apiKey: anthropicByokInput,
+            setStatus: setAnthropicByokStatus,
+            setInput: setAnthropicByokInput,
+            setLoading: setAnthropicByokLoading,
+          }),
+        deleteKey: () =>
+          void deleteProviderByokKey({
+            providerSlug: "anthropic",
+            providerLabel: "Anthropic",
+            setStatus: setAnthropicByokStatus,
+            setLoading: setAnthropicByokLoading,
+          }),
+        loadStatus: () => void loadAnthropicByokStatus(),
+      },
+    ],
+    [
+      anthropicByokInput,
+      anthropicByokLoading,
+      anthropicByokStatus,
+      cohereByokInput,
+      cohereByokLoading,
+      cohereByokStatus,
+      deleteProviderByokKey,
+      loadAnthropicByokStatus,
+      loadCohereByokStatus,
+      loadOpenAiByokStatus,
+      openAiByokInput,
+      openAiByokLoading,
+      openAiByokStatus,
+      saveProviderByokKey,
       user,
-      inputValue: anthropicByokInput,
-      setInputValue: setAnthropicByokInput,
-      status: anthropicByokStatus,
-      loading: anthropicByokLoading,
-      saveKey: () => void saveProviderByokKey({
-        providerSlug: "anthropic",
-        providerLabel: "Anthropic",
-        apiKey: anthropicByokInput,
-        setStatus: setAnthropicByokStatus,
-        setInput: setAnthropicByokInput,
-        setLoading: setAnthropicByokLoading,
-      }),
-      deleteKey: () => void deleteProviderByokKey({
-        providerSlug: "anthropic",
-        providerLabel: "Anthropic",
-        setStatus: setAnthropicByokStatus,
-        setLoading: setAnthropicByokLoading,
-      }),
-      loadStatus: () => void loadAnthropicByokStatus(),
-    },
-  ], [
-    anthropicByokInput,
-    anthropicByokLoading,
-    anthropicByokStatus,
-    cohereByokInput,
-    cohereByokLoading,
-    cohereByokStatus,
-    deleteProviderByokKey,
-    loadAnthropicByokStatus,
-    loadCohereByokStatus,
-    loadOpenAiByokStatus,
-    openAiByokInput,
-    openAiByokLoading,
-    openAiByokStatus,
-    saveProviderByokKey,
-    user,
-  ]);
+    ],
+  );
 
   return (
     <ErrorBoundary>
@@ -873,8 +1093,12 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
       <AppNav
         user={user}
         onSignOut={() => void clearSession()}
-        onToggleLeftPanel={() => setMobilePanel((p) => p === "left" ? "none" : "left")}
-        onToggleRightPanel={() => setMobilePanel((p) => p === "right" ? "none" : "right")}
+        onToggleLeftPanel={() =>
+          setMobilePanel((p) => (p === "left" ? "none" : "left"))
+        }
+        onToggleRightPanel={() =>
+          setMobilePanel((p) => (p === "right" ? "none" : "right"))
+        }
       />
 
       <h1 className="sr-only">Response Workspace</h1>
@@ -902,7 +1126,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
                 + New Chat
               </button>
               {/* Simplified mobile sidebar content */}
-              <p className="fg-muted text-xs">Use desktop view for full sidebar.</p>
+              <p className="fg-muted text-xs">
+                Use desktop view for full sidebar.
+              </p>
             </div>
           </div>
         )}

@@ -66,13 +66,34 @@ const envSchema = z.object({
   RAG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
   RAG_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
   RAG_STORAGE_BUCKET: z.string().min(1).default("documents"),
+  // Default on: the cross-encoder is the primary relevance stage and degrades
+  // cleanly to the heuristic order when no Cohere key is configured or the
+  // call fails/times out.
   RAG_CROSS_ENCODER_ENABLED: z.preprocess(
-    (val) => val === "true" || val === "1" || val === true,
-    z.boolean().default(false),
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
   ),
   RAG_CROSS_ENCODER_MODEL: z.string().min(1).default("rerank-v3.5"),
+  RAG_CROSS_ENCODER_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(3000),
+  // HyDE runs only inside the user-requested "Broaden search" expansion path.
+  RAG_HYDE_ENABLED: z.preprocess(
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
+  ),
+  // Minimum number of web sources required before a web-augmented answer may
+  // proceed without sufficient local document evidence. A single stray web hit
+  // must not bypass the evidence gate.
+  RAG_WEB_MIN_SOURCES: z.coerce.number().int().positive().default(2),
+  // Guarded pattern (`!(falsy strings)`) rather than the truthy-check used by
+  // the default-false flags: a truthy-check maps `undefined` to `false` before
+  // `.default(true)` can apply, silently disabling a default-on feature when
+  // the env var is unset.
   RAG_CONTEXTUAL_GROUPING_ENABLED: z.preprocess(
-    (val) => val === "true" || val === "1" || val === true,
+    (val) => !(val === "false" || val === "0" || val === false),
     z.boolean().default(true),
   ),
   RAG_WEB_SEARCH_ENABLED: z.preprocess(
@@ -141,6 +162,9 @@ const parsed = envSchema.safeParse({
   RAG_STORAGE_BUCKET: process.env.RAG_STORAGE_BUCKET,
   RAG_CROSS_ENCODER_ENABLED: process.env.RAG_CROSS_ENCODER_ENABLED,
   RAG_CROSS_ENCODER_MODEL: process.env.RAG_CROSS_ENCODER_MODEL,
+  RAG_CROSS_ENCODER_TIMEOUT_MS: process.env.RAG_CROSS_ENCODER_TIMEOUT_MS,
+  RAG_HYDE_ENABLED: process.env.RAG_HYDE_ENABLED,
+  RAG_WEB_MIN_SOURCES: process.env.RAG_WEB_MIN_SOURCES,
   RAG_CONTEXTUAL_GROUPING_ENABLED: process.env.RAG_CONTEXTUAL_GROUPING_ENABLED,
   RAG_WEB_SEARCH_ENABLED: process.env.RAG_WEB_SEARCH_ENABLED,
   RAG_WEB_SEARCH_PROVIDER: process.env.RAG_WEB_SEARCH_PROVIDER,

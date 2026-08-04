@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RetrievedChunk, RetrievalTrace } from "../lib/contracts/retrieval";
+import type {
+  RetrievedChunk,
+  RetrievalTrace,
+} from "../lib/contracts/retrieval";
 
 function ensureRetrievalTestEnv(): void {
   process.env.SUPABASE_URL ??= "https://example.supabase.co";
@@ -24,7 +27,10 @@ function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
   };
 }
 
-function buildTrace(normalizedQuery: string, candidateCounts?: Partial<RetrievalTrace["candidateCounts"]>): RetrievalTrace {
+function buildTrace(
+  normalizedQuery: string,
+  candidateCounts?: Partial<RetrievalTrace["candidateCounts"]>,
+): RetrievalTrace {
   return {
     normalizedQuery,
     language: "EN",
@@ -43,7 +49,8 @@ function buildTrace(normalizedQuery: string, candidateCounts?: Partial<Retrieval
 
 test("retrieveRankedCandidatesWithRouting preserves standard retrieval when expansion is disabled", async () => {
   ensureRetrievalTestEnv();
-  const { retrieveRankedCandidatesWithRouting } = await import("../lib/retrieval/router");
+  const { retrieveRankedCandidatesWithRouting } =
+    await import("../lib/retrieval/router");
 
   let retrieveCalls = 0;
   const result = await retrieveRankedCandidatesWithRouting(
@@ -75,9 +82,13 @@ test("retrieveRankedCandidatesWithRouting preserves standard retrieval when expa
   });
 });
 
-test("retrieveRankedCandidatesWithRouting ignores expansion for single-document scope", async () => {
+test("retrieveRankedCandidatesWithRouting expands a single-document scope when requested", async () => {
+  // Expansion is a per-request opt-in and no longer requires 2+ scoped
+  // documents; a single-document (or unscoped) query still fans out into
+  // base + variation + HyDE branches.
   ensureRetrievalTestEnv();
-  const { retrieveRankedCandidatesWithRouting } = await import("../lib/retrieval/router");
+  const { retrieveRankedCandidatesWithRouting } =
+    await import("../lib/retrieval/router");
 
   let retrieveCalls = 0;
   let generateVariationCalls = 0;
@@ -109,17 +120,20 @@ test("retrieveRankedCandidatesWithRouting ignores expansion for single-document 
     },
   );
 
-  assert.equal(retrieveCalls, 1);
-  assert.equal(generateVariationCalls, 0);
-  assert.equal(generateHydeCalls, 0);
+  // base + one surviving variation + hyde ("Find the policy" collapses into
+  // the base query and is filtered).
+  assert.equal(retrieveCalls, 3);
+  assert.equal(generateVariationCalls, 1);
+  assert.equal(generateHydeCalls, 1);
   assert.equal(result.queryExpansion.requested, true);
-  assert.equal(result.queryExpansion.applied, false);
-  assert.equal(result.queryExpansion.strategy, "standard");
+  assert.equal(result.queryExpansion.applied, true);
+  assert.equal(result.queryExpansion.strategy, "query_expansion");
 });
 
 test("retrieveRankedCandidatesWithRouting expands and fuses multi-document queries when requested", async () => {
   ensureRetrievalTestEnv();
-  const { retrieveRankedCandidatesWithRouting } = await import("../lib/retrieval/router");
+  const { retrieveRankedCandidatesWithRouting } =
+    await import("../lib/retrieval/router");
 
   const seenQueries: string[] = [];
   let rerankCallCount = 0;
@@ -138,47 +152,89 @@ test("retrieveRankedCandidatesWithRouting expands and fuses multi-document queri
         "compare onboarding requirements with security guidance",
         "how do onboarding and security instructions differ",
       ],
-      generateHyde: async () => "The documents compare onboarding requirements, security controls, and operational differences.",
+      generateHyde: async () =>
+        "The documents compare onboarding requirements, security controls, and operational differences.",
       retrieveBase: async ({ query }) => {
         seenQueries.push(query);
         if (query === "Compare the onboarding and security guidance") {
           return {
             chunks: [
-              buildChunk({ chunkId: "base-a", retrievalScore: 0.9, documentId: "doc-a" }),
-              buildChunk({ chunkId: "shared", retrievalScore: 0.8, documentId: "doc-b" }),
+              buildChunk({
+                chunkId: "base-a",
+                retrievalScore: 0.9,
+                documentId: "doc-a",
+              }),
+              buildChunk({
+                chunkId: "shared",
+                retrievalScore: 0.8,
+                documentId: "doc-b",
+              }),
             ],
-            trace: buildTrace("compare the onboarding and security guidance", { vector: 3, keyword: 2 }),
+            trace: buildTrace("compare the onboarding and security guidance", {
+              vector: 3,
+              keyword: 2,
+            }),
           };
         }
-        if (query === "compare onboarding requirements with security guidance") {
+        if (
+          query === "compare onboarding requirements with security guidance"
+        ) {
           return {
             chunks: [
-              buildChunk({ chunkId: "shared", retrievalScore: 0.88, documentId: "doc-b" }),
-              buildChunk({ chunkId: "variation-b", retrievalScore: 0.76, documentId: "doc-b" }),
+              buildChunk({
+                chunkId: "shared",
+                retrievalScore: 0.88,
+                documentId: "doc-b",
+              }),
+              buildChunk({
+                chunkId: "variation-b",
+                retrievalScore: 0.76,
+                documentId: "doc-b",
+              }),
             ],
-            trace: buildTrace("compare onboarding requirements with security guidance", { vector: 2, keyword: 1 }),
+            trace: buildTrace(
+              "compare onboarding requirements with security guidance",
+              { vector: 2, keyword: 1 },
+            ),
           };
         }
         if (query === "how do onboarding and security instructions differ") {
           return {
             chunks: [
-              buildChunk({ chunkId: "variation-c", retrievalScore: 0.79, documentId: "doc-a" }),
+              buildChunk({
+                chunkId: "variation-c",
+                retrievalScore: 0.79,
+                documentId: "doc-a",
+              }),
             ],
-            trace: buildTrace("how do onboarding and security instructions differ", { vector: 2, keyword: 0 }),
+            trace: buildTrace(
+              "how do onboarding and security instructions differ",
+              { vector: 2, keyword: 0 },
+            ),
           };
         }
         return {
           chunks: [
-            buildChunk({ chunkId: "hyde-d", retrievalScore: 0.7, documentId: "doc-b" }),
+            buildChunk({
+              chunkId: "hyde-d",
+              retrievalScore: 0.7,
+              documentId: "doc-b",
+            }),
           ],
           trace: buildTrace("hyde", { vector: 1, keyword: 0 }),
         };
       },
-      rerankCandidates: async ({ candidates, topK }) => {
+      rerankCandidates: async ({ candidates }) => {
         rerankCallCount += 1;
-        assert.equal(candidates.some((chunk) => chunk.chunkId === "shared"), true);
-        assert.equal(candidates.some((chunk) => chunk.chunkId === "hyde-d"), true);
-        return candidates.slice(0, topK);
+        assert.equal(
+          candidates.some((chunk) => chunk.chunkId === "shared"),
+          true,
+        );
+        assert.equal(
+          candidates.some((chunk) => chunk.chunkId === "hyde-d"),
+          true,
+        );
+        return candidates;
       },
     },
   );
@@ -191,7 +247,7 @@ test("retrieveRankedCandidatesWithRouting expands and fuses multi-document queri
   ]);
   assert.equal(rerankCallCount, 1);
   assert.equal(result.queryExpansion.applied, true);
-  assert.equal(result.queryExpansion.strategy, "multi_document_expansion");
+  assert.equal(result.queryExpansion.strategy, "query_expansion");
   assert.equal(result.queryExpansion.variationCount, 2);
   assert.equal(result.queryExpansion.hydeUsed, true);
   assert.equal(result.queryExpansion.branchCount, 4);
@@ -205,7 +261,8 @@ test("retrieveRankedCandidatesWithRouting marks every branch as already expanded
   // service would expand each branch again, turning N branches into
   // N x RAG_MULTI_QUERY_VARIATIONS embedding calls for a single request.
   ensureRetrievalTestEnv();
-  const { retrieveRankedCandidatesWithRouting } = await import("../lib/retrieval/router");
+  const { retrieveRankedCandidatesWithRouting } =
+    await import("../lib/retrieval/router");
 
   const seenInputs: Array<{ query: string; disableMultiQuery?: boolean }> = [];
 
@@ -218,16 +275,22 @@ test("retrieveRankedCandidatesWithRouting marks every branch as already expanded
     },
     {
       retrieveBase: async (input) => {
-        seenInputs.push({ query: input.query, disableMultiQuery: input.disableMultiQuery });
+        seenInputs.push({
+          query: input.query,
+          disableMultiQuery: input.disableMultiQuery,
+        });
         return { chunks: [buildChunk({})], trace: buildTrace(input.query) };
       },
       generateVariations: async (query) => [query, "renewal clause"],
       generateHyde: async () => "A hypothetical passage about renewal terms.",
-      rerankCandidates: async ({ candidates, topK }) => candidates.slice(0, topK),
+      rerankCandidates: async ({ candidates }) => candidates,
     },
   );
 
-  assert.ok(seenInputs.length > 1, "expected the router to fan out into branches");
+  assert.ok(
+    seenInputs.length > 1,
+    "expected the router to fan out into branches",
+  );
   assert.ok(
     seenInputs.every((input) => input.disableMultiQuery === true),
     "every branch retrieval must suppress a second round of expansion",

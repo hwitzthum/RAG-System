@@ -20,7 +20,7 @@ import { generateHypotheticalDocument } from "@/lib/retrieval/hyde";
 type QueryExpansionTrace = {
   requested: boolean;
   applied: boolean;
-  strategy: "standard" | "multi_document_expansion";
+  strategy: "standard" | "query_expansion";
   variationCount: number;
   hydeUsed: boolean;
   branchCount: number;
@@ -34,7 +34,10 @@ type RoutedRetrievalDependencies = {
   retrieveBase: (
     input: RetrieveRankedCandidatesInput,
   ) => Promise<RetrieveRankedCandidatesResult>;
-  generateVariations: (query: string) => Promise<string[]>;
+  generateVariations: (
+    query: string,
+    language: SupportedLanguage,
+  ) => Promise<string[]>;
   generateHyde: (input: {
     query: string;
     language: SupportedLanguage;
@@ -43,7 +46,6 @@ type RoutedRetrievalDependencies = {
     normalizedQuery: string;
     candidates: RetrievedChunk[];
     poolSize: number;
-    topK: number;
     language?: SupportedLanguage;
   }) => Promise<RetrievedChunk[]>;
 };
@@ -151,8 +153,11 @@ export async function retrieveRankedCandidatesWithRouting(
 ): Promise<RoutedRetrievalResult> {
   const deps = { ...getDefaultDependencies(), ...overrides };
   const scopedDocumentIds = normalizeDocumentScope(input.documentIds);
-  const queryExpansionRequested = Boolean(input.enableQueryExpansion);
-  const shouldExpand = queryExpansionRequested && scopedDocumentIds.length > 1;
+  // Expansion is a per-request user opt-in ("Broaden search") and applies to
+  // any scope, including a single document or the whole corpus. It previously
+  // required 2+ scoped documents, which meant HyDE and the variation branches
+  // never ran in the default flow.
+  const shouldExpand = Boolean(input.enableQueryExpansion);
 
   if (!shouldExpand) {
     const base = await deps.retrieveBase({
@@ -161,12 +166,13 @@ export async function retrieveRankedCandidatesWithRouting(
       languageHint: input.languageHint,
       documentIds: scopedDocumentIds,
       cacheNamespace: input.cacheNamespace,
+      disableMultiQuery: input.disableMultiQuery,
     });
 
     return {
       ...base,
       queryExpansion: {
-        requested: queryExpansionRequested,
+        requested: shouldExpand,
         applied: false,
         strategy: "standard",
         variationCount: 0,
@@ -184,8 +190,10 @@ export async function retrieveRankedCandidatesWithRouting(
   );
 
   const [queries, hydePassage] = await Promise.all([
-    deps.generateVariations(normalizedQuery),
-    deps.generateHyde({ query: normalizedQuery, language }),
+    deps.generateVariations(normalizedQuery, language),
+    env.RAG_HYDE_ENABLED
+      ? deps.generateHyde({ query: normalizedQuery, language })
+      : Promise.resolve(null),
   ]);
 
   const uniqueVariations = [
@@ -234,21 +242,22 @@ export async function retrieveRankedCandidatesWithRouting(
     0,
     Math.max(env.RAG_RERANK_POOL_SIZE, input.topK * 4),
   );
-  let rerankedCandidates = await deps.rerankCandidates({
+  // Same stage order as the core service: heuristic rerank scores the full
+  // fused pool, the cross-encoder re-orders that full pool, grouping applies
+  // its adjacency boost, and only then is the list cut to topK.
+  let orderedCandidates = await deps.rerankCandidates({
     normalizedQuery,
     candidates: fusedCandidates,
     poolSize: env.RAG_RERANK_POOL_SIZE,
-    topK: input.topK,
     language,
   });
 
   if (env.RAG_CROSS_ENCODER_ENABLED) {
     try {
-      rerankedCandidates = await crossEncoderRerank({
+      orderedCandidates = await crossEncoderRerank({
         query: normalizedQuery,
-        chunks: rerankedCandidates,
+        chunks: orderedCandidates,
         model: env.RAG_CROSS_ENCODER_MODEL,
-        topK: input.topK,
       });
     } catch {
       // Fall back to reranker order if cross-encoder fails.
@@ -256,8 +265,10 @@ export async function retrieveRankedCandidatesWithRouting(
   }
 
   if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    rerankedCandidates = applyContextualGrouping(rerankedCandidates);
+    orderedCandidates = applyContextualGrouping(orderedCandidates);
   }
+
+  const rerankedCandidates = orderedCandidates.slice(0, input.topK);
 
   const baseTrace = branchResults[0]!.result.trace;
   const candidateCounts = summarizeCandidateCounts(
@@ -280,7 +291,7 @@ export async function retrieveRankedCandidatesWithRouting(
     queryExpansion: {
       requested: true,
       applied: true,
-      strategy: "multi_document_expansion",
+      strategy: "query_expansion",
       variationCount: uniqueVariations.length,
       hydeUsed: branches.some((branch) => branch.kind === "hyde"),
       branchCount: branches.length,

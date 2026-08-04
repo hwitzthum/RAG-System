@@ -59,7 +59,6 @@ export type RetrievalServiceDependencies = {
     normalizedQuery: string;
     candidates: RetrievedChunk[];
     poolSize: number;
-    topK: number;
     language?: SupportedLanguage;
   }) => Promise<RetrievedChunk[]>;
   searchVector: typeof searchVectorCandidates;
@@ -227,7 +226,7 @@ export async function retrieveRankedCandidates(
   // cross-language fallback pass to run: every search already covers the whole
   // corpus. Language is applied as a ranking signal during rerank instead.
   if (env.RAG_MULTI_QUERY_ENABLED && !input.disableMultiQuery) {
-    const queries = await generateQueryVariations(normalizedQuery);
+    const queries = await generateQueryVariations(normalizedQuery, language);
     const embeddings = await Promise.all(
       queries.map((q) => deps.createEmbedding(q)),
     );
@@ -286,21 +285,24 @@ export async function retrieveRankedCandidates(
     rrfK: env.RAG_RRF_K,
   });
 
-  let rerankedCandidates = await deps.rerankCandidates({
+  // Stage order matters: the heuristic reranker scores the whole fused pool,
+  // the cross-encoder then re-orders that FULL pool (not the final topK, which
+  // would make it incapable of rescuing a relevant candidate from deeper in
+  // the pool), contextual grouping applies its adjacency boost while
+  // borderline chunks are still in play, and only then is the list cut to topK.
+  let orderedCandidates = await deps.rerankCandidates({
     normalizedQuery,
     candidates: fusedCandidates,
     poolSize: env.RAG_RERANK_POOL_SIZE,
-    topK,
     language,
   });
 
   if (env.RAG_CROSS_ENCODER_ENABLED) {
     try {
-      rerankedCandidates = await crossEncoderRerank({
+      orderedCandidates = await crossEncoderRerank({
         query: normalizedQuery,
-        chunks: rerankedCandidates,
+        chunks: orderedCandidates,
         model: env.RAG_CROSS_ENCODER_MODEL,
-        topK,
       });
     } catch {
       // Fall back to existing rerank order if cross-encoder fails.
@@ -308,8 +310,10 @@ export async function retrieveRankedCandidates(
   }
 
   if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    rerankedCandidates = applyContextualGrouping(rerankedCandidates);
+    orderedCandidates = applyContextualGrouping(orderedCandidates);
   }
+
+  const rerankedCandidates = orderedCandidates.slice(0, topK);
 
   const candidateCounts: RetrievalTrace["candidateCounts"] = {
     vector: vectorCandidates.length,

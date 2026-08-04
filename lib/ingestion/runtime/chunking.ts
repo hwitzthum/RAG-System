@@ -1,9 +1,15 @@
-import type { ChunkCandidate, ExtractedPage, Section } from "@/lib/ingestion/runtime/types";
+import type {
+  ChunkCandidate,
+  ExtractedPage,
+  Section,
+} from "@/lib/ingestion/runtime/types";
 import type { SupportedLanguage } from "@/lib/supabase/database.types";
 
 // Match headings in ALL CAPS or Title Case (with optional leading numbering like "1.2 Section Name").
-const HEADING_UPPERCASE = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
-const HEADING_TITLECASE = /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+(?:\s+(?:[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+|and|or|of|the|for|in|on|to|with|&|\/|-)){1,10}$/;
+const HEADING_UPPERCASE =
+  /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
+const HEADING_TITLECASE =
+  /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+(?:\s+(?:[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+|and|or|of|the|for|in|on|to|with|&|\/|-)){1,10}$/;
 const RELAXED_MIN_CHARS = 20;
 
 function isHeading(line: string): boolean {
@@ -39,7 +45,10 @@ export function splitIntoSections(page: ExtractedPage): Section[] {
         sections.push({
           pageNumber: page.pageNumber,
           sectionTitle: currentTitle,
-          text: currentContent.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
+          text: currentContent
+            .join("\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim(),
         });
         currentContent = [];
       }
@@ -58,7 +67,10 @@ export function splitIntoSections(page: ExtractedPage): Section[] {
     sections.push({
       pageNumber: page.pageNumber,
       sectionTitle: currentTitle,
-      text: currentContent.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
+      text: currentContent
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim(),
     });
   }
 
@@ -77,18 +89,26 @@ function tokenize(text: string): string[] {
   return text.split(/\s+/).filter((part) => part.length > 0);
 }
 
-function decodeTokens(tokens: string[], tokenStart: number, tokenEnd: number): string {
+function decodeTokens(
+  tokens: string[],
+  tokenStart: number,
+  tokenEnd: number,
+): string {
   return tokens.slice(tokenStart, tokenEnd).join(" ");
 }
 
-function countTokens(text: string): number {
+export function countTokens(text: string): number {
   return tokenize(text).length;
 }
 
 const SENTENCE_END_PATTERN = /[.!?]$/;
 const SCAN_RADIUS = 50;
 
-function findSentenceBoundary(tokens: string[], nominalEnd: number, totalTokens: number): number {
+function findSentenceBoundary(
+  tokens: string[],
+  nominalEnd: number,
+  totalTokens: number,
+): number {
   if (nominalEnd >= totalTokens) return totalTokens;
   const searchStart = Math.max(1, nominalEnd - SCAN_RADIUS);
   const searchEnd = Math.min(totalTokens, nominalEnd + SCAN_RADIUS);
@@ -109,9 +129,7 @@ function findSentenceBoundary(tokens: string[], nominalEnd: number, totalTokens:
 const BULLET_OR_LIST_PATTERN = /^(?:[-*•]\s+|\d+(?:[.)]\s+))/;
 
 function splitIntoParagraphs(text: string): string[] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim());
+  const lines = text.split(/\r?\n/).map((line) => line.trim());
   const paragraphs: string[] = [];
   let current: string[] = [];
 
@@ -143,7 +161,9 @@ function splitIntoParagraphs(text: string): string[] {
 }
 
 function mergeSectionTitles(titles: string[]): string {
-  const deduped = titles.filter((title, index) => titles.indexOf(title) === index);
+  const deduped = titles.filter(
+    (title, index) => titles.indexOf(title) === index,
+  );
   return deduped.join(" / ");
 }
 
@@ -178,7 +198,10 @@ function mergeAdjacentSections(
     if (shouldMerge) {
       current = {
         pageNumber: current.pageNumber,
-        sectionTitle: mergeSectionTitles([current.sectionTitle, next.sectionTitle]),
+        sectionTitle: mergeSectionTitles([
+          current.sectionTitle,
+          next.sectionTitle,
+        ]),
         text: combinedText,
       };
       continue;
@@ -192,7 +215,10 @@ function mergeAdjacentSections(
   return merged;
 }
 
-function buildParagraphOverlap(paragraphs: string[], overlapTokens: number): string[] {
+function buildParagraphOverlap(
+  paragraphs: string[],
+  overlapTokens: number,
+): string[] {
   if (overlapTokens <= 0 || paragraphs.length === 0) {
     return [];
   }
@@ -222,7 +248,10 @@ function chunkOversizedParagraph(
 
   while (start < tokens.length) {
     const rawEnd = Math.min(start + targetTokens, tokens.length);
-    const end = rawEnd < tokens.length ? findSentenceBoundary(tokens, rawEnd, tokens.length) : rawEnd;
+    const end =
+      rawEnd < tokens.length
+        ? findSentenceBoundary(tokens, rawEnd, tokens.length)
+        : rawEnd;
     const content = decodeTokens(tokens, start, end).trim();
     if (content) {
       chunks.push(content);
@@ -258,7 +287,11 @@ export function chunkSections(input: {
   const chunks: ChunkCandidate[] = [];
   let chunkIndex = 0;
 
-  for (const section of mergeAdjacentSections(sections, targetTokens, minChars)) {
+  for (const section of mergeAdjacentSections(
+    sections,
+    targetTokens,
+    minChars,
+  )) {
     if (!section.text) {
       continue;
     }
@@ -275,7 +308,10 @@ export function chunkSections(input: {
 
     while (paragraphIndex < paragraphs.length) {
       const chunkParagraphs = [...overlapParagraphs];
-      let chunkTokenCount = chunkParagraphs.reduce((sum, paragraph) => sum + countTokens(paragraph), 0);
+      let chunkTokenCount = chunkParagraphs.reduce(
+        (sum, paragraph) => sum + countTokens(paragraph),
+        0,
+      );
       let addedFreshParagraph = false;
 
       while (paragraphIndex < paragraphs.length) {
@@ -287,9 +323,16 @@ export function chunkSections(input: {
             break;
           }
 
-          const oversizedParagraphChunks = chunkOversizedParagraph(paragraph, targetTokens, overlapTokens);
+          const oversizedParagraphChunks = chunkOversizedParagraph(
+            paragraph,
+            targetTokens,
+            overlapTokens,
+          );
           for (const oversizedContent of oversizedParagraphChunks) {
-            if (oversizedContent.length < minChars && oversizedContent.length < RELAXED_MIN_CHARS) {
+            if (
+              oversizedContent.length < minChars &&
+              oversizedContent.length < RELAXED_MIN_CHARS
+            ) {
               continue;
             }
             chunks.push({
@@ -308,7 +351,10 @@ export function chunkSections(input: {
           break;
         }
 
-        if (chunkTokenCount > 0 && chunkTokenCount + paragraphTokens > targetTokens) {
+        if (
+          chunkTokenCount > 0 &&
+          chunkTokenCount + paragraphTokens > targetTokens
+        ) {
           if (!addedFreshParagraph) {
             overlapParagraphs = [];
             chunkParagraphs.length = 0;
@@ -335,12 +381,18 @@ export function chunkSections(input: {
         });
         chunkIndex += 1;
         emittedSectionChunk = true;
-        overlapParagraphs = buildParagraphOverlap(chunkParagraphs, overlapTokens);
+        overlapParagraphs = buildParagraphOverlap(
+          chunkParagraphs,
+          overlapTokens,
+        );
       }
     }
 
     // Keep short but meaningful sections indexable instead of failing ingestion.
-    if (!emittedSectionChunk && normalizedSectionText.length >= Math.min(minChars, RELAXED_MIN_CHARS)) {
+    if (
+      !emittedSectionChunk &&
+      normalizedSectionText.length >= Math.min(minChars, RELAXED_MIN_CHARS)
+    ) {
       chunks.push({
         chunkIndex,
         pageNumber: section.pageNumber,
