@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     status: "ok",
-    service: "api",
+    service: "rag-system-web",
     timestamp: new Date().toISOString(),
   });
 }
