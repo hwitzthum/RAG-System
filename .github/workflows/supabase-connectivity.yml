@@ -16,6 +16,22 @@ name: Supabase Deploy Credential Check
 # expired credentials, and remote history containing versions with no local
 # file (which makes the real push abort).
 #
+# SCOPE — this guards one consumer, not the credential. The Supabase database
+# password is shared by three of them:
+#
+#   1. this repository's SUPABASE_DB_PASSWORD secret  (covered here)
+#   2. Rezeptmeister's Vercel DATABASE_URL            (NOT covered)
+#   3. Rezeptmeister's Render DATABASE_URL            (NOT covered)
+#
+# Rezeptmeister (github.com/hwitzthum/Rezeptmeister) keeps its tables in the
+# same `public` schema of the same project and reaches them through the pooler
+# with the same postgres role. On 2026-08-04 the password was reset to fix this
+# repository's deploy path, which silently broke both of Rezeptmeister's
+# deployments. A green run here says nothing about those two — check them
+# separately after any password reset. Rezeptmeister's own frontend
+# /api/health issues a real SELECT 1 and reports "degraded" on failure; its
+# backend /health does not touch the database at all.
+#
 # Note: GitHub disables scheduled workflows after 60 days without repository
 # activity. If this stops reporting entirely, re-enable it in the Actions tab
 # rather than assuming it is passing.
