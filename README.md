@@ -398,7 +398,9 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `RAG_WEB_MIN_SOURCES`               | No       | `2`           | Web sources required to answer without local evidence                                                          |
 | `RAG_EVIDENCE_PLACEMENT`            | No       | `ends`        | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order |
 | `RAG_CITATION_VERIFICATION_ENABLED` | No       | `true`        | Post-answer LLM check that cited sentences are supported (annotate-only)                                       |
-| `RAG_EVAL_JUDGE_MODEL`              | No       | `gpt-4o-mini` | Model for the benchmark judge and the citation verifier                                                        |
+| `RAG_EVAL_JUDGE_MODEL`              | No       | `claude-opus-5` | Offline benchmark judge. Must differ from `RAG_LLM_MODEL` — `faithfulness` is a release gate. A `claude-*` value routes via `ANTHROPIC_API_KEY`; anything else via OpenAI |
+| `RAG_CITATION_VERIFIER_MODEL`       | No       | `gpt-4o-mini` | Production citation verifier (answer path, 3.5s timeout)                                                       |
+| `RAG_DATASET_GENERATOR_MODEL`       | No       | `gpt-4o-mini` | Offline generator for the corpus-derived evaluation dataset                                                    |
 | `RAG_WEB_SEARCH_ENABLED`            | No       | `false`       | Enable Tavily web-augmented retrieval globally                                                                 |
 | `RAG_WEB_SEARCH_API_KEY`            | No       | —             | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`                                                     |
 | `RAG_WEB_SEARCH_MAX_RESULTS`        | No       | `5`           | Maximum web results per query                                                                                  |
@@ -707,7 +709,7 @@ Query
 
 **3. LLM Inference (streamed)** — Default model `gpt-4o-mini` at temperature 0, streamed sentence-by-sentence: each completed sentence passes per-sentence redaction (secrets, PII, HTML, unsafe links; prompt-leak signatures halt the stream) before it is emitted as an SSE token event. The `final` event carries the fully-filtered authoritative answer and the client replaces streamed text with it. Model is configurable per-deployment or per-user BYOK.
 
-**3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_EVAL_JUDGE_MODEL`) checks that every `[n]`-cited sentence is entailed by the chunk(s) it cites. The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
+**3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_CITATION_VERIFIER_MODEL`) checks that every `[n]`-cited sentence is entailed by the chunk(s) it cites. The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
 
 **4. Web Augmentation (opt-in)** — Tavily results with relevance ≥ 0.5 are appended as `[WEB-N]` sources after the document evidence. The model is instructed to prefer document sources; web sources are surfaced separately in the response. When local evidence fails the gate, the answer proceeds only with at least `RAG_WEB_MIN_SOURCES` (default 2) web sources, and sub-threshold document chunks are dropped from the prompt.
 
@@ -724,7 +726,9 @@ Retrieval and answer quality are measured against a golden dataset with a live b
 | `npm run eval:smoke`          | Live benchmark over the first 25 queries, non-gating.                                                                                                                                                                                                                                     |
 | `npm run eval:benchmark:dry`  | Harness self-test with fabricated results — validates the pipeline, not the system.                                                                                                                                                                                                       |
 
-**Metrics** — Classic IR metrics (recall@5, nDCG@10, MRR) are computed deterministically; answer quality is additionally scored by an **LLM judge** (`RAG_EVAL_JUDGE_MODEL`, default `gpt-4o-mini`): statement-level faithfulness, answer relevance, per-chunk context precision, and answer-point context recall. Abstentions on answerable questions score 0 answer-relevance and are reported as an abstention rate — an over-cautious system cannot look perfect. Judge metrics are report-only.
+**Metrics** — Classic IR metrics (recall@5, nDCG@10, MRR) are computed deterministically; answer quality is additionally scored by an **LLM judge** (`RAG_EVAL_JUDGE_MODEL`, default `claude-opus-5`): statement-level faithfulness, answer relevance, per-chunk context precision, and answer-point context recall. The judge sees the same rendered evidence the answerer saw — full chunk text plus the contextual augmentation — and returns schema-constrained JSON, so a malformed verdict is impossible rather than merely unlikely. Abstentions on answerable questions score 0 answer-relevance and are reported as an abstention rate — an over-cautious system cannot look perfect.
+
+**`faithfulness` is a release gate** (default `>= 0.9`), and the benchmark refuses to start when the judge and generator are the same model: a judge sharing the generator's weights grades its own phrasing habits as correct. A run with zero judged queries fails the gate rather than passing on an empty average. The older token-overlap `groundingScore` / `hallucinationRate` pair is **report-only** — it measured 35% bag-of-words overlap between the answer and the very chunks that produced it, against a prompt instructing the model to quote those chunks, so it was structurally incapable of failing (0.000/0.000/0.000/0.004 across four live runs). Abstentions now score `null` there instead of a perfect 1.0 and are excluded from the average. Answer relevance, context precision, and context recall remain report-only.
 
 **Citation quality is gated by two complementary metrics**: the **citation evidence hit rate** (deterministic — did at least one citation point to the golden document + page; extra citations from legitimate multi-chunk synthesis are not penalised) and the **verified citation rate** (content-level — the fraction of cited sentences the production citation verifier judged entailed by their sources; a run with zero verified queries fails the gate rather than passing on an empty average). The old strict page-level citation accuracy remains in reports for continuity but no longer gates. Latency gates pair a tight median (uncached p50 < 8s, cached p50 < 7s — stable regression detectors) with weather-tolerant tails (uncached p95 < 15s, cached p95 < 12s), all calibrated against live measurement and inclusive of answer generation plus citation verification; with ~40 samples per run, p95 alone is decided by the few slowest upstream LLM calls and would flake on transient provider slowness.
 
@@ -946,7 +950,8 @@ All three conditions are satisfied automatically by the application's cookie-set
 ### Pre-deployment Checks
 
 ```bash
-npm run release:readiness:precutover    # Dry-run all checks
+npm run eval:benchmark                  # Live benchmark (required by the readiness gate)
+npm run release:readiness               # Release gates
 npm run release:matrix:precutover       # Full pre-deployment validation matrix
 ```
 

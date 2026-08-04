@@ -9,6 +9,7 @@ import {
   summarizeBenchmark,
 } from "../lib/evaluation/metrics";
 import type {
+  BenchmarkSummaryMetrics,
   EvaluationQueryRecord,
   QueryBenchmarkResult,
 } from "../lib/evaluation/types";
@@ -127,7 +128,15 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
       cachedLatencyMs: 400,
       cacheHitOnRepeat: true,
     },
-    judge: null,
+    judge: {
+      judged: true,
+      faithfulness: 1,
+      answerRelevance: 1,
+      contextPrecision: 1,
+      contextRecall: 1,
+      abstained: false,
+      unsupportedStatementCount: 0,
+    },
     failures: [],
     error: null,
   };
@@ -146,7 +155,6 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
         citationAccuracy: 0,
         citationEvidenceHit: 0,
         verifiedCitationRate: 0.5,
-        hallucinationRate: 0.8,
         cacheHitOnRepeat: false,
         uncachedLatencyMs: 16000,
         cachedLatencyMs: 13000,
@@ -155,6 +163,63 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
   ]).overall;
   const failing = evaluateThresholds(failingSummary);
   assert.equal(failing.passed, false);
+});
+
+test("faithfulness gates the build and fails closed when nothing was judged", () => {
+  const passing: BenchmarkSummaryMetrics = {
+    ...PASSING_SUMMARY,
+    judgedCount: 1,
+    faithfulness: 0.95,
+  };
+  const evaluation = evaluateThresholds(passing);
+  const check = evaluation.checks.find((item) =>
+    item.metric.startsWith("Faithfulness"),
+  );
+  assert.ok(check, "faithfulness must be a gated check");
+  assert.equal(check.passed, true);
+
+  // Below the threshold blocks the build.
+  const belowThreshold = evaluateThresholds({
+    ...passing,
+    faithfulness: 0.5,
+  });
+  assert.equal(belowThreshold.passed, false);
+
+  // Zero judged queries must fail loudly rather than pass on an empty average.
+  const unjudged = evaluateThresholds({
+    ...passing,
+    judgedCount: 0,
+    faithfulness: 0,
+  });
+  assert.equal(unjudged.passed, false);
+});
+
+test("the token-overlap grounding metric no longer gates the build", () => {
+  const evaluation = evaluateThresholds({
+    ...PASSING_SUMMARY,
+    judgedCount: 1,
+    faithfulness: 1,
+    groundingScore: 0,
+    hallucinationRate: 1,
+    groundedQueryCount: 1,
+  });
+  assert.equal(
+    evaluation.checks.some((check) => check.metric === "Hallucination rate"),
+    false,
+  );
+  assert.equal(evaluation.passed, true);
+});
+
+test("an abstention scores null grounding instead of a perfect score", async () => {
+  const { computeAnswerMetrics } = await import("../lib/evaluation/metrics");
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  const metrics = computeAnswerMetrics(record, "", [], [], true, null);
+  assert.equal(metrics.groundingScore, null);
+  assert.equal(metrics.hallucinationRate, null);
 });
 
 test("citationEvidenceHit does not penalise extra citations from multi-chunk synthesis", async () => {
@@ -301,3 +366,31 @@ test("summarizeBenchmark averages judge metrics over judged queries only", () =>
   assert.equal(summary.contextRecall, 0.75);
   assert.equal(summary.abstentionRate, 0.5);
 });
+
+const PASSING_SUMMARY: BenchmarkSummaryMetrics = {
+  queryCount: 1,
+  evaluatedCount: 1,
+  systemErrorCount: 0,
+  recallAt5: 1,
+  ndcgAt10: 1,
+  mrr: 1,
+  citationAccuracy: 1,
+  groundingScore: 1,
+  hallucinationRate: 0,
+  groundedQueryCount: 1,
+  cacheHitRate: 1,
+  uncachedP50LatencyMs: 1500,
+  uncachedP95LatencyMs: 1500,
+  cachedP50LatencyMs: 400,
+  cachedP95LatencyMs: 400,
+  systemErrorRate: 0,
+  citationEvidenceHitRate: 1,
+  verifiedCitationRate: 1,
+  verifiedQueryCount: 1,
+  judgedCount: 1,
+  faithfulness: 1,
+  answerRelevance: 1,
+  contextPrecision: 1,
+  contextRecall: 1,
+  abstentionRate: 0,
+};

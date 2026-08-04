@@ -8,8 +8,11 @@ import type {
 import type { SupportedLanguage } from "@/lib/supabase/database.types";
 
 // Match headings in ALL CAPS or Title Case (with optional leading numbering like "1.2 Section Name").
+// The leading lookahead demands at least one letter: without it a purely
+// numeric all-caps line — a table header row such as "2024 2025 2026" — was
+// consumed as a section title and dropped from the chunk body entirely.
 const HEADING_UPPERCASE =
-  /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
+  /^(?=[^A-Z\u00C4\u00D6\u00DC]*[A-Z\u00C4\u00D6\u00DC])(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C4\u00D6\u00DC0-9][A-Z\u00C4\u00D6\u00DC0-9\s:/-]{3,}$/;
 const HEADING_TITLECASE =
   /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+(?:\s+(?:[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+|and|or|of|the|for|in|on|to|with|&|\/|-)){1,10}$/;
 const RELAXED_MIN_CHARS = 20;

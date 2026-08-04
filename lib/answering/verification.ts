@@ -115,7 +115,7 @@ export async function verifyCitedStatements(input: {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: env.RAG_EVAL_JUDGE_MODEL,
+        model: env.RAG_CITATION_VERIFIER_MODEL,
         temperature: 0,
         max_tokens: 300,
         response_format: { type: "json_object" },

@@ -707,6 +707,8 @@ export async function POST(request: NextRequest) {
               ],
               cacheHit: retrievalResult.trace.cacheHit,
               retrievalVersion: retrievalResult.trace.retrievalVersion,
+              retrievalConfigFingerprint:
+                retrievalResult.trace.configFingerprint,
               insufficientEvidence: answerResult.insufficientEvidence,
               promptInjection: answerResult.promptInjection,
               outputFilter: answerResult.outputFilter,

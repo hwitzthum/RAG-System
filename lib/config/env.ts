@@ -88,9 +88,18 @@ const envSchema = z.object({
   // proceed without sufficient local document evidence. A single stray web hit
   // must not bypass the evidence gate.
   RAG_WEB_MIN_SOURCES: z.coerce.number().int().positive().default(2),
-  // Model used by the evaluation LLM-judge (benchmark faithfulness/relevance)
-  // and the production citation verifier.
-  RAG_EVAL_JUDGE_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  // Model used by the evaluation LLM-judge (benchmark faithfulness/relevance).
+  // Deliberately a different family from RAG_LLM_MODEL: a judge sharing the
+  // generator's weights grades its own habits as correct, and `faithfulness`
+  // is a release gate. Anything starting with "claude" routes through the
+  // Anthropic SDK; any other value routes through OpenAI.
+  RAG_EVAL_JUDGE_MODEL: z.string().min(1).default("claude-opus-5"),
+  // Production citation verifier — runs on the answer path under a 3.5s
+  // timeout, so it stays on the fast, cheap model rather than following the
+  // offline judge to a frontier model.
+  RAG_CITATION_VERIFIER_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  // Offline generator for the corpus-derived evaluation dataset.
+  RAG_DATASET_GENERATOR_MODEL: z.string().min(1).default("gpt-4o-mini"),
   // "ends" places the strongest evidence at the beginning AND end of the
   // prompt (lost-in-the-middle mitigation); "score" keeps plain score order.
   RAG_EVIDENCE_PLACEMENT: z.enum(["ends", "score"]).default("ends"),
@@ -177,6 +186,8 @@ const parsed = envSchema.safeParse({
   RAG_HYDE_ENABLED: process.env.RAG_HYDE_ENABLED,
   RAG_WEB_MIN_SOURCES: process.env.RAG_WEB_MIN_SOURCES,
   RAG_EVAL_JUDGE_MODEL: process.env.RAG_EVAL_JUDGE_MODEL,
+  RAG_CITATION_VERIFIER_MODEL: process.env.RAG_CITATION_VERIFIER_MODEL,
+  RAG_DATASET_GENERATOR_MODEL: process.env.RAG_DATASET_GENERATOR_MODEL,
   RAG_EVIDENCE_PLACEMENT: process.env.RAG_EVIDENCE_PLACEMENT,
   RAG_CITATION_VERIFICATION_ENABLED:
     process.env.RAG_CITATION_VERIFICATION_ENABLED,

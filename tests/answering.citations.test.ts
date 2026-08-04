@@ -86,6 +86,38 @@ test("resolveCitedChunks counts out-of-range markers without emitting them", () 
     [1],
   );
   assert.equal(result.invalidMarkerCount, 1);
+  // The marker must also leave the prose: shipping "[9]" against 3 chunks
+  // gives the reader nothing to open in the Evidence Navigator.
+  assert.equal(result.answer, "Valid [1]. Hallucinated.");
+});
+
+test("resolveCitedChunks keeps the valid half of a compound marker", () => {
+  const result = resolveCitedChunks({
+    answer: "Revenue rose [2, 9].",
+    chunks: buildChunks(3),
+  });
+
+  assert.equal(result.answer, "Revenue rose [2].");
+  assert.equal(result.invalidMarkerCount, 1);
+  assert.deepEqual(
+    result.citations.map((citation) => citation.evidenceIndex),
+    [2],
+  );
+});
+
+test("resolveCitedChunks returns the answer byte-identical when every marker resolves", () => {
+  const answer = "First [1].\n[2, 3] follow.";
+  const result = resolveCitedChunks({ answer, chunks: buildChunks(3) });
+
+  assert.equal(result.answer, answer);
+  assert.equal(result.invalidMarkerCount, 0);
+});
+
+test("resolveCitedChunks leaves [WEB-n] markers untouched", () => {
+  const answer = "Local fact [1]. Web fact [WEB-1].";
+  const result = resolveCitedChunks({ answer, chunks: buildChunks(2) });
+
+  assert.equal(result.answer, answer);
 });
 
 test("resolveCitedChunks falls back to every chunk when no marker is usable", () => {

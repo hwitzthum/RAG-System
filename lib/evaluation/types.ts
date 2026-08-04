@@ -55,8 +55,14 @@ export type QueryAnswerMetrics = {
    * no sentences carried markers; such queries are excluded from averages.
    */
   verifiedCitationRate: number | null;
-  groundingScore: number;
-  hallucinationRate: number;
+  /**
+   * Bag-of-words overlap against the chunks that produced the answer
+   * (report-only, not gated). Null on abstention: an abstention makes no
+   * claims, so scoring it 1.0 made a system that refused everything look
+   * perfectly grounded. Null queries are excluded from the average.
+   */
+  groundingScore: number | null;
+  hallucinationRate: number | null;
 };
 
 /**
@@ -89,6 +95,9 @@ export type BenchmarkThresholds = {
   ndcgAt10: number;
   citationEvidenceHitRate: number;
   verifiedCitationRate: number;
+  /** LLM-judge statement-level entailment. Gated; see below. */
+  faithfulnessMin: number;
+  /** Report-only since the grounding metric was demoted. */
   hallucinationRateMax: number;
   cacheHitRate: number;
   uncachedP50LatencyMs: number;
@@ -121,6 +130,12 @@ export const DEFAULT_BENCHMARK_THRESHOLDS: BenchmarkThresholds = {
   ndcgAt10: 0.8,
   citationEvidenceHitRate: 0.8,
   verifiedCitationRate: 0.9,
+  // Set to match verifiedCitationRate rather than to the level the current
+  // system happens to reach. The bag-of-words grounding metric it replaces
+  // scored 0.000/0.000/0.000/0.004 across four live runs -- it could not fail.
+  // Expect the first runs under a real NLI-style judge to fail while the true
+  // faithfulness level is discovered; fix the cause, do not lower this number.
+  faithfulnessMin: 0.9,
   hallucinationRateMax: 0.05,
   cacheHitRate: 0.3,
   uncachedP50LatencyMs: 8000,
@@ -137,8 +152,10 @@ export type BenchmarkSummaryMetrics = {
   ndcgAt10: number;
   mrr: number;
   citationAccuracy: number;
+  /** Averages over queries that produced a score; abstentions are excluded. */
   groundingScore: number;
   hallucinationRate: number;
+  groundedQueryCount: number;
   cacheHitRate: number;
   uncachedP50LatencyMs: number;
   uncachedP95LatencyMs: number;

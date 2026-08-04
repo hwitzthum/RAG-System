@@ -82,8 +82,9 @@ Artifacts are written to:
 
 - `evaluation/runs/benchmark-<timestamp>.json`
 - `evaluation/reports/benchmark-<timestamp>.md`
-- `evaluation/runs/latest.json`
-- `evaluation/reports/latest.md`
+- `evaluation/runs/latest.json` (live mode only)
+- `evaluation/reports/latest.md` (live mode only)
+- `evaluation/runs/latest-dry-run.json` and `evaluation/reports/latest-dry-run.md` (dry-run mode)
 
 ## Production Hardening Validation (Phase 12)
 
@@ -93,7 +94,11 @@ npm run obs:ingestion:check:dry
 npm run perf:load:dry
 npm run perf:resilience:dry
 npm run perf:soak:verify:dry
-npm run release:readiness:precutover
+# release:readiness requires a live benchmark artifact
+# (evaluation/runs/latest.json with mode=live); dry runs write latest-dry-run.json
+# and can no longer satisfy the gate.
+npm run eval:benchmark
+npm run release:readiness
 ```
 
 For staging hardening execution:
@@ -190,7 +195,7 @@ Note:
 
 ## Phase 8 Definition of Done Checklist
 
-- cache key includes normalized query + language + retrieval version + topK
+- cache key includes normalized query + language + retrieval version + topK + ranking-config fingerprint
 - cache lookup runs before retrieval and reranking
 - cache miss writes ranked retrieval results into `retrieval_cache`
 - cache TTL is enforced via `expires_at` and `RAG_CACHE_TTL_SECONDS`
@@ -200,7 +205,7 @@ Note:
 ## Phase 9 Definition of Done Checklist
 
 - provider abstraction exists for embedding, reranker, and LLM
-- grounded answer prompt templates are implemented in `prompts/`
+- grounded answer prompt templates are implemented in `lib/answering/prompts.ts` (and `lib/answering/web-augmented-prompts.ts` for the web-augmented variant)
 - insufficient-evidence fallback response is enforced
 - query API returns SSE stream (`meta`, `token`, `final`, `done`)
 - final SSE event includes answer + citation metadata

@@ -22,6 +22,7 @@ Phase 12 launch runbook with release checklist, rollback plan, and approval gate
 ## Release Checklist
 
 1. Validate staging env file and credentials:
+
 ```bash
 cp .env.staging.example .env.staging
 npm run infra:check-env:staging
@@ -32,11 +33,13 @@ Required values in `.env.staging`:
 - `CRON_SECRET=<long-random-secret>`
 
 2. Run benchmark and quality gates:
+
 ```bash
 npm run eval:benchmark
 ```
 
 3. Run production hardening checks:
+
 ```bash
 npm run obs:validate
 npm run obs:ingestion:check
@@ -90,7 +93,7 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 - uncached p95 latency exceeds `7s` sustained
 - cached p95 latency exceeds `2.5s` sustained
 - citation accuracy drops below `0.90`
-- hallucination rate reaches `>= 0.05`
+- LLM-judge `faithfulness` drops below `0.90` (the token-overlap hallucination rate it replaced was report-only and could not fail)
 - repeated 5xx query error bursts or provider outage
 - sustained ingestion queue growth or repeated cron-run failures
 

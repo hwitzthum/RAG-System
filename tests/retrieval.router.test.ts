@@ -37,6 +37,7 @@ function buildTrace(
     cacheKey: `cache:${normalizedQuery}`,
     cacheHit: false,
     retrievalVersion: 1,
+    configFingerprint: "cfg000000000",
     topK: 3,
     candidateCounts: {
       vector: candidateCounts?.vector ?? 2,

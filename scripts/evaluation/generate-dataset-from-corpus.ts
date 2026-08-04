@@ -170,7 +170,7 @@ async function run(): Promise<void> {
   const { getSupabaseAdminClient } = await import("../../lib/supabase/admin");
 
   const apiKey = env.OPENAI_API_KEY;
-  const model = env.RAG_EVAL_JUDGE_MODEL;
+  const model = env.RAG_DATASET_GENERATOR_MODEL;
   const supabase = getSupabaseAdminClient();
 
   const { data: documents, error: docError } = await supabase

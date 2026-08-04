@@ -565,10 +565,11 @@ Run and archive outputs:
 2. `npm run test:security`
 3. `npm run eval:benchmark:dry`
 4. `npm run perf:soak:verify -- --window-hours 24 --min-completed-jobs 25 --min-ready-documents 25 --max-p95-completion-ms 900000 --max-dead-letter-growth 0 --max-duplicate-write-errors 0`
-5. `npm run release:readiness:precutover`
-6. Final cutover gate: run live benchmark + strict readiness
+5. Cutover gate: run the live benchmark, then readiness
    - `npm run eval:benchmark`
    - `npm run release:readiness`
+
+   `release:readiness` only accepts a live benchmark artifact. `eval:benchmark:dry` writes `evaluation/runs/latest-dry-run.json`, which the gate ignores.
 
 Matrix shortcut commands:
 

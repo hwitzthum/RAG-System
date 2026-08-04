@@ -20,13 +20,29 @@ import {
   searchKeywordCandidates,
   searchVectorCandidates,
 } from "@/lib/retrieval/repository";
-import { buildRetrievalCacheKey } from "@/lib/retrieval/trace";
+import {
+  buildRetrievalCacheKey,
+  computeRetrievalConfigFingerprint,
+} from "@/lib/retrieval/trace";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 import { isDocumentOverviewQuery } from "@/lib/retrieval/intent";
 
 const MIN_CANDIDATE_LIMIT = 20;
+
+// Computed once: the ranking configuration is process-wide and immutable.
+export const RETRIEVAL_CONFIG_FINGERPRINT = computeRetrievalConfigFingerprint({
+  crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
+  crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
+  rerankPoolSize: env.RAG_RERANK_POOL_SIZE,
+  rrfK: env.RAG_RRF_K,
+  contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
+  multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
+  multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
+  queryEmbeddingModel: env.RAG_QUERY_EMBEDDING_MODEL,
+  queryEmbeddingDimensions: env.RAG_QUERY_EMBEDDING_DIMENSIONS,
+});
 
 export type RetrieveRankedCandidatesInput = {
   query: string;
@@ -124,6 +140,7 @@ export async function retrieveRankedCandidates(
     retrievalVersion,
     topK,
     scopeKey: strategyScopeKey,
+    configFingerprint: RETRIEVAL_CONFIG_FINGERPRINT,
   });
 
   // Best-effort, fire-and-forget cache hygiene — avoids blocking the query path.
@@ -161,6 +178,7 @@ export async function retrieveRankedCandidates(
         cacheKey,
         cacheHit: true,
         retrievalVersion,
+        configFingerprint: RETRIEVAL_CONFIG_FINGERPRINT,
         topK,
         candidateCounts: cached.candidateCounts,
       },
@@ -206,6 +224,7 @@ export async function retrieveRankedCandidates(
         cacheKey,
         cacheHit: false,
         retrievalVersion,
+        configFingerprint: RETRIEVAL_CONFIG_FINGERPRINT,
         topK,
         candidateCounts,
       },
@@ -251,7 +270,12 @@ export async function retrieveRankedCandidates(
         }
       }
     }
-    vectorCandidates = [...chunkMap.values()];
+    // Sorted, not insertion-ordered: reciprocalRankFusion derives a candidate's
+    // rank purely from its array index, so an unsorted merge would discard the
+    // best-score-per-chunk computed above and fuse on Map insertion order.
+    vectorCandidates = [...chunkMap.values()].sort(
+      (a, b) => b.retrievalScore - a.retrievalScore,
+    );
 
     keywordCandidates = await deps.searchKeyword({
       normalizedQuery,
@@ -347,6 +371,7 @@ export async function retrieveRankedCandidates(
     cacheKey,
     cacheHit: false,
     retrievalVersion,
+    configFingerprint: RETRIEVAL_CONFIG_FINGERPRINT,
     topK,
     candidateCounts,
   };
