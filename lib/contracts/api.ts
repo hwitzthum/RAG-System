@@ -91,6 +91,12 @@ export type QueryResponseMeta = {
     unsupportedCount: number;
     unverified: boolean;
   } | null;
+  /**
+   * The model hit RAG_LLM_MAX_OUTPUT_TOKENS mid-answer, so the text ends where
+   * the budget ran out rather than where the answer finished. Absent on the
+   * early-return paths that never call a model.
+   */
+  answerTruncated?: boolean;
 };
 
 export type QuerySseMetaEvent = {

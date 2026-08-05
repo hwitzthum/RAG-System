@@ -232,7 +232,7 @@ test("generateWebAugmentedAnswer drops sub-threshold local chunks when proceedin
       llmProvider: {
         generateAnswer: async ({ userPrompt }) => {
           capturedPrompt = userPrompt;
-          return "Refunds are honoured within 30 days [1].";
+          return { text: "Refunds are honoured within 30 days [1].", truncated: false };
         },
       },
     },

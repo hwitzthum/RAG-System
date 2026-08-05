@@ -107,6 +107,14 @@ export function ChatMessage({
                   : ""}
               </span>
             ) : null}
+            {turn.retrievalMeta?.answerTruncated ? (
+              <span
+                className="badge badge-warning"
+                title="The answer reached the output-length limit and stops mid-thought. Ask a narrower question, or raise RAG_LLM_MAX_OUTPUT_TOKENS."
+              >
+                truncated
+              </span>
+            ) : null}
             {turn.pending ? <StreamingDots /> : null}
             {turn.failed ? (
               <span className="badge badge-danger">failed</span>

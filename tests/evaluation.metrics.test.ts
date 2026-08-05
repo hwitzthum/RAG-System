@@ -120,6 +120,7 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
         },
       ],
       insufficientEvidence: false,
+      truncated: false,
     },
     metrics: {
       ...retrieval,
@@ -306,7 +307,12 @@ test("summarizeBenchmark averages judge metrics over judged queries only", () =>
       candidateCounts: { vector: 1, keyword: 1, fused: 1, reranked: 1 },
       chunks: [],
     },
-    answer: { text: "answer", citations: [], insufficientEvidence: false },
+    answer: {
+      text: "answer",
+      citations: [],
+      insufficientEvidence: false,
+      truncated: false,
+    },
     metrics: {
       recallAt5: 1,
       ndcgAt10: 1,
@@ -393,4 +399,5 @@ const PASSING_SUMMARY: BenchmarkSummaryMetrics = {
   contextPrecision: 1,
   contextRecall: 1,
   abstentionRate: 0,
+  truncationRate: 0,
 };

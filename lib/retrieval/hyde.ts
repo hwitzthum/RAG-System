@@ -33,7 +33,7 @@ export async function generateHypotheticalDocument(input: {
       timeout,
     ]);
 
-    const hypothesis = raw.trim();
+    const hypothesis = raw.text.trim();
     return hypothesis.length > 0 ? hypothesis : null;
   } catch {
     return null;

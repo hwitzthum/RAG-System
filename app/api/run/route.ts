@@ -41,6 +41,7 @@ type FinalEvent = {
     insufficientEvidence?: boolean;
     cacheHit?: boolean;
     latencyMs?: number;
+    answerTruncated?: boolean;
   };
   queryHistoryId?: string;
 };
@@ -128,6 +129,7 @@ export async function POST(request: NextRequest) {
           final.retrievalMeta?.insufficientEvidence ?? false,
         cacheHit: final.retrievalMeta?.cacheHit ?? false,
         latencyMs: final.retrievalMeta?.latencyMs ?? null,
+        answerTruncated: final.retrievalMeta?.answerTruncated ?? false,
       },
       signal: request.signal,
     });

@@ -119,7 +119,7 @@ test("generateGroundedAnswer streams redacted sentences and returns the filtered
           ]) {
             onDelta(delta);
           }
-          return rawAnswer;
+          return { text: rawAnswer, truncated: false };
         },
       },
     },

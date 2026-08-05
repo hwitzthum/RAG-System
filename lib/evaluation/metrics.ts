@@ -421,6 +421,11 @@ function summarizeBucket(
         ? judged.filter((result) => result.judge?.abstained).length /
           judged.length
         : 0,
+    truncationRate:
+      results.length > 0
+        ? results.filter((result) => result.answer.truncated).length /
+          results.length
+        : 0,
   };
 }
 

@@ -822,6 +822,14 @@ Even when an injection attempt evades the scanner and manipulates the LLM, the r
 
 Detected content is replaced with `[REDACTED]`, and the response includes a `redactions_count` integer field. A non-zero count is a signal worth monitoring — it indicates an injection attempt reached the LLM and partially succeeded.
 
+**PII redaction is deliberately not maximal.** In a retrieval system, "looks like a phone number" and "looks like the figure the user asked for" are the same shape: a generic grouped-numeral pattern turns `Total: 12 500 000 units shipped.` into `Total: [REDACTED] units shipped.`, and it does so *after* citations are attached, leaving a `[n]` marker pointing at a number the reader can no longer see. `RAG_PII_REDACTION` selects the trade-off:
+
+| Mode | Behaviour |
+| --- | --- |
+| `off` | No PII redaction. Secret and prompt-leak filtering still apply. |
+| `numbers_safe` (default) | SSNs always redacted. A grouped numeral is treated as a phone number only with an explicit cue (`Tel.`, `phone`, `Fax`, …) or a `+CC` prefix. Email addresses are redacted **unless they appear in the retrieved evidence** — an address inside the caller's own RBAC-scoped documents is the answer, not a leak. |
+| `strict` | Every pattern applied unconditionally. Choose this only when the corpus is known to be numeral-light and false redactions are preferable to any exposure. |
+
 ---
 
 ### BYOK Encryption

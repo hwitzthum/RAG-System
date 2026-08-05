@@ -45,7 +45,18 @@ const envSchema = z.object({
   RAG_RRF_K: z.coerce.number().int().positive().default(60),
   RAG_RERANK_POOL_SIZE: z.coerce.number().int().positive().default(40),
   RAG_LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
-  RAG_LLM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(700),
+  RAG_LLM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(2_000),
+  // Output PII redaction mode.
+  //   off           — no PII redaction at all
+  //   numbers_safe  — SSNs always; phone numbers only with an explicit context
+  //                   cue; email addresses only when absent from the retrieved
+  //                   evidence. The default, because the generic grouped-numeral
+  //                   phone pattern redacts exactly the figures a RAG system
+  //                   exists to surface ("12 500 000" -> "[REDACTED]").
+  //   strict        — every PII pattern applied unconditionally
+  RAG_PII_REDACTION: z
+    .enum(["off", "numbers_safe", "strict"])
+    .default("numbers_safe"),
   RAG_MIN_EVIDENCE_CHUNKS: z.coerce.number().int().positive().default(2),
   // Evidence gate, cross-encoder scale (Cohere relevanceScore).
   RAG_MIN_RERANK_SCORE: z.coerce.number().nonnegative().default(0.25),
@@ -173,6 +184,7 @@ const parsed = envSchema.safeParse({
   RAG_RERANK_POOL_SIZE: process.env.RAG_RERANK_POOL_SIZE,
   RAG_LLM_MODEL: process.env.RAG_LLM_MODEL,
   RAG_LLM_MAX_OUTPUT_TOKENS: process.env.RAG_LLM_MAX_OUTPUT_TOKENS,
+  RAG_PII_REDACTION: process.env.RAG_PII_REDACTION,
   RAG_MIN_EVIDENCE_CHUNKS: process.env.RAG_MIN_EVIDENCE_CHUNKS,
   RAG_MIN_RERANK_SCORE: process.env.RAG_MIN_RERANK_SCORE,
   RAG_MIN_HEURISTIC_RELEVANCE: process.env.RAG_MIN_HEURISTIC_RELEVANCE,
