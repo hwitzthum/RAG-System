@@ -302,8 +302,18 @@ function sanitizeExtractedText(value: string): string {
 function extractTextOperatorsFromContent(content: string): string[] {
   const extracted: string[] = [];
   const textScopes = content.match(/BT[\s\S]*?ET/g) ?? [content];
+  // The array-operator alternative's inner group must exclude `\` from the
+  // "any other character" branch (`[^\]\\]`, not `[^\]]`). Without that
+  // exclusion, a run of literal backslashes with no closing `]` can be
+  // partitioned by the engine as either single [^\]] characters or \\.
+  // escape pairs in exponentially many ways before it gives up — classic
+  // catastrophic backtracking. A malicious PDF that fails pdfjs parsing (so
+  // extraction falls back to this scanner) and embeds as few as ~80
+  // unescaped backslashes inside an unterminated `[` array can hang the
+  // ingestion worker's single-threaded event loop indefinitely, blocking the
+  // shared ingestion queue for every user. See tests/pdf-extractor.redos.test.ts.
   const operatorRegex =
-    /(\[(?:\\.|[^\]])*?\]\s*TJ)|((?:\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>)\s*(?:Tj|'|"))/g;
+    /(\[(?:\\.|[^\]\\])*?\]\s*TJ)|((?:\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>)\s*(?:Tj|'|"))/g;
 
   for (const scope of textScopes) {
     operatorRegex.lastIndex = 0;
