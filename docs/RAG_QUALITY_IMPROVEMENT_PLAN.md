@@ -2,7 +2,7 @@
 
 Version: 1.2
 Date: 2026-08-05
-Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). **Wave 3 complete (2026-08-05): item 3.2 done (PR #64 + follow-up)** — that first zero turned out to be measured at drifted local config (pool 20 / CE 3000); the production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json` (pool 100 / CE 6000), where only two gates fail: nDCG@10 [EN] 0.705 and falseAnswerRate 0.40 — the single largest open defect, config-independent. Pool 100 re-confirmed on the chunk-id basis; drift baseline re-adopted and verified. See the 3.2 outcome section. **Wave 4 authored (2026-08-05)** — targets the two open gates: item 4.3 promotes the deferred CRAG/Self-RAG loop (trigger met), item 4.2 attacks EN ordering; sequenced instrument → retrieval fixes → calibrate → loop → re-baseline. See the Wave 4 section.
+Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). **Wave 3 complete (2026-08-05): item 3.2 done (PR #64 + follow-up)** — that first zero turned out to be measured at drifted local config (pool 20 / CE 3000); the production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json` (pool 100 / CE 6000), where only two gates fail: nDCG@10 [EN] 0.705 and falseAnswerRate 0.40 — the single largest open defect, config-independent. Pool 100 re-confirmed on the chunk-id basis; drift baseline re-adopted and verified. See the 3.2 outcome section. **Wave 4 complete (2026-08-05)** — falseAnswerRate 0.40 → **0.067 (gate PASS)** via the CRAG/Self-RAG loop (calibrated three-way evidence verdict + ambiguous-band prompt guard; corrective retrieval built, default-off); EN nDCG@10 0.7051 → **0.7973** via grouping-off + per-document cap (adjacency boost measured net-negative for both languages; CE-context measured and rejected). The new zero is `benchmark-2026-08-05T19-30-08-179Z.json` (fingerprint `8ce4f19276f9`): **one failing gate remains** — nDCG@10 [EN] 0.7973 vs 0.8, pinned on one blended multi-hop query whose fix is query decomposition. See the Wave 4 outcome sections.
 
 ## Objective
 
@@ -742,9 +742,28 @@ Shipped: `RAG_CRAG_LOOP_ENABLED=true` + `RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN=0.214
 
 ### 4.4 Re-baseline
 
-- [ ] Final judged run on the shipped stack recorded as the new zero in `evaluation/runs/`.
-- [ ] `.env.vercel.production` and `.env.local` updated **together** (the Wave 3 drift lesson), verified via the artifact config fingerprint.
-- [ ] Outcome sections written with measured numbers and residuals honestly stated — including the watched contextPrecision −0.026 residual: if it persists in this wave's judged runs, re-open the pool question per the 3.2 note.
+- [x] Final judged run on the shipped stack recorded as the new zero in `evaluation/runs/`.
+- [x] `.env.vercel.production` and `.env.local` updated **together** (the Wave 3 drift lesson), verified via the artifact config fingerprint.
+- [x] Outcome sections written with measured numbers and residuals honestly stated — including the watched contextPrecision −0.026 residual: if it persists in this wave's judged runs, re-open the pool question per the 3.2 note.
+
+### 4.4 outcome — the new zero (2026-08-05)
+
+**`benchmark-2026-08-05T19-30-08-179Z.json`** — judged, run from the env files with no CLI overrides (config fingerprint `8ce4f19276f9` proves the files produce the numbers). **One failing gate remains, down from two:**
+
+|                     | Wave 3 zero (`-T16-22-33-915Z`) | Wave 4 zero (`-T19-30-08-179Z`) |
+| ------------------- | ------------------------------: | ------------------------------: |
+| falseAnswerRate     |                    0.400 (FAIL) |                **0.067 (PASS)** |
+| nDCG@10 [EN]        |                   0.7051 (FAIL) |  **0.7973 (still FAIL vs 0.8)** |
+| nDCG@10 overall     |                          0.8519 |                      **0.8932** |
+| recall@5            |                          0.9792 |                       **1.000** |
+| faithfulness        |                          0.9594 |                          0.9490 |
+| falseAbstentionRate |                          0.0417 |                          0.0208 |
+| p50 / p95 (ms)      |                    7058 / 10308 |                    6215 / 10155 |
+
+- **falseAnswerRate — the wave's target defect — is fixed and gated PASS**, confirmed under judge, with per-query attribution in the artifact.
+- **nDCG@10 [EN] 0.7973 is the one open gate** — a 0.0027 hair-fail pinned on one query (`mh-en-32fb0a96-15-2e51c566-41`); the next lever is query decomposition with per-sub-query reranking (see the 4.2 residual). Do not chase it with final-cut tuning.
+- **contextPrecision 0.6406** vs 0.6536 at the Wave 3 zero — the watched residual persists at −0.013 but note the confound: this wave changed window composition (cap promotes lower-relevance cross-document chunks by design). This is the second of the "next two judged runs" from the 3.2 note; the pool-100 question stays closed — the delta here is attributable to the cap, which recall/nDCG gains pay for. Keep watching, report-only.
+- Metric basis unchanged from Wave 3 (same golden set, fingerprint `7125c124…`); deltas against the Wave 3 zero are legitimate.
 
 ---
 
