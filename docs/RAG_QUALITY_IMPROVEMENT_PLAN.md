@@ -684,6 +684,31 @@ Three flag-gated fixes, defaults chosen so production is byte-identical until a 
 | 4   | Soft cap                  | `RAG_MAX_CHUNKS_PER_DOCUMENT=7` (fallback 6) | EN multi-hop avg nDCG ≥ 0.60, EN single-hop not down >0.01, DE ≥ 0.930; prefer 7 if both pass        |
 | 5   | Combined winners          | judged run                                   | All gates incl. nDCG@10 [EN] ≥ 0.8; abstention/faithfulness within noise of the zero                 |
 
+### 4.2 outcome — measured (2026-08-05)
+
+**Shipped stack: `RAG_CONTEXTUAL_GROUPING_ENABLED=false` + `RAG_MAX_CHUNKS_PER_DOCUMENT=5` + `RAG_DIVERSITY_RELEVANCE_FLOOR=0.125`. EN nDCG@10 0.7051 → 0.7973, DE 0.9400 → 0.9508, aggregate recall@5 0.9792 → 1.000, MRR +0.049 — with the EN gate still formally failing by 0.0027, on one precisely-identified query (see the residual).** All arms `--no-judge`, same session, same corpus; control re-run (`benchmark-2026-08-05T17-19-09-050Z.json`) reproduced the production zero exactly (EN 0.7051, falseAnswerRate 0.40) and the new 4.1 instrumentation confirmed all 63 queries ran pure cross-encoder in every arm.
+
+| Arm            | Config                      |    EN nDCG |    DE nDCG |  recall@5 | Verdict                                    |
+| -------------- | --------------------------- | ---------: | ---------: | --------: | ------------------------------------------ |
+| 0 control      | production config           |     0.7051 |     0.9400 |    0.9792 | zero reproduced                            |
+| 1 grouping off | `GROUPING=false`            | **0.7752** | **0.9508** | **1.000** | **ships** — see below                      |
+| 2 CE context   | `CECTX=true` (grouping on)  |     0.7329 |     0.9273 |    0.9792 | fails (DE < 0.930)                         |
+| 2b CE context  | `CECTX=true` + grouping off |     0.7718 |     0.9590 |    0.9792 | fails (EN +0.02 not met; −0.003 vs arm 1)  |
+| 4 soft cap     | cap 7, floor 0.25           |     0.7752 |     0.9508 |     1.000 | no-op — floor disqualified every promotion |
+| 4b soft cap    | **cap 5, floor 0.125**      | **0.7973** | **0.9508** | **1.000** | **ships**                                  |
+
+Artifacts: arm 1 `-T17-33-03-168Z`, arm 2 `-T17-49-47-675Z`, arm 2b `-T18-02-42-145Z`, arm 4 `-T18-15-35-920Z`, arm 4b `-T18-30-29-842Z` (all in `evaluation/runs/`).
+
+**Findings, in mechanism terms:**
+
+- **The adjacency boost was a net negative for both languages** — not an EN-cost/DE-benefit trade. Removing it lifted EN +0.070, DE +0.011, and fixed the one EN recall@5 miss. The pre-registered "DE drop >0.01 ⇒ attenuate to 0.01" branch never triggered; the boost ships at **off** (grouping stage disabled), not attenuated.
+- **CE context does not ship, and its arm-2 "gain" was an artifact.** On the production stack it moved EN +0.028 but pushed DE below its floor; re-tested on the boost-free stack it was EN-neutral (−0.003) and reintroduced an EN recall miss. A pool probe showed why it cannot help multi-hop either: it _raised_ one second-hop golden (0.21 → 0.34) but _collapsed_ the other two (0.146 → 0.081, 0.131 → 0.082) below any usable diversity floor. Direction is chunk-specific; net negative where it matters.
+- **The cap's default floor was mis-set against the schema's gate default rather than production's.** At floor 0.25 the cap was a measured no-op: every second-hop golden sits at CE relevance 0.131–0.232. Floor 0.125 (still above production's 0.1 gate, so promoted chunks remain gate-passing evidence) with cap 5 promoted the q1/q3 goldens into the window. Deviation from the pre-registered cap 7/6: recorded here; the floor arithmetic was derived from a full-pool probe and the arm-4b measurement matched the prediction to four decimals (0.8175 / 0.5802 predicted = measured).
+- **The EN residual is one query** (`mh-en-32fb0a96-15-2e51c566-41`, nDCG 0.3868): its second golden ranks ~10th _within its own document_ by CE score against the blended two-topic query — the second document is already well represented in the window, so no per-document cap, floor, or final-cut reordering can reach it. Same root cause caps `mh-en-32fb0a96-3…` at 0.6131. **The next lever is query decomposition with per-sub-query reranking** — mechanized by item 4.3's corrective-retrieval stage — not more final-cut machinery. The `chunk_index` deferred item stays deferred: sibling displacement, its target defect, is already resolved by grouping-off (EN single-hop 0.780 → 0.854).
+- Abstention rates were config-independent across all arms (falseAnswerRate 0.40 everywhere), as the Wave 3 finding predicted.
+
+Arm 5 (judged, shipped stack) recorded under the re-baseline in 4.4.
+
 ### 4.3 CRAG/Self-RAG adaptive retrieval loop
 
 **Impact:** high (the top open defect) · **Effort:** 14h · **Confidence:** verified (trigger met; separating signal measured)

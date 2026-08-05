@@ -91,3 +91,41 @@ test("chunks retrieved from the same page currently boost each other", () => {
     assert.ok(Math.abs((chunk.rerankScore ?? 0) - 0.45) < 1e-9);
   }
 });
+
+test("the boost magnitude parameter is honored", () => {
+  const chunks = [
+    buildChunk({ chunkId: "a", pageNumber: 1, rerankScore: 0.4 }),
+    buildChunk({ chunkId: "b", pageNumber: 2, rerankScore: 0.4 }),
+  ];
+
+  const ordered = applyContextualGrouping(chunks, 0.01);
+  const score = (id: string) =>
+    ordered.find((chunk) => chunk.chunkId === id)?.rerankScore ?? 0;
+
+  assert.ok(Math.abs(score("a") - 0.41) < 1e-9);
+  assert.ok(Math.abs(score("b") - 0.41) < 1e-9);
+});
+
+test("a zero boost degrades to a stable score-ordered pass-through", () => {
+  const chunks = [
+    buildChunk({ chunkId: "top", pageNumber: 5, rerankScore: 0.9 }),
+    buildChunk({ chunkId: "mid", pageNumber: 6, rerankScore: 0.7 }),
+    buildChunk({
+      chunkId: "low",
+      documentId: "doc-2",
+      pageNumber: 1,
+      rerankScore: 0.5,
+    }),
+  ];
+
+  const ordered = applyContextualGrouping(chunks, 0);
+
+  assert.deepEqual(
+    ordered.map((chunk) => chunk.chunkId),
+    ["top", "mid", "low"],
+  );
+  assert.deepEqual(
+    ordered.map((chunk) => chunk.rerankScore),
+    [0.9, 0.7, 0.5],
+  );
+});

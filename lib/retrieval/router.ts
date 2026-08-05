@@ -14,6 +14,7 @@ import {
 } from "@/lib/retrieval/service";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
+import { applyDocumentDiversity } from "@/lib/retrieval/diversity";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { generateHypotheticalDocument } from "@/lib/retrieval/hyde";
 
@@ -265,7 +266,18 @@ export async function retrieveRankedCandidatesWithRouting(
   }
 
   if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    orderedCandidates = applyContextualGrouping(orderedCandidates);
+    orderedCandidates = applyContextualGrouping(
+      orderedCandidates,
+      env.RAG_ADJACENCY_BOOST,
+    );
+  }
+
+  if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
+    orderedCandidates = applyDocumentDiversity(orderedCandidates, {
+      topK: input.topK,
+      maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+      relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
+    });
   }
 
   const rerankedCandidates = orderedCandidates.slice(0, input.topK);

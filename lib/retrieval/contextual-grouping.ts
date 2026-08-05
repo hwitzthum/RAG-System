@@ -14,10 +14,16 @@ import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 // Fixing that means keying on chunk_index, which needs a column on two SQL
 // RETURNS TABLE signatures and the RetrievedChunk contract. Do not re-tune this
 // constant without an nDCG@10 sweep.
+//
+// Wave 4 made the magnitude a parameter (env RAG_ADJACENCY_BOOST, passed by
+// the caller so this module stays env-free): with cross-encoder rank gaps of
+// 0.01–0.05, a 0.05-per-neighbour boost can leapfrog a genuine relevance
+// preference, and the same-page defect above scales with it.
 const ADJACENCY_BOOST = 0.05;
 
 export function applyContextualGrouping(
   chunks: RetrievedChunk[],
+  adjacencyBoost: number = ADJACENCY_BOOST,
 ): RetrievedChunk[] {
   if (chunks.length <= 1) {
     return chunks;
@@ -39,13 +45,13 @@ export function applyContextualGrouping(
       let boost = 0;
 
       if (i > 0 && sorted[i].pageNumber - sorted[i - 1].pageNumber <= 1) {
-        boost += ADJACENCY_BOOST;
+        boost += adjacencyBoost;
       }
       if (
         i < sorted.length - 1 &&
         sorted[i + 1].pageNumber - sorted[i].pageNumber <= 1
       ) {
-        boost += ADJACENCY_BOOST;
+        boost += adjacencyBoost;
       }
 
       // Boost the ordering score only. `relevanceScore` is deliberately left

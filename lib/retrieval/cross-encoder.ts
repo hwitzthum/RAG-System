@@ -19,6 +19,37 @@ export type CrossEncoderInput = {
 // Raise this constant in step if the pool is ever taken higher.
 const CROSS_ENCODER_POOL_CAP = 100;
 
+const CE_DOCUMENT_CHAR_CAP = 4096;
+// sectionTitle + context together; content fills the remainder. The context
+// paragraph is a short generated summary (≤4 sentences), so 1024 is generous.
+const CE_HEADER_CHAR_CAP = 1024;
+
+/**
+ * Text the cross-encoder scores for one chunk. With `includeContext` the
+ * header carries `sectionTitle` plus the chunk's contextual-retrieval
+ * paragraph — the document-level disambiguation that separates near-duplicate
+ * siblings sharing a section title. The header is capped separately so a long
+ * content body can never truncate the context away; content takes whatever of
+ * the 4096-char budget remains.
+ */
+export function buildCrossEncoderDocument(
+  chunk: RetrievedChunk,
+  includeContext: boolean,
+): string {
+  if (!includeContext || !chunk.context) {
+    return `${chunk.sectionTitle}\n${chunk.content}`.slice(
+      0,
+      CE_DOCUMENT_CHAR_CAP,
+    );
+  }
+  const header = `${chunk.sectionTitle}\n${chunk.context}`.slice(
+    0,
+    CE_HEADER_CHAR_CAP,
+  );
+  const contentBudget = CE_DOCUMENT_CHAR_CAP - header.length - 1;
+  return `${header}\n${chunk.content.slice(0, contentBudget)}`;
+}
+
 /**
  * Reranks the full candidate pool with Cohere's cross-encoder and returns the
  * full pool in cross-encoded order. Deliberately does NOT truncate to topK:
@@ -45,7 +76,7 @@ export async function crossEncoderRerank(
   const overflowChunks = input.chunks.slice(CROSS_ENCODER_POOL_CAP);
 
   const documents = cappedChunks.map((chunk) =>
-    `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
+    buildCrossEncoderDocument(chunk, env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT),
   );
 
   try {
