@@ -2,7 +2,7 @@
 
 Version: 1.1
 Date: 2026-08-05
-Status: Wave 0 complete (merged 2026-08-04, PR #57). Wave 1 in progress — 1.1 and 1.3 shipped (PR #60), 1.4 withdrawn and 1.5 deferred on measurement, 1.2 under sweep, 1.6 not started. Waves 2-3 not started.
+Status: Wave 0 complete (PR #57). **Wave 1 complete (2026-08-05)** — 1.1 and 1.3 shipped (PR #60), 1.2 shipped (PR #61), 1.6 shipped (PR #62); 1.4 withdrawn and 1.5 deferred, both on measurement. Waves 2-3 not started; both require a corpus re-ingest.
 
 ## Objective
 
@@ -140,7 +140,7 @@ Pool 20 → 60 buys exactly one EN query of recall (1/18 = 0.056) and nothing in
 | 1.2 Pool width          | **Resolved by sweep.** Pool raised 60 → 100; `RAG_CANDIDATE_LIMIT` not built (no depth left to add). |
 | 1.4 HyDE auto-fire      | **WITHDRAWN on measurement.** Net-negative on EN and ~2× latency.                                    |
 | 1.5 HNSW iterative scan | **DEFERRED on measurement.** Provably inert at current corpus size.                                  |
-| 1.6 Prompt contract     | Code written; **awaiting a judged benchmark** before it ships.                                       |
+| 1.6 Prompt contract     | **Shipped** after a judged A/B. Pre-registered criterion tripped; ship argued, not assumed.          |
 
 **Net effect of Phase A on the wave: two items shipped, two withdrawn, one resolved to a one-line config change, one still to be measured.** Four of the six were labelled "Impact: high · Confidence: verified" on a code read. That label meant considerably less than it appeared to.
 
@@ -300,6 +300,35 @@ Shipping the migration now would mean a schema change on a database **shared wit
 
 ### 1.6 Rewrite the answer prompt as an output contract
 
+**SHIPPED after a judged A/B (2026-08-05) — but the pre-registered ship criterion tripped, and the decision to ship anyway is argued below rather than assumed.**
+
+Two judged runs at identical config (pool 100, `maxOutputTokens` 2000, judge `claude-opus-5`, generator `gpt-4o-mini`), differing only in the prompt: control `benchmark-2026-08-05T05-31-30-986Z.json`, treatment `-T05-47-47-452Z.json`.
+
+|                                     |   control |  contract |
+| ----------------------------------- | --------: | --------: |
+| citationEvidenceHitRate _(gated)_   |    0.8636 | **0.8864** |
+| verifiedCitationRate _(gated)_      |    0.9383 | **0.9623** |
+| contextRecall                       |    0.9682 |    0.9682 |
+| faithfulness                        |    0.9858 |    0.9771 |
+| answerRelevance                     |    0.9639 |    0.9455 |
+| contextPrecision                    |    0.6761 |    0.6676 |
+| markerCount / unsupportedStatements |   371 / 4 | 450 / **9** |
+| answers with `##` headings / Limitations | 0 / 0 | 44 / 44 |
+
+Retrieval metrics are identical to four decimals, as they must be — the prompt cannot move retrieval. Both runs pass 10/10 gates.
+
+**The criterion tripped.** It was stated in advance as: ship only if `citationEvidenceHitRate` and `contextRecall` hold or improve **and** `unsupportedStatementCount` does not inflate alongside `markerCount`. Markers rose 21% and unsupported statements more than doubled.
+
+**Why it ships anyway.** The criterion was written to catch one specific failure — marker spam, the model spraying citations to inflate the verifier's denominator without improving grounding. That failure is directly refuted by the data: markers rose **and** `verifiedCitationRate` rose, so the additional markers are accurate rather than padding. The proxy tripped; the thing it was proxying for did not happen.
+
+The unsupported statements are substantially a **measurement artifact of the contract's mandated Limitations section**. All 44 answers now carry one, against 0 before, and **6 of the 9 unsupported statements are negative-existential claims inside it** ("The evidence does not establish the full extent of…"). A faithfulness judge asking "is this statement supported by the retrieved evidence?" marks such a claim unsupported by construction — no chunk can support an assertion about what the chunks omit. Excluding them, unsupported statements go 4 → ~3: flat.
+
+**Judge noise floor, measured for the first time.** `contextPrecision` moved −0.0085 between two runs whose retrieved chunks are byte-identical. That movement is therefore pure judge run-to-run variance, and it establishes a floor of roughly **±0.01** on these metrics. `faithfulness` (−0.0087) sits at that floor and should not be read as a regression. This also retro-informs item 1.2: the −0.0398 `contextPrecision` drop from pool 20 → 100 is ~4× the floor and is probably real.
+
+**What is not explained away.** `answerRelevance` fell 0.0184 — roughly 2× the noise floor — across 26 of 44 queries, with the worst-hit queries being the same ones that gained Limitations sections. Appending a paragraph about what the evidence does *not* address plausibly dilutes judged directness. This is a genuine cost of the mandatory section, accepted in exchange for the two gated citation metrics and for answers that disclose their own gaps.
+
+**Harness defect this exposes — for Wave 3.** `computeAnswerMetrics`/the LLM judge now sees a sentence type that did not exist in the corpus of answers it was calibrated on. Negative-existential claims should be excluded from faithfulness scoring, or scored against a different question ("does the evidence contradict this?" rather than "does the evidence support this?"). Until then, `faithfulness` is biased slightly downward for every answer with a Limitations section, which is now all of them. Do **not** respond by removing the Limitations requirement to make the metric look better.
+
 **Impact:** high · **Effort:** 5h · **Confidence:** verified
 
 The shipped prompt (`lib/answering/prompts.ts`) says:
@@ -390,7 +419,9 @@ The generator has `chunk.id` in hand and throws it away. The schema has no chunk
 - [ ] Add a multi-hop slice by prompting the generator with two chunks from different documents.
 - [ ] Delete the synthetic fixture and the CI test at `tests/evaluation.metrics.test.ts` that keeps it alive.
 - [ ] Add **per-language threshold checks** so EN cannot hide behind DE.
-- [ ] Add the scoped-query slice needed to verify item 1.5.
+- [ ] ~~Add the scoped-query slice needed to verify item 1.5.~~ Item 1.5 was deferred on measurement; the slice is only needed if its trigger condition is ever met.
+- [ ] **Stop scoring negative-existential claims as unsupported.** Since item 1.6 shipped, every answer carries a `## Limitations` section asserting what the evidence does _not_ establish. The judge asks "is this statement supported by the retrieved evidence?", which such a claim can never satisfy, so `faithfulness` is now biased downward for all 44 answers — 6 of the 9 unsupported statements in the 1.6 treatment run were of exactly this kind. Either exclude Limitations sections from statement extraction, or score them against "does the evidence _contradict_ this?" instead. Fix the metric, not the prompt.
+- [ ] **Record the judge noise floor in the report.** Two runs over byte-identical retrieved chunks differed by 0.0085 on `contextPrecision` (see item 1.6), so any judge delta under ~0.01 is indistinguishable from variance. Every judge metric in the report should carry that caveat, or deltas at the floor will keep being read as signal.
 
 **Measure:** self-measuring. Abstention becomes measurable for the first time — today a build that answers everything confidently, hallucinating on out-of-corpus questions, passes every gate. Chunk-id ground truth also upgrades recall@5 from a fuzzy page proxy to an exact-hit metric, removing label noise from the flagship number. Regenerating resets every historical metric; the unanswerable slice will look bad at first — **do not lower the threshold to fit**.
 
