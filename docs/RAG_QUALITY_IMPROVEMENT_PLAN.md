@@ -2,7 +2,7 @@
 
 Version: 1.2
 Date: 2026-08-05
-Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). Item 3.2's remaining bullets (Wave 1 A/B re-runs, embedding-drift baseline re-adoption) are open.
+Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). **Wave 3 complete (2026-08-05): item 3.2 done (PR #64 + follow-up)** — that first zero turned out to be measured at drifted local config (pool 20 / CE 3000); the production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json` (pool 100 / CE 6000), where only two gates fail: nDCG@10 [EN] 0.705 and falseAnswerRate 0.40 — the single largest open defect, config-independent. Pool 100 re-confirmed on the chunk-id basis; drift baseline re-adopted and verified. See the 3.2 outcome section.
 
 ## Objective
 
@@ -611,9 +611,33 @@ Shipped as written (deviations noted in the checklist above). New dataset: 63 re
 
 ### 3.2 Re-baseline
 
-- [ ] Re-run the Wave 1 A/Bs against the new corpus to confirm nothing regressed. Note: comparisons against pre-3.1 runs are meaningless (metric basis changed); re-run both arms fresh.
-- [ ] Re-adopt the embedding-drift baseline (`centroid_drift_within_limit` fails once by design after the re-embed).
-- [x] Record the new zero in `evaluation/runs/` — `benchmark-2026-08-05T14-54-59-370Z.json` (2026-08-05, fingerprint `7125c124…`).
+- [x] Re-run the Wave 1 A/Bs against the new corpus to confirm nothing regressed. The re-runnable Wave 1 decision is the 1.2 pool choice (1.1/1.3/1.6 are merged fixes with no coherent "off" arm). Re-run as a clean same-session pair on the chunk-id dataset — see the outcome below. Pool 100 confirmed.
+- [x] Re-adopt the embedding-drift baseline. Already done before this item ran: the baseline was refreshed 2026-08-05T13:35Z after the designed post-re-embed failure (`embedding-drift-2026-08-05T08-06-28-479Z.json`, `passed: false`). A fresh live check passes against it — `embedding-drift-2026-08-05T15-36-22-267Z.json`.
+- [x] Record the new zero in `evaluation/runs/`. **The zero moved twice.** The first candidate (`benchmark-2026-08-05T14-54-59-370Z.json`) turned out to be measured at `RAG_RERANK_POOL_SIZE=20` / cross-encoder timeout 3000 — `.env.local`, which feeds every local benchmark, had silently drifted from `.env.vercel.production` (100/6000) after the Wave 1 rollout; the item 0.2 config fingerprint in the artifact is what exposed it. `.env.local` is now aligned. **The production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json`** (pool 100, CE timeout 6000, fingerprint `7125c124…`).
+
+### 3.2 outcome — measured (2026-08-05)
+
+**The config drift was most of the "EN collapse."** At the true production config, the failing picture shrinks from four gates to two:
+
+|                 | mislabeled zero (pool 20 / CE 3000) | production zero (pool 100 / CE 6000) |
+| --------------- | ----------------------------------: | -----------------------------------: |
+| recall@5        |                               0.917 |                            **0.979** |
+| nDCG@10         |                       0.7985 (FAIL) |                    **0.8519** (PASS) |
+| Recall@5 [EN]   |                        0.778 (FAIL) |                     **0.944** (PASS) |
+| nDCG@10 [EN]    |                       0.5627 (FAIL) |       **0.7051** (still FAIL vs 0.8) |
+| falseAnswerRate |                        0.333 (FAIL) |        **0.400** (still FAIL vs 0.1) |
+
+Open gates at the production zero: **nDCG@10 [EN]** (0.705 vs 0.8 — EN ordering, the real residual retrieval problem) and **falseAnswerRate** (0.40 — see below).
+
+**The 1.2 pool decision holds on the new basis.** Same-session pair, judge `claude-opus-5`, generator `gpt-4o-mini`, CE timeout 6000 both arms. Artifacts: `benchmark-2026-08-05T16-00-51-540Z.json` (60) and `-T16-22-33-915Z.json` (100):
+
+- recall@5 identical (0.9792) — saturation exactly as the Wave 1 sweep found.
+- nDCG@10 +0.0069, MRR +0.0030, EN nDCG +0.0185, citationEvidenceHit +0.0417, contextRecall +0.0146 at pool 100; latency flat. The original pick criterion was nDCG@10 — it still points to 100.
+- The Wave 1 residual **resolved**: verifiedCitationRate −0.0015 (was −0.0187), well inside the floor.
+- New residual to watch, honestly stated: **contextPrecision −0.0260** at pool 100 — 2.6× the judge floor, larger than the −0.0085 that cleared the pre-registered criterion in Wave 1. Counter-weighed by contextRecall and citation-evidence gains, and contextPrecision is report-only; one observation on n=48, not acted on. If it persists across the next two judged runs, re-open the pool question.
+- falseAnswerRate 0.333 → 0.400 is one query flipping on n=15 — abstention behaviour is config-independent, as expected for an answering-policy defect.
+
+**falseAnswerRate is now the single largest open defect** (0.33–0.40 across every configuration measured): the system confidently answers a third or more of questions about entities that provably do not exist in the corpus. Retrieval config cannot fix it; the CRAG/Self-RAG deferral trigger ("a false-answer number to optimize against") is met, and EN ordering (nDCG 0.705) is the retrieval item behind it.
 
 ---
 
