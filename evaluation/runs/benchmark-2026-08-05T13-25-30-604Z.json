@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-08-05T13:35:11.164Z",
+  "generatedAt": "2026-08-05T13:25:30.604Z",
   "mode": "live",
   "datasetPath": "/Users/hwitzthum/rag-system/evaluation/evaluation_queries.generated.json",
   "queryCount": 40,
   "config": {
     "topK": 8,
     "expansion": false,
-    "judge": false,
-    "ignoreExpectedSection": true,
-    "cacheNamespace": "benchmark:2026-08-05T13:25:30.898Z",
+    "judge": true,
+    "ignoreExpectedSection": false,
+    "cacheNamespace": "benchmark:2026-08-05T13:07:09.409Z",
     "retrievalConfigFingerprint": "c35ec5d0c65d",
     "generatorModel": "gpt-4o-mini",
     "judgeModel": "claude-opus-5",
@@ -53,27 +53,27 @@
       "queryCount": 40,
       "evaluatedCount": 40,
       "systemErrorCount": 0,
-      "recallAt5": 0.95,
-      "ndcgAt10": 0.8778585554803119,
-      "mrr": 0.8744047619047619,
-      "citationAccuracy": 0.42220238095238083,
-      "groundingScore": 0.9967436974789916,
-      "hallucinationRate": 0.003256302521008403,
+      "recallAt5": 0.45,
+      "ndcgAt10": 0.4099279700481926,
+      "mrr": 0.39940476190476193,
+      "citationAccuracy": 0.39479166666666665,
+      "groundingScore": 0.994189133986928,
+      "hallucinationRate": 0.005810866013071897,
       "groundedQueryCount": 40,
       "cacheHitRate": 1,
-      "uncachedP50LatencyMs": 7392,
-      "uncachedP95LatencyMs": 17307,
-      "cachedP50LatencyMs": 6322,
-      "cachedP95LatencyMs": 8440,
+      "uncachedP50LatencyMs": 7441,
+      "uncachedP95LatencyMs": 10241,
+      "cachedP50LatencyMs": 5702,
+      "cachedP95LatencyMs": 8856,
       "systemErrorRate": 0,
       "citationEvidenceHitRate": 0.95,
-      "verifiedCitationRate": 0.9526455026455027,
+      "verifiedCitationRate": 0.9812779812779814,
       "verifiedQueryCount": 39,
-      "judgedCount": 0,
-      "faithfulness": 0,
-      "answerRelevance": 0,
-      "contextPrecision": 0,
-      "contextRecall": 0,
+      "judgedCount": 40,
+      "faithfulness": 0.9867971611721611,
+      "answerRelevance": 0.9390000000000003,
+      "contextPrecision": 0.621875,
+      "contextRecall": 1,
       "abstentionRate": 0,
       "truncationRate": 0
     },
@@ -82,27 +82,27 @@
         "queryCount": 14,
         "evaluatedCount": 14,
         "systemErrorCount": 0,
-        "recallAt5": 0.8571428571428571,
-        "ndcgAt10": 0.7805723789572685,
-        "mrr": 0.7602040816326531,
-        "citationAccuracy": 0.22295918367346942,
+        "recallAt5": 0.42857142857142855,
+        "ndcgAt10": 0.36126265883080916,
+        "mrr": 0.33163265306122447,
+        "citationAccuracy": 0.22380952380952382,
         "groundingScore": 1,
         "hallucinationRate": 0,
         "groundedQueryCount": 14,
         "cacheHitRate": 1,
-        "uncachedP50LatencyMs": 8142,
-        "uncachedP95LatencyMs": 23322,
-        "cachedP50LatencyMs": 7388,
-        "cachedP95LatencyMs": 10876,
+        "uncachedP50LatencyMs": 8067,
+        "uncachedP95LatencyMs": 17001,
+        "cachedP50LatencyMs": 5925,
+        "cachedP95LatencyMs": 14048,
         "systemErrorRate": 0,
         "citationEvidenceHitRate": 0.9285714285714286,
-        "verifiedCitationRate": 0.9164835164835166,
-        "verifiedQueryCount": 13,
-        "judgedCount": 0,
-        "faithfulness": 0,
-        "answerRelevance": 0,
-        "contextPrecision": 0,
-        "contextRecall": 0,
+        "verifiedCitationRate": 0.9795918367346939,
+        "verifiedQueryCount": 14,
+        "judgedCount": 14,
+        "faithfulness": 0.9885531135531137,
+        "answerRelevance": 0.9392857142857142,
+        "contextPrecision": 0.8660714285714286,
+        "contextRecall": 1,
         "abstentionRate": 0,
         "truncationRate": 0
       },
@@ -110,27 +110,27 @@
         "queryCount": 26,
         "evaluatedCount": 26,
         "systemErrorCount": 0,
-        "recallAt5": 1,
-        "ndcgAt10": 0.9302434197619505,
-        "mrr": 0.935897435897436,
-        "citationAccuracy": 0.5294871794871795,
-        "groundingScore": 0.9949903038138331,
-        "hallucinationRate": 0.005009696186166774,
+        "recallAt5": 0.46153846153846156,
+        "ndcgAt10": 0.43613236839601444,
+        "mrr": 0.4358974358974359,
+        "citationAccuracy": 0.48685897435897435,
+        "groundingScore": 0.9910602061337356,
+        "hallucinationRate": 0.008939793866264457,
         "groundedQueryCount": 26,
         "cacheHitRate": 1,
-        "uncachedP50LatencyMs": 6581,
-        "uncachedP95LatencyMs": 9647,
-        "cachedP50LatencyMs": 5677,
-        "cachedP95LatencyMs": 8025,
+        "uncachedP50LatencyMs": 7011,
+        "uncachedP95LatencyMs": 9198,
+        "cachedP50LatencyMs": 5552,
+        "cachedP95LatencyMs": 7921,
         "systemErrorRate": 0,
         "citationEvidenceHitRate": 0.9615384615384616,
-        "verifiedCitationRate": 0.9707264957264958,
-        "verifiedQueryCount": 26,
-        "judgedCount": 0,
-        "faithfulness": 0,
-        "answerRelevance": 0,
-        "contextPrecision": 0,
-        "contextRecall": 0,
+        "verifiedCitationRate": 0.9822222222222221,
+        "verifiedQueryCount": 25,
+        "judgedCount": 26,
+        "faithfulness": 0.9858516483516483,
+        "answerRelevance": 0.9388461538461537,
+        "contextPrecision": 0.49038461538461536,
+        "contextRecall": 1,
         "abstentionRate": 0,
         "truncationRate": 0
       },
@@ -225,15 +225,15 @@
     "checks": [
       {
         "metric": "Recall@5",
-        "actual": 0.95,
+        "actual": 0.45,
         "target": ">= 0.85",
-        "passed": true
+        "passed": false
       },
       {
         "metric": "nDCG@10",
-        "actual": 0.8778585554803119,
+        "actual": 0.4099279700481926,
         "target": ">= 0.8",
-        "passed": true
+        "passed": false
       },
       {
         "metric": "Citation evidence hit rate",
@@ -243,15 +243,15 @@
       },
       {
         "metric": "Verified citation rate",
-        "actual": 0.9526455026455027,
+        "actual": 0.9812779812779814,
         "target": ">= 0.9",
         "passed": true
       },
       {
         "metric": "Faithfulness (LLM judge)",
-        "actual": 0,
+        "actual": 0.9867971611721611,
         "target": ">= 0.9",
-        "passed": false
+        "passed": true
       },
       {
         "metric": "Cache hit rate",
@@ -261,25 +261,25 @@
       },
       {
         "metric": "Uncached p50 latency (ms)",
-        "actual": 7392,
+        "actual": 7441,
         "target": "< 8000",
         "passed": true
       },
       {
         "metric": "Uncached p95 latency (ms)",
-        "actual": 17307,
+        "actual": 10241,
         "target": "< 15000",
-        "passed": false
+        "passed": true
       },
       {
         "metric": "Cached p50 latency (ms)",
-        "actual": 6322,
+        "actual": 5702,
         "target": "< 7000",
         "passed": true
       },
       {
         "metric": "Cached p95 latency (ms)",
-        "actual": 8440,
+        "actual": 8856,
         "target": "< 12000",
         "passed": true
       }
@@ -374,19 +374,25 @@
         ]
       },
       "answer": {
-        "text": "The integration of AI in HR can have both positive and negative effects on employee well-being and job security. While AI can enhance efficiency and reduce bias, it also raises significant concerns regarding job security, fairness, and transparency, which can negatively impact employee perceptions and behaviors.\n\n## Positive Effects of AI Integration\nAI has the potential to improve employee experiences by providing hyper-personalized support and reducing the time spent on manual HR tasks, which can enhance job satisfaction and foster loyalty [7][8]. When implemented thoughtfully, AI can take over routine tasks, allowing employees to focus on more meaningful work, which may lead to increased job satisfaction [2][6].\n\n## Negative Effects of AI Integration\nConversely, negative perceptions of AI, particularly regarding job security and fairness, can lead to increased turnover intentions and disengagement [1][5]. Employees who feel threatened by AI or perceive it as a hindrance are more likely to disengage and consider leaving their organizations [1][2]. The lack of transparency in AI systems can breed distrust and anxiety, as employees may feel they have lost control over their work and are subject to arbitrary evaluations [3][4][5]. For instance, unpredictable changes in AI-driven performance evaluations can lead to increased stress and higher turnover intentions [3][5].\n\n## Importance of Transparency and Communication\nThe evidence indicates that transparency and clear communication about AI systems are crucial for mitigating negative perceptions and enhancing employee trust [4][6]. Organizations that involve employees in the development and implementation of AI systems can significantly increase trust and reduce concerns about fairness and job security [4][5]. When employees understand how AI systems function and feel they have some influence over outcomes, they are more likely to engage positively with these systems [4][5].\n\n## Limitations\nThe evidence does not establish a definitive conclusion on the overall impact of AI on employee well-being and job security, as it presents a mixed picture of both positive and negative effects. Additionally, the specific outcomes may vary depending on the context and implementation of AI systems.",
+        "text": "The integration of AI in HR can have both positive and negative effects on employee well-being and job security. While AI can enhance efficiency and reduce bias, it also raises significant concerns regarding job security, fairness, and transparency, which can lead to increased stress and disengagement among employees [1][8].\n\n## Positive Impacts of AI on Employee Well-Being\nAI has the potential to improve employee experiences by providing hyper-personalized support and reducing the time spent on manual HR tasks, which can enhance job satisfaction and foster loyalty [7][8]. When implemented thoughtfully, AI can take over routine tasks, allowing employees to focus on more meaningful work, thereby increasing job satisfaction [2][6].\n\n## Negative Impacts of AI on Employee Well-Being\nConversely, negative perceptions of AI, particularly regarding job security and fairness, can lead to higher turnover intentions and increased absenteeism [1][5]. Employees who feel threatened by AI or perceive it as unfair are more likely to disengage from their work and consider leaving their organizations [1][4]. The lack of transparency in AI systems can exacerbate feelings of distrust and anxiety, as employees may feel they have lost control over their work [3][4][6].\n\n## The Role of Transparency and Communication\nTransparency and clear communication about AI systems are crucial for mitigating negative perceptions and enhancing trust among employees [4][5][6]. When employees understand how AI systems operate and feel involved in their implementation, they are more likely to engage positively with these systems [4][5]. Organizations that prioritize transparency and ethical use of AI can create a work environment where AI supports rather than disrupts employee well-being [2][6].\n\n## Limitations\nThe evidence indicates mixed perceptions of AI among employees, with some viewing it as a tool for efficiency while others see it as a threat to job security. The relationship between AI integration and employee well-being is complex and influenced by various factors, including organizational support and individual attitudes toward AI. There is no definitive conclusion on the overall impact of AI on job security, as it varies by context and implementation.",
         "citations": [
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 1,
-            "chunkId": "1eeb748e-fa5b-4d74-a2fb-31ce23fef6b3",
-            "evidenceIndex": 7
+            "pageNumber": 6,
+            "chunkId": "ca1203d7-495d-4e0c-aac5-0d77289465eb",
+            "evidenceIndex": 1
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
             "pageNumber": 1,
             "chunkId": "f17a48e9-0a3e-4617-b62d-49b8e68969a5",
             "evidenceIndex": 8
+          },
+          {
+            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
+            "pageNumber": 1,
+            "chunkId": "1eeb748e-fa5b-4d74-a2fb-31ce23fef6b3",
+            "evidenceIndex": 7
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
@@ -402,27 +408,21 @@
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 6,
-            "chunkId": "ca1203d7-495d-4e0c-aac5-0d77289465eb",
-            "evidenceIndex": 1
-          },
-          {
-            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
             "pageNumber": 4,
             "chunkId": "bdfa88a2-9605-4665-9dac-547435116104",
             "evidenceIndex": 5
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 2,
-            "chunkId": "90e23728-410e-422c-b2e8-d7492159e207",
-            "evidenceIndex": 3
-          },
-          {
-            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
             "pageNumber": 4,
             "chunkId": "dd7fffd9-633a-4b2c-ab39-1a9a6603e5bc",
             "evidenceIndex": 4
+          },
+          {
+            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
+            "pageNumber": 2,
+            "chunkId": "90e23728-410e-422c-b2e8-d7492159e207",
+            "evidenceIndex": 3
           }
         ],
         "insufficientEvidence": false,
@@ -430,30 +430,31 @@
       },
       "metrics": {
         "recallAt5": 1,
-        "ndcgAt10": 0.6509209298071326,
+        "ndcgAt10": 0.6309297535714575,
         "mrr": 0.5,
         "firstRelevantRank": 2,
         "relevantRanks": [
-          2,
-          4
+          2
         ],
         "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 17872,
-        "cachedLatencyMs": 7388,
+        "uncachedLatencyMs": 10350,
+        "cachedLatencyMs": 7507,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [
-        {
-          "failureType": "latency",
-          "probableRootCause": "Query latency exceeded release threshold for cached or uncached execution.",
-          "remediationTicket": "TODO-EVAL-en-32fb0a96-0"
-        }
-      ],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [],
       "error": null
     },
     {
@@ -544,13 +545,19 @@
         ]
       },
       "answer": {
-        "text": "AI's impact on employee job satisfaction and retention is complex and multifaceted. While AI can enhance job satisfaction by automating routine tasks and providing personalized experiences, it can also lead to decreased satisfaction and higher turnover intentions when employees perceive AI systems as unfair, intrusive, or lacking transparency [1][2][4][6][8].\n\n## Job Satisfaction\nAI can improve job satisfaction by allowing employees to focus on more meaningful work and by automating mundane tasks [1][4]. However, job satisfaction tends to decrease when employees feel anxious about AI evaluations, especially if they do not understand the criteria used [1][3]. Employees who perceive AI as fair and supportive, particularly in performance evaluations, report higher job satisfaction [1][2]. Conversely, when AI-driven processes are seen as intrusive or when they diminish personal interactions, job satisfaction can decline [2][3][4].\n\n## Employee Retention\nNegative perceptions of AI, particularly regarding job security and fairness, can lead to higher turnover intentions [2][4][7]. Employees who feel that AI evaluations are arbitrary or unpredictable are more likely to disengage and consider leaving their jobs [1][3][7]. On the other hand, when AI is perceived as a tool that enhances employee contributions and is implemented transparently, it can strengthen organizational commitment and reduce turnover intentions [1][2][4][7]. Organizations that prioritize transparency, fairness, and employee involvement in AI implementation are more likely to foster a supportive work environment that enhances both job satisfaction and retention [2][4][5][6].\n\n## Limitations\nThe evidence does not establish a clear causal relationship between AI implementation and employee outcomes, as it highlights both positive and negative perceptions of AI among employees. Additionally, the specific mechanisms through which AI affects job satisfaction and retention are not fully detailed, leaving some ambiguity in understanding the overall impact.",
+        "text": "AI affects employee job satisfaction and retention in complex ways, with its impact largely dependent on transparency, fairness, and employee perceptions. While AI can enhance job satisfaction by automating routine tasks and providing personalized experiences, it can also lead to decreased satisfaction and higher turnover intentions when employees perceive AI systems as unfair or intrusive.\n\n## Impact on Job Satisfaction\nAI can improve job satisfaction by automating routine tasks, allowing employees to focus on more meaningful work [1]. However, job satisfaction tends to decrease when employees feel anxious about how AI evaluates their work, especially if they do not understand the evaluation criteria [1][3]. Employees who perceive AI systems as fair and supportive, particularly in performance evaluations, report higher job satisfaction [1]. Conversely, when AI-driven processes are seen as intrusive or lacking transparency, job satisfaction diminishes [2][4].\n\n## Impact on Employee Retention\nNegative perceptions of AI, particularly regarding job security and fairness, can lead to higher turnover intentions [4][7]. Employees who feel that AI evaluations are arbitrary or unpredictable are more likely to disengage from their work and consider leaving their organizations [7]. On the other hand, AI systems that enhance the employee experience through personalization and continuous feedback can reduce turnover intentions by creating a more supportive work environment [7][8]. Organizations that prioritize transparency and involve employees in AI implementation are more likely to foster trust and reduce turnover [2][6].\n\n## Limitations\nThe evidence indicates that while AI can enhance job satisfaction and retention, it can also have negative effects if not implemented transparently and fairly. However, the specific thresholds or conditions under which these effects occur are not fully established in the provided evidence.",
         "citations": [
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
             "pageNumber": 3,
             "chunkId": "1af8f3f0-0c9d-453f-af22-4e24c502f0a8",
             "evidenceIndex": 1
+          },
+          {
+            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
+            "pageNumber": 3,
+            "chunkId": "8cfdf775-6ccd-4f32-88ae-94643795f66c",
+            "evidenceIndex": 3
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
@@ -566,9 +573,9 @@
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 1,
-            "chunkId": "f17a48e9-0a3e-4617-b62d-49b8e68969a5",
-            "evidenceIndex": 6
+            "pageNumber": 4,
+            "chunkId": "bdfa88a2-9605-4665-9dac-547435116104",
+            "evidenceIndex": 7
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
@@ -578,46 +585,45 @@
           },
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 3,
-            "chunkId": "8cfdf775-6ccd-4f32-88ae-94643795f66c",
-            "evidenceIndex": 3
-          },
-          {
-            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 4,
-            "chunkId": "bdfa88a2-9605-4665-9dac-547435116104",
-            "evidenceIndex": 7
-          },
-          {
-            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 7,
-            "chunkId": "4d4a8d4a-03f7-4859-b966-eec43d94e460",
-            "evidenceIndex": 5
+            "pageNumber": 1,
+            "chunkId": "f17a48e9-0a3e-4617-b62d-49b8e68969a5",
+            "evidenceIndex": 6
           }
         ],
         "insufficientEvidence": false,
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 0.8503449055347546,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1,
-          5
-        ],
-        "citationAccuracy": 0.25,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 0.2857142857142857,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7947,
-        "cachedLatencyMs": 6913,
+        "uncachedLatencyMs": 7488,
+        "cachedLatencyMs": 5925,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-en-32fb0a96-5"
+        }
+      ],
       "error": null
     },
     {
@@ -708,7 +714,7 @@
         ]
       },
       "answer": {
-        "text": "Companies can improve trust and job satisfaction regarding AI decision-making by focusing on transparency, employee involvement, and ethical practices. Ensuring that employees understand how AI systems operate and involving them in the design and implementation processes can significantly enhance trust and engagement with these systems [1][4][5][8].\n\n## Transparency and Communication\nThe evidence indicates that transparency about AI systems and their decision-making processes is crucial for easing employee concerns and boosting satisfaction [1][4]. Providing detailed explanations of how AI functions can significantly increase trust while reducing worries about fairness and job security [4][5]. However, the evidence also states that too much transparency can sometimes create discomfort, which may negatively impact trust [2][3].\n\n## Employee Involvement\nInvolving employees in the development and implementation of AI systems can enhance their sense of control and connection to the technology, fostering a healthier work environment [2][4][5]. Organizations that successfully engage employees in these processes tend to see improved trust and reduced turnover intentions [3][4].\n\n## Ethical Use and Support\nThe ethical use of AI, including regular audits for bias and strong feedback mechanisms, is essential for maintaining employee well-being [1][3]. Companies should also prioritize ongoing support, training, and skill development to help employees navigate AI systems effectively [1][7]. When employees feel supported and valued, they are more likely to engage positively with AI, leading to higher job satisfaction [1][4][8].\n\n## Limitations\nThe evidence does not establish a definitive framework for all companies, as the effectiveness of these strategies may vary based on specific organizational contexts and employee perceptions. Additionally, while transparency is emphasized, its dual nature—potentially causing discomfort—suggests that a careful balance is necessary.",
+        "text": "Companies can improve trust and job satisfaction regarding AI decision-making by focusing on transparency, employee involvement, and ethical practices. Ensuring that employees understand how AI systems operate and involving them in the design and implementation processes can significantly enhance trust and engagement with these systems [1][4][5][8].\n\n## Transparency and Communication\nThe evidence indicates that transparency about AI systems and their decision-making processes is crucial for easing employee concerns and boosting satisfaction [1][4]. Providing detailed explanations of how AI functions can significantly increase trust while reducing worries about fairness and job security [4][5]. However, it is essential to strike the right balance, as too much transparency can sometimes create discomfort and negatively impact trust [2][3].\n\n## Employee Involvement\nInvolving employees in the development and implementation of AI systems can enhance their sense of control and connection to the technology, fostering a healthier work environment [2][4][5]. Organizations that successfully engage employees in these processes often see improved perceptions of AI as a supportive tool rather than a threat [1][3].\n\n## Ethical Use and Support\nThe ethical use of AI, including regular audits for bias and strong feedback mechanisms, is vital for maintaining employee trust [1][3]. Companies should also prioritize ongoing support and training to help employees navigate AI systems effectively, which can further enhance job satisfaction and reduce turnover intentions [1][4][5].\n\n## Limitations\nThe evidence does not establish specific quantitative measures or detailed case studies demonstrating the effectiveness of these strategies in various organizational contexts. Additionally, while the evidence highlights the importance of transparency and involvement, it does not provide a comprehensive framework for implementation.",
         "citations": [
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
@@ -745,12 +751,6 @@
             "pageNumber": 4,
             "chunkId": "bdfa88a2-9605-4665-9dac-547435116104",
             "evidenceIndex": 3
-          },
-          {
-            "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
-            "pageNumber": 7,
-            "chunkId": "f94e69a0-443e-4a53-b874-4a7ec34a686b",
-            "evidenceIndex": 7
           }
         ],
         "insufficientEvidence": false,
@@ -767,11 +767,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8109,
-        "cachedLatencyMs": 6072,
+        "uncachedLatencyMs": 10241,
+        "cachedLatencyMs": 6367,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
           "failureType": "retrieval",
@@ -874,7 +882,7 @@
         ]
       },
       "answer": {
-        "text": "Organizations can ensure that AI positively impacts employee well-being by focusing on transparency, communication, and employee involvement in AI implementation. Key strategies include providing clear explanations of how AI systems function, ensuring fairness in AI-driven processes, and promoting collaboration between humans and AI rather than replacing employees with technology [1][3][4][6][8].\n\n## Transparency and Communication\nThe evidence indicates that transparency in AI systems is critical for fostering trust and positive employee attitudes. When organizations provide detailed explanations of how AI systems operate and how decisions are made, it significantly increases trust and reduces concerns about fairness and job security [3][4][7]. However, the evidence also notes that while transparency can improve perceptions of effectiveness, it can sometimes create discomfort, which may undermine trust [5][8].\n\n## Employee Involvement\nInvolving employees in the development and implementation of AI systems can further enhance trust and engagement. Organizations that respect employee roles and address their concerns through involvement are more likely to create a supportive work environment [3][4][7]. This approach helps employees feel valued and connected to the technology, fostering a healthier workplace [5][8].\n\n## Balancing AI Benefits and Challenges\nThe evidence emphasizes the need for organizations to balance the benefits of AI with its challenges. Negative perceptions of AI, particularly regarding job security and fairness, can lead to higher turnover intentions, while positive perceptions can enhance job satisfaction and retention [1][4][6][8]. Therefore, organizations must prioritize ethical AI practices and ensure that AI enhances employee contributions and autonomy rather than diminishing them [1][6][8].\n\n## Limitations\nThe evidence does not establish specific metrics or outcomes for measuring the success of these strategies in enhancing employee well-being. Additionally, it does not clarify the extent to which different industries may require tailored approaches to AI implementation.",
+        "text": "Organizations can ensure that AI positively impacts employee well-being by focusing on transparency, communication, and employee involvement in AI implementation. Key strategies include providing clear explanations of how AI systems function, ensuring fairness in AI-driven processes, and promoting collaboration between humans and AI rather than replacing employees with technology [1][3][4][6][8].\n\n## Transparency and Communication\nThe evidence indicates that transparency in AI systems is critical for fostering trust and positive employee attitudes. When organizations communicate clearly about how AI evaluations work, it can significantly reduce anxiety and concerns about fairness and job security [3][4][7]. However, the evidence also notes that while transparency is essential, too much can create discomfort, which may undermine trust [5][8].\n\n## Employee Involvement\nInvolving employees in the development and implementation of AI systems can enhance trust and engagement. Organizations that respect employee roles and address their concerns through involvement are more likely to create a supportive work environment [1][3][4][7]. This approach helps employees feel valued and connected to the technology, which can improve job satisfaction and retention [1][6][8].\n\n## Balancing Benefits and Challenges\nThe evidence states that organizations must balance the benefits of AI with its challenges, such as concerns about job security and privacy. AI can enhance job satisfaction by automating routine tasks and providing personalized experiences, but negative perceptions can lead to increased turnover intentions [1][4][6][8]. Therefore, organizations should prioritize ethical AI practices and ensure that employees feel supported in a technology-driven environment [8].\n\n## Limitations\nThe evidence does not establish specific metrics or outcomes for measuring the success of these strategies in enhancing employee well-being. Additionally, it does not clarify how organizations can effectively implement these strategies in practice.",
         "citations": [
           {
             "documentId": "32fb0a96-461f-461d-a8f2-6306c8193753",
@@ -923,25 +931,41 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1,
-          2
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.2857142857142857,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": null,
+        "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 9912,
-        "cachedLatencyMs": 7415,
+        "uncachedLatencyMs": 17001,
+        "cachedLatencyMs": 14048,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-en-32fb0a96-16"
+        },
+        {
+          "failureType": "latency",
+          "probableRootCause": "Query latency exceeded release threshold for cached or uncached execution.",
+          "remediationTicket": "TODO-EVAL-en-32fb0a96-16"
+        }
+      ],
       "error": null
     },
     {
@@ -1032,7 +1056,7 @@
         ]
       },
       "answer": {
-        "text": "Der Zweck des Unterstützungsantrags besteht darin, die finanzielle Situation und die Unterstützungsbedürftigkeit nach Sozialhilferichtlinien zu klären. Er kann von Personen mit den Status N, S, VA, B-FL und F-FL gestellt werden, die in einem kantonalen Durchgangszentrum untergebracht sind [1][2].\n\n## Zweck des Unterstützungsantrags\nDer Unterstützungsantrag dient dazu, die finanzielle Situation und die Unterstützungsbedürftigkeit nach Sozialhilferichtlinien zu klären [1]. Bei hinreichend ausgewiesener Notlage können die Personen bereits vor dem Ausfüllen und der Einreichung des Antrags untergebracht und finanziell unterstützt werden [1].\n\n## Wer kann den Antrag stellen?\nDen Antrag können Personen mit den Status N, S, VA, B-FL und F-FL stellen, die im Rahmen eines Eintrittsgesprächs oder in einem zeitlich kurz darauffolgenden Folgegespräch schriftlich finanzielle Unterstützung beantragen [1][2]. \n\n## Limitations\nDie Beweise geben keine Informationen über spezifische Anforderungen oder Bedingungen, die für die Antragstellung gelten könnten, abgesehen von den genannten Statusen.",
+        "text": "Der Zweck des Unterstützungsantrags besteht darin, die finanzielle Situation und die Unterstützungsbedürftigkeit nach Sozialhilferichtlinien zu klären. Er kann von Personen mit den Status N, S, VA, B-FL und F-FL gestellt werden, die in einem kantonalen Durchgangszentrum untergebracht sind [1][2].\n\n## Zweck des Unterstützungsantrags\nDer Unterstützungsantrag dient dazu, die finanzielle Situation und die Unterstützungsbedürftigkeit nach Sozialhilferichtlinien zu klären. Dies ist notwendig, um sicherzustellen, dass die betroffenen Personen die erforderliche Unterstützung erhalten können [1].\n\n## Wer kann den Antrag stellen?\nDen Antrag können Personen mit den Status N, S, VA, B-FL und F-FL stellen, die im Rahmen eines Eintrittsgesprächs oder in einem zeitlich kurz darauffolgenden Folgegespräch schriftlich finanzielle Unterstützung beantragen [1][2]. \n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Anforderungen oder Bedingungen für die Antragstellung, abgesehen von den genannten Statusen. Es bleibt unklar, ob es zusätzliche Kriterien gibt, die für die Antragsteller relevant sein könnten.",
         "citations": [
           {
             "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
@@ -1061,21 +1085,23 @@
         ],
         "citationAccuracy": 0.5,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 0.75,
+        "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6314,
-        "cachedLatencyMs": 4992,
+        "uncachedLatencyMs": 5727,
+        "cachedLatencyMs": 4605,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [
-        {
-          "failureType": "citation",
-          "probableRootCause": "Citation verifier judged one or more cited sentences unsupported by their sources.",
-          "remediationTicket": "TODO-EVAL-de-373a9133-0"
-        }
-      ],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.92,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [],
       "error": null
     },
     {
@@ -1166,7 +1192,7 @@
         ]
       },
       "answer": {
-        "text": "Für den Prozess des Unterstützungsantrags sind folgende Unterlagen erforderlich:\n\n1. **Erwerbseinnahmen bei unselbständiger Erwerbstätigkeit**:\n   - Lohnabrechnungen der letzten 6 Monate\n   - Arbeitsvertrag\n   - Evtl. Kündigung [1][3].\n\n2. **Erwerbseinnahmen bei selbständiger Erwerbstätigkeit**:\n   - Relevante Unterlagen zu Erwerbseinnahmen aus selbständiger Erwerbstätigkeit nach Absprache mit der Ressortleitung [1][3].\n\n3. **Erwerbsersatzeinnahmen, Renten**:\n   - Abrechnungen der letzten 6 Monate oder Kontoauszüge der letzten 6 Monate als Nachweis des Renteneingangs [1][3].\n\n4. **Unterhaltsbeiträge/Alimente**:\n   - Abrechnungen der letzten 6 Monate oder Nachweis auf Konto [4].\n\n5. **Guthaben auf Bank-/Postkonti**:\n   - Kontoauszüge der letzten 6 Monate [4].\n\n6. **Auto**:\n   - Eurotaxbewertung\n   - Fahrzeugausweis\n   - Versicherungsnachweis\n   - Kaufvertrag/Kaufpreis [4].\n\n7. **Wertschriften, Liegenschaften, andere Vermögenswerte**:\n   - Unterlagen nach Absprache mit der Ressortleitung [4].\n\n8. **Persönliche Identifikationsdokumente** und Nachweise über Einkommen oder Vermögen (falls vorhanden) sind ebenfalls erforderlich, insbesondere wenn eine Person volljährig wird [8].\n\n## Limitations\nDie Beweislage ist unklar bezüglich spezifischer Anforderungen für alle möglichen Einkommensarten und Vermögenswerte, da nicht alle Details zu den erforderlichen Unterlagen in den bereitgestellten Informationen enthalten sind.",
+        "text": "Für den Prozess des Unterstützungsantrags sind folgende Unterlagen erforderlich:\n\n1. **Erwerbseinnahmen bei unselbständiger Erwerbstätigkeit**:\n   - Lohnabrechnungen der letzten 6 Monate\n   - Arbeitsvertrag\n   - Evtl. Kündigung [1][3].\n\n2. **Erwerbseinnahmen bei selbständiger Erwerbstätigkeit**:\n   - Relevante Unterlagen zu Erwerbseinnahmen aus selbständiger Erwerbstätigkeit nach Absprache mit der Ressortleitung [1][3].\n\n3. **Erwerbsersatzeinnahmen, Renten**:\n   - Abrechnungen der letzten 6 Monate oder Kontoauszüge der letzten 6 Monate als Nachweis des Renteneingangs [1][3].\n\n4. **Unterhaltsbeiträge/Alimente**:\n   - Abrechnungen der letzten 6 Monate oder Nachweis auf Konto [4].\n\n5. **Guthaben auf Bank-/Postkonti**:\n   - Kontoauszüge der letzten 6 Monate [4].\n\n6. **Auto**:\n   - Eurotaxbewertung\n   - Fahrzeugausweis\n   - Versicherungsnachweis\n   - Kaufvertrag/Kaufpreis [4].\n\n7. **Wertschriften, Liegenschaften, andere Vermögenswerte**:\n   - Unterlagen nach Absprache mit der Ressortleitung [4].\n\n8. **Persönliche Identifikationsdokumente** und Nachweise über Einkommen oder Vermögen (falls vorhanden) sind ebenfalls erforderlich, insbesondere wenn eine Person volljährig wird [8].\n\n## Limitations\nDie Beweislage ist unklar bezüglich spezifischer Anforderungen für alle möglichen Einkommensarten und Vermögenswerte, da nicht alle Details zu jedem Punkt vollständig ausgeführt sind.",
         "citations": [
           {
             "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
@@ -1210,11 +1236,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7669,
-        "cachedLatencyMs": 7375,
+        "uncachedLatencyMs": 7517,
+        "cachedLatencyMs": 6598,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.97,
+        "contextPrecision": 0.625,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -1306,13 +1340,31 @@
         ]
       },
       "answer": {
-        "text": "Die Twinteinnahmen auf dem Konto im Kanton Zürich werden grundsätzlich angerechnet. Einnahmen über Twint, die im Total pro Monat 10% des Grundbedarfslevels (GBL) nicht übersteigen und im Einzelfall unter CHF 50.- liegen, müssen lediglich auf dem Kontoauszug vermerkt werden. Übersteigen die Einnahmen jedoch diese Grenzen, ist eine schriftliche Begründung mit entsprechenden Belegen erforderlich, und nicht plausible Begründungen führen zu einem Abzug bei der Sozialhilfe oder Asylfürsorge [1].\n\n## Behandlung von Twinteinnahmen\n\nDie Anrechnung von Twinteinnahmen erfolgt in Abhängigkeit von deren Höhe. Einnahmen, die 10% des GBL übersteigen oder höher als CHF 50.- im Einzelfall sind, erfordern eine detaillierte Dokumentation und Begründung [1]. Bei nicht plausiblen Begründungen werden diese Einnahmen von der Sozialhilfe abgezogen [1].\n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen über die genauen Verfahren oder Fristen zur Einreichung der Begründungen für Twinteinnahmen. Es bleibt unklar, wie die Begründungen konkret geprüft werden und welche weiteren Konsequenzen bei nicht plausiblen Begründungen folgen.",
+        "text": "Die Twinteinnahmen auf dem Konto im Kanton Zürich werden grundsätzlich als Einnahmen angerechnet. Wenn die Einnahmen über Twint im Total pro Monat 10% des Grundbedarfslevels (GBL) nicht übersteigen und im Einzelfall unter CHF 50.- liegen, ist lediglich eine Begründung der Klient*innen auf dem Kontoauszug zu vermerken und abzulegen. Übersteigen die Einnahmen jedoch diese Schwellwerte, ist eine schriftliche Begründung mit den dazugehörigen Belegen einzufordern und abzulegen; nicht plausible Begründungen führen zu einem Abzug bei der Sozialhilfe oder Asylfürsorge [1].\n\n## Behandlung von Einkommen\nEinkommen wird grundsätzlich vollständig von der Sozialhilfeauszahlung abgezogen, wobei in bestimmten Fällen ein Einkommensfreibetrag gewährt werden kann. Es ist darauf zu achten, dass auch ausländisches Renteneinkommen bei der Auszahlung des GBL abgezogen wird, sofern darauf zugegriffen werden kann [3].\n\n## Dokumentationsanforderungen\nFür die Budgetberechnung müssen relevante Unterlagen zu den Einnahmen eingereicht werden, und es ist wichtig, dass alle Einnahmen, einschließlich der Twinteinnahmen, korrekt dokumentiert werden [2][5]. \n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über die genauen Verfahren zur Anrechnung von Twinteinnahmen in allen möglichen Szenarien oder über die genauen Auswirkungen auf die Sozialhilfe, wenn die Einnahmen die festgelegten Grenzen überschreiten.",
         "citations": [
           {
             "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
             "pageNumber": 5,
             "chunkId": "da8a9597-329c-4c35-995e-18e85cda23ad",
             "evidenceIndex": 1
+          },
+          {
+            "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
+            "pageNumber": 4,
+            "chunkId": "dd9f9c8d-48ac-474d-8eaf-75ff407a5b04",
+            "evidenceIndex": 3
+          },
+          {
+            "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
+            "pageNumber": 2,
+            "chunkId": "79abe2d7-56a8-4ef4-bdca-ee805aaed361",
+            "evidenceIndex": 2
+          },
+          {
+            "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
+            "pageNumber": 2,
+            "chunkId": "1b495eb1-2d50-46d5-b1f9-d9f433fcdbc0",
+            "evidenceIndex": 5
           }
         ],
         "insufficientEvidence": false,
@@ -1326,17 +1378,31 @@
         "relevantRanks": [
           1
         ],
-        "citationAccuracy": 1,
+        "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6123,
-        "cachedLatencyMs": 5231,
+        "uncachedLatencyMs": 6838,
+        "cachedLatencyMs": 5758,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 0.875,
+        "answerRelevance": 0.9,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 1
+      },
+      "failures": [
+        {
+          "failureType": "grounding",
+          "probableRootCause": "Judge found 1 answer statement(s) unsupported by the retrieved evidence.",
+          "remediationTicket": "TODO-EVAL-de-373a9133-6"
+        }
+      ],
       "error": null
     },
     {
@@ -1427,7 +1493,7 @@
         ]
       },
       "answer": {
-        "text": "Die Hauptthemen, die in dem Dokument über rollen-basierte Arbeit behandelt werden, sind die Definition von rollen-basierter Arbeit, die Analyse der aktuellen Arbeitsweise und die Identifikation von Problemen, die durch diesen Ansatz gelöst werden sollen [2]. \n\n## Definition von rollen-basierter Arbeit\nRollen-basierte Arbeit wird als ein System mit klar definierten Funktionen innerhalb von Service-Strukturen beschrieben, wobei eine Person mehrere Rollen innehaben kann und der Fokus auf der aktiven Unterstützung des Business liegt [1]. \n\n## Probleme traditioneller Arbeitsweisen\nDas Dokument identifiziert mehrere zentrale Herausforderungen traditioneller, personengebundener Organisationsstrukturen, darunter unklare Verantwortlichkeiten, Engpässe durch Personenabhängigkeit, Wissensverlust bei Abwesenheiten und verzögerte Entscheidungsfindung [5][6]. Diese Probleme bilden die Grundlage für die Notwendigkeit eines neuen, rollenbasierten Ansatzes [4].\n\n## Strategische Verschiebung\nEs wird eine strategische Verschiebung hin zu einem serviceorientierten Modell betont, in dem Cross-Funktionale Teams und rollenbasierte Zusammenarbeit zentral sind [4]. \n\n## Limitations\nDie Beweise legen nicht dar, wie genau die Umsetzung der rollenbasierten Arbeit erfolgen soll oder welche spezifischen Ergebnisse erwartet werden.",
+        "text": "Die Hauptthemen, die in dem Dokument über rollen-basierte Arbeit behandelt werden, sind die Definition von rollenbasierter Arbeit, die Analyse der aktuellen Arbeitsweise und die Identifikation von Problemen, die durch diesen Ansatz gelöst werden sollen [2]. \n\n## Definition von rollenbasierter Arbeit\nRollen-basierte Arbeit wird als ein System beschrieben, in dem eine Rolle eine klar definierte Funktion innerhalb von Service-Strukturen übernimmt und eine Person mehrere Rollen innehaben kann [1]. Der Fokus liegt auf der aktiven Unterstützung des Business und der expliziten Dokumentation der Rollen [1].\n\n## Probleme traditioneller Arbeitsweisen\nDas Dokument identifiziert mehrere zentrale Herausforderungen traditioneller, personengebundener Organisationsstrukturen, darunter unklare Verantwortlichkeiten, Engpässe durch Personenabhängigkeit, Wissensverlust bei Abwesenheiten und schwierige Entscheidungsfindung [5][6]. Diese Probleme bilden die Grundlage für die Notwendigkeit eines neuen, rollenbasierten Ansatzes [4].\n\n## Strategische Verschiebung\nEs wird eine strategische Verschiebung hin zu einem serviceorientierten Modell betont, bei dem Cross-Funktionale Teams und die Nutzung von rollenbasierten Werkzeugen zentral sind [4]. Dies wird als Schlüssel zur Verbesserung der Zusammenarbeit und zur Wertschöpfung für die Kunden dargestellt [4].\n\n## Limitations\nDie Beweise geben keine spezifischen Details zu den Lösungen, die durch rollenbasierte Arbeit erreicht werden können, oder zu den konkreten Ergebnissen, die aus der Implementierung dieses Modells resultieren.",
         "citations": [
           {
             "documentId": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
@@ -1476,11 +1542,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6335,
-        "cachedLatencyMs": 5326,
+        "uncachedLatencyMs": 6839,
+        "cachedLatencyMs": 6738,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.88,
+        "contextPrecision": 0.75,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
           "failureType": "citation",
@@ -1578,7 +1652,7 @@
         ]
       },
       "answer": {
-        "text": "Typische Herausforderungen bei der rollenbasierten Arbeit umfassen unklare Verantwortlichkeiten, Engpässe durch Personenabhängigkeit, Wissensverlust bei Abwesenheiten sowie schwierige Entscheidungsfindungen. Diese Probleme sind charakteristisch für traditionelle, personengebundene Organisationsstrukturen und verdeutlichen die Notwendigkeit eines rollenbasierten Ansatzes [8].\n\n## Unklare Verantwortlichkeiten\nEin häufiges Problem ist die Unklarheit darüber, wer für bestimmte Aufgaben verantwortlich ist, was zu Fragen wie „Ist das meine Aufgabe?“ führt [8].\n\n## Engpässe durch Personenabhängigkeit\nDie Abhängigkeit von einzelnen Personen kann zu Engpässen führen, wenn diese nicht verfügbar sind, was die Effizienz der Arbeit beeinträchtigt [8].\n\n## Wissensverlust\nWissen kann verloren gehen, wenn Mitarbeiter aufgrund von Urlaub, Krankheit oder Kündigungen abwesend sind, was die Kontinuität der Arbeit gefährdet [8].\n\n## Schwierige Entscheidungsfindung\nDie Entscheidungsfindung kann erschwert werden, da oft unklar ist, wer die Befugnis hat, Entscheidungen zu treffen, was zu Verzögerungen führen kann [8].\n\n## Limitations\nDie Beweise beschreiben die Herausforderungen traditioneller Strukturen, aber sie bieten keine spezifischen Lösungen oder Strategien zur Überwindung dieser Herausforderungen im Rahmen der rollenbasierten Arbeit.",
+        "text": "Typische Herausforderungen bei der rollenbasierten Arbeit umfassen unklare Verantwortlichkeiten, Engpässe durch Personenabhängigkeit, Wissensverlust bei Abwesenheiten sowie schwierige Entscheidungsfindungen. Diese Probleme sind charakteristisch für traditionelle, personengebundene Organisationsstrukturen und verdeutlichen die Notwendigkeit eines rollenbasierten Ansatzes [8].\n\n## Unklare Verantwortlichkeiten\nEin häufiges Problem ist die Unklarheit darüber, wer für bestimmte Aufgaben verantwortlich ist, was zu Fragen wie „Ist das meine Aufgabe?“ führt [8].\n\n## Engpässe durch Personenabhängigkeit\nDie Abhängigkeit von einzelnen Personen kann zu Engpässen führen, wenn diese nicht verfügbar sind, was die Effizienz der Arbeit beeinträchtigt [8].\n\n## Wissensverlust\nWissen kann verloren gehen, wenn Mitarbeiter aufgrund von Urlaub, Krankheit oder Kündigungen abwesend sind, was die Kontinuität der Arbeit gefährdet [8].\n\n## Schwierige Entscheidungsfindung\nDie Entscheidungsfindung kann erschwert werden, da oft unklar ist, wer die Befugnis hat, Entscheidungen zu treffen, was zu Verzögerungen führt [8].\n\n## Limitations\nDie Beweise beschreiben die Herausforderungen, die mit traditionellen, personengebundenen Strukturen verbunden sind, und legen nahe, dass ein rollenbasierter Ansatz diese Probleme adressieren kann. Es gibt jedoch keine spezifischen Informationen darüber, wie diese Herausforderungen konkret in der rollenbasierten Arbeit auftreten oder gelöst werden.",
         "citations": [
           {
             "documentId": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
@@ -1591,24 +1665,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 0.6309297535714575,
-        "mrr": 0.5,
-        "firstRelevantRank": 2,
-        "relevantRanks": [
-          2
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 1,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7392,
-        "cachedLatencyMs": 5040,
+        "uncachedLatencyMs": 6407,
+        "cachedLatencyMs": 4478,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.9,
+        "contextPrecision": 0.25,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-7b8b0ee3-3"
+        }
+      ],
       "error": null
     },
     {
@@ -1699,7 +1785,7 @@
         ]
       },
       "answer": {
-        "text": "Rollen-basierte Arbeit bedeutet, dass eine Rolle eine klar definierte Funktion innerhalb eines Systems von Services und Service-Familien übernimmt, wobei eine Person mehrere Rollen innehaben kann. Der Fokus liegt auf der aktiven Unterstützung des Business und der expliziten Dokumentation der Rollen [1][2].\n\n## Struktur der rollen-basierten Arbeit\nDie Struktur der rollen-basierten Arbeit basiert auf einem neuen Ansatz, der Verantwortung für Services und deren Wertschöpfung in den Mittelpunkt stellt. Dies geschieht durch die Bildung von cross-funktionalen Teams, die eng zusammenarbeiten und die Werkzeuge der rollenbasierten Zusammenarbeit nutzen [2][7]. Ein zentraler Vorteil dieses Modells ist die Klarheit und Transparenz, da jeder weiß, wer wofür verantwortlich ist, was zu einer Reduktion von Konflikten führt [5]. \n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Rollen oder die genaue Implementierung der rollenbasierten Arbeit. Es bleibt unklar, wie die Übergangsprozesse von traditionellen zu rollenbasierten Strukturen konkret aussehen.",
+        "text": "Rollen-basierte Arbeit bedeutet, dass eine Rolle eine klar definierte Funktion innerhalb eines Systems von Services und Service-Familien übernimmt, wobei eine Person mehrere Rollen innehaben kann. Der Fokus liegt auf der aktiven Unterstützung des Business und der expliziten Dokumentation der Rollen [1][2].\n\n## Struktur der rollen-basierten Arbeit\nDie Struktur der rollen-basierten Arbeit basiert auf einem serviceorientierten Ansatz, der die Zusammenarbeit in cross-funktionalen Teams fördert. Dies stellt einen Paradigmenwechsel von traditionellen, hierarchischen Strukturen dar, bei dem die Wertschöpfung der Kunden im Zentrum steht [2][7]. Die Vorteile dieses Ansatzes umfassen Klarheit und Transparenz in den Verantwortlichkeiten, was zu weniger Konflikten führt [5]. \n\n## Limitations\nDie Beweise geben keine detaillierte Beschreibung der spezifischen Rollen oder der genauen Mechanismen der Zusammenarbeit in diesem Modell. Es bleibt unklar, wie die Implementierung konkret aussieht und welche Herausforderungen dabei auftreten könnten.",
         "citations": [
           {
             "documentId": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
@@ -1730,24 +1816,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 5201,
-        "cachedLatencyMs": 3933,
+        "uncachedLatencyMs": 5912,
+        "cachedLatencyMs": 4595,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.92,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-7b8b0ee3-6"
+        }
+      ],
       "error": null
     },
     {
@@ -1838,7 +1936,7 @@
         ]
       },
       "answer": {
-        "text": "Die im Dokument erwähnten KI-Modelle sind Claude, GPT-4, Gemini, Llama und Mistral. Diese Modelle werden von Caritas, der Mercator Stiftung und 50 weiteren Schweizer Organisationen vertraut [1].\n\n## Erwähnte KI-Modelle\nDie spezifischen KI-Modelle, die im Dokument genannt werden, sind:\n- Claude\n- GPT-4\n- Gemini\n- Llama\n- Mistral [1].\n\n## Vertrauenswürdige Organisationen\nDie Organisationen, die auf die genannten KI-Modelle vertrauen, umfassen:\n- Caritas\n- Mercator Stiftung\n- 50 weitere Schweizer Organisationen [1].\n\n## Limitations\nDie Beweise geben keine weiteren Details zu den spezifischen Anwendungen oder den Gründen für das Vertrauen in diese KI-Modelle durch die genannten Organisationen.",
+        "text": "Die im Dokument erwähnten KI-Modelle sind Claude, GPT-4, Gemini, Llama und Mistral. Diese Modelle werden von 50 Schweizer Organisationen, darunter Caritas und die Mercator Stiftung, vertraut [1]. \n\n## Erwähnte KI-Modelle\nDie spezifischen KI-Modelle, die im Dokument genannt werden, sind:\n- Claude\n- GPT-4\n- Gemini\n- Llama\n- Mistral [1].\n\n## Vertrauenswürdige Organisationen\nDie Organisationen, die auf die Plattform vertrauen, umfassen:\n- Caritas\n- Mercator Stiftung\n- 50 weitere Schweizer Organisationen [1].\n\n## Limitations\nDie Beweise geben keine weiteren Details zu den spezifischen Anwendungen oder den Gründen für das Vertrauen in diese KI-Modelle durch die genannten Organisationen.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -1851,24 +1949,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 1,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 5668,
-        "cachedLatencyMs": 4830,
+        "uncachedLatencyMs": 4607,
+        "cachedLatencyMs": 3361,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.125,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-3"
+        }
+      ],
       "error": null
     },
     {
@@ -1959,7 +2069,7 @@
         ]
       },
       "answer": {
-        "text": "Der Wettbewerbsvorteil liegt laut dem Dokument nicht im Modell selbst, sondern im Kontext, der sich aus dem Domänenwissen, den Prozessen, der Kundenkenntnis und dem impliziten Wissen ergibt. Diese Aspekte sind nicht replizierbar durch Wettbewerber und stellen somit den wahren Differenzierungsfaktor dar [1].",
+        "text": "Der Wettbewerbsvorteil liegt laut dem Dokument nicht im Modell selbst, sondern im Kontext, der sich aus Domänenwissen, Prozessen, Kundenkenntnis und implizitem Wissen zusammensetzt. Diese Aspekte sind nicht replizierbar von Wettbewerbern und stellen somit den wahren Differenzierungsfaktor dar [1]. \n\n## Wettbewerbsvorteil im Detail\nDie Aussage, dass der Wettbewerbsvorteil nicht im Modell liegt, sondern in der Expertise und dem spezifischen Kontext einer Organisation, wird durch den Kontext als \"neuer Code\" untermauert. Es wird betont, dass die Fähigkeit, die eigene Expertise und das Wissen über Kunden und Prozesse zu nutzen, entscheidend für den Erfolg ist [1].\n\n## Limitations\nDie Beweise bieten keine weiteren Details oder spezifischen Beispiele für den Wettbewerbsvorteil außerhalb der genannten Aspekte. Es gibt keine quantitativen Daten oder Vergleiche mit Wettbewerbern, die die Argumentation weiter stützen könnten.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -1972,24 +2082,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 1,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 4100,
-        "cachedLatencyMs": 4312,
+        "uncachedLatencyMs": 5745,
+        "cachedLatencyMs": 3597,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.125,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-9"
+        }
+      ],
       "error": null
     },
     {
@@ -2080,7 +2202,7 @@
         ]
       },
       "answer": {
-        "text": "Der Prozess zur Erstellung eines Abstracts aus einem PDF-Dokument erfolgt in zwei Schritten: Zuerst wird das PDF hochgeladen und relevante Informationen in eine strukturierte Form extrahiert, gefolgt von der Erstellung des Abstracts aus diesen Informationen.\n\n## Zwei-Schritt-Prozess\nDer Workflow zur Erstellung eines Abstracts umfasst zwei Hauptschritte: Im ersten Schritt wird das PDF hochgeladen, und ein Extraktions-Prompt generiert strukturierte Bullet Points in einem einheitlichen Format. Im zweiten Schritt wird dieser Output verwendet, um einen fertigen Abstract von 450 bis 600 Wörtern in drei Absätzen zu schreiben [1][8]. Dieser Ansatz gewährleistet Konsistenz in den Ergebnissen, da die Informationen in einer festen Struktur erfasst werden, bevor sie in den Abstract umgewandelt werden [1][2].\n\n## Herausforderungen und Lösungen\nDie Erstellung von Projektabstrakten ist oft zeitaufwendig und inkonsistent, da verschiedene Autoren unterschiedliche Stile verwenden und technische Proposals in verständliche Texte übersetzt werden müssen [4]. Der zwei-Schritt-Prozess wurde entwickelt, um diese Herausforderungen zu adressieren, indem er eine konsistente Struktur für die Abstracts bietet und die Qualität der Kommunikation verbessert [2][3].\n\n## Struktur des Abstracts\nDer fertige Abstract besteht aus drei Absätzen, die jeweils spezifische Inhalte und Anleitungen für den Ton enthalten: Der erste Absatz behandelt den Kontext und die Herausforderung, der zweite Absatz die Intervention und Strategie, und der dritte Absatz die Auswirkungen und Zukunft [5]. \n\n## Limitations\nDie Beweise legen nicht dar, wie die Qualität der generierten Abstracts konkret bewertet wird oder welche spezifischen Kriterien für die Extraktion der Informationen verwendet werden.",
+        "text": "Der Prozess zur Erstellung eines Abstracts aus einem PDF-Dokument erfolgt in zwei Schritten: Zuerst wird das PDF hochgeladen, und relevante Informationen werden in eine strukturierte Form extrahiert. Im zweiten Schritt wird diese strukturierte Information verwendet, um einen fertigen Abstract zu erstellen.\n\n## Zwei-Schritt-Prozess\nDer Workflow zur Erstellung eines Abstracts umfasst zwei Hauptschritte: Im ersten Schritt wird das PDF hochgeladen, und ein Extraktions-Prompt generiert strukturierte Bullet Points in einem einheitlichen Format. Im zweiten Schritt wird das Ergebnis des ersten Schrittes in einen Schreib-Prompt eingegeben, der einen fertigen Abstract von 450 bis 600 Wörtern in drei Absätzen erstellt [1][8]. \n\n## Herausforderungen und Lösungen\nDie Notwendigkeit eines zwei Schritte umfassenden Prozesses ergibt sich aus der Herausforderung, dass verschiedene PDFs unterschiedlich strukturierte Abstracts liefern können. Der zwei-Schritt-Prozess sorgt für Konsistenz in den Ergebnissen [2][4]. Zudem wird durch die strukturierte Herangehensweise sichergestellt, dass die generierten Texte professionell und nicht wie Fundraising-Appeals klingen [3][4].\n\n## Struktur des Abstracts\nDer fertige Abstract besteht aus drei Absätzen: Der erste Absatz behandelt den Kontext und die Herausforderung, der zweite Absatz beschreibt die Intervention und Strategie, und der dritte Absatz thematisiert die Auswirkungen und die Zukunft [5].\n\n## Limitations\nDie Beweise legen nicht dar, wie genau die Extraktion der Informationen aus dem PDF erfolgt oder welche spezifischen Technologien dabei verwendet werden.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -2123,24 +2245,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 0.6309297535714575,
-        "mrr": 0.5,
-        "firstRelevantRank": 2,
-        "relevantRanks": [
-          2
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.16666666666666666,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
-        "groundingScore": 1,
-        "hallucinationRate": 0,
-        "uncachedLatencyMs": 7352,
-        "cachedLatencyMs": 6332,
+        "groundingScore": 0.8888888888888888,
+        "hallucinationRate": 0.11111111111111116,
+        "uncachedLatencyMs": 6926,
+        "cachedLatencyMs": 5612,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.75,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-15"
+        }
+      ],
       "error": null
     },
     {
@@ -2231,7 +2365,7 @@
         ]
       },
       "answer": {
-        "text": "Das Feedback für die Projekte wurde durch eine Umfrage gesammelt, die 16 Teilnehmer umfasste, darunter sowohl Key Users als auch Skeptiker. Die Teilnehmer bewerteten vier Beispiel-Projektabstrakte mithilfe strukturierter Fragen und einer abschließenden Bewertung auf einer Skala von 1 bis 6 [1][3][4].\n\n## Feedback-Methodik\nDie Umfrage beinhaltete strukturierte Fragen zu jedem der vier Projektabstrakte sowie Platz für qualitatives Feedback in Freitextform [1]. Dies ermöglichte eine differenzierte Rückmeldung zu den Projekten und half, den Ton und die Methodik weiter zu verfeinern [4].\n\n## Teilnehmerzusammensetzung\nDie Auswahl der 16 Teilnehmer war bewusst gemischt, um verschiedene Perspektiven zu integrieren, was sowohl die Meinungen von Key Users als auch von Skeptikern einschloss [1]. \n\n## Limitations\nDie Beweise geben keine detaillierten Informationen darüber, wie die gesammelten Rückmeldungen konkret in die Projektentwicklung integriert wurden oder welche spezifischen Änderungen aufgrund des Feedbacks vorgenommen wurden.",
+        "text": "Das Feedback für die Projekte wurde durch eine Umfrage gesammelt, die strukturierte Fragen zu vier Beispiel-Projektabstrakten beinhaltete. Die Teilnehmer, bestehend aus 16 Kollegen, darunter sowohl Key Users als auch Skeptiker, hatten die Möglichkeit, qualitatives Feedback in Freitextform zu geben und eine finale Bewertung auf einer Skala von 1 bis 6 abzugeben [1][3][4]. \n\n## Feedback-Methodik\nDie Umfrage umfasste vier verschiedene Projektabstrakte, zu denen die Teilnehmer strukturierte Fragen beantworteten. Dies ermöglichte eine differenzierte Rückmeldung zu den Projekten und deren Modellen [1]. \n\n## Teilnehmerzusammensetzung\nDie Auswahl der Teilnehmer war bewusst gemischt, um verschiedene Perspektiven zu integrieren, was die Validität des Feedbacks erhöhen sollte [1]. \n\n## Limitations\nDie Beweise geben keine detaillierten Informationen darüber, wie das Feedback konkret ausgewertet oder in die Projektentwicklung integriert wurde.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -2256,24 +2390,41 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.3333333333333333,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 5098,
-        "cachedLatencyMs": 3395,
+        "uncachedLatencyMs": 6238,
+        "cachedLatencyMs": 3695,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 0.8571428571428571,
+        "answerRelevance": 1,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 1
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-21"
+        },
+        {
+          "failureType": "grounding",
+          "probableRootCause": "Judge found 1 answer statement(s) unsupported by the retrieved evidence.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-21"
+        }
+      ],
       "error": null
     },
     {
@@ -2364,7 +2515,7 @@
         ]
       },
       "answer": {
-        "text": "Die Regeln für den Tone of Voice im Prompt umfassen neun spezifische Richtlinien, die darauf abzielen, Objektivität und Klarheit in der Kommunikation zu gewährleisten. Diese Regeln beinhalten die Verwendung einfacher Sprache, das Vermeiden von Hype und Dringlichkeit, den Fokus auf konkrete Handlungen, das Informieren statt Überzeugen, sowie eine strukturierte Präsentation der Informationen [1].\n\n## Die neun Regeln im Detail\n\n1. **Objektivität bewahren** - Informationen werden ohne Dramatisierung präsentiert.\n2. **Einfache Sprache verwenden** - Es werden einfache, deklarative Sätze genutzt.\n3. **Hype und Dringlichkeit vermeiden** - Keine \"Countdown-Uhren\" oder \"Rennen gegen die Zeit\".\n4. **Fokus auf konkrete Handlungen** - Es wird beschrieben, was getan wird, nicht die narrative Spannung betont.\n5. **Informativ statt überzeugend** - Der Fokus liegt auf dem Informieren, nicht auf dem Verkaufen.\n6. **Mäßigen Optimismus verwenden** - Die Kommunikation ist realistisch positiv, nicht euphorisch.\n7. **Strukturierte Präsentation** - Es wird ein klarer, logischer Aufbau verwendet.\n8. **Rhetorische Mittel vermeiden** - Es werden keine rhetorischen Fragen oder Metaphern eingesetzt.\n9. **Professionelle Distanz wahren** - Der Ton ist beobachtend, nicht aktivistisch [1][3].\n\n## Limitations\nDie Beweise geben keine weiteren Details zu spezifischen Anwendungen oder Beispielen für die Umsetzung dieser Regeln. Es bleibt unklar, wie diese Regeln in verschiedenen Kontexten konkret angewendet werden können.",
+        "text": "Die Regeln für den Tone of Voice im Prompt umfassen neun spezifische Richtlinien, die darauf abzielen, Objektivität und Klarheit in der Kommunikation zu gewährleisten. Diese Regeln beinhalten die Verwendung einfacher Sprache, das Vermeiden von Hype und Dringlichkeit, den Fokus auf konkrete Handlungen, das Informieren statt Überzeugen, sowie einen realistisch positiven Ton.\n\n## Die neun Regeln für den Tone of Voice\n\n1. **Objektivität bewahren** - Informationen werden ohne Dramatisierung präsentiert.\n2. **Einfache Sprache verwenden** - Es werden einfache, deklarative Sätze genutzt.\n3. **Hype und Dringlichkeit vermeiden** - Keine \"Countdown-Uhren\" oder \"Rennen gegen die Zeit\".\n4. **Fokus auf konkrete Handlungen** - Es wird beschrieben, was getan wird, nicht narrative Spannung erzeugt.\n5. **Informativ statt überzeugend** - Der Fokus liegt auf Informieren, nicht auf Verkaufen.\n6. **Mäßigen Optimismus verwenden** - Der Ton ist realistisch positiv, nicht euphorisch.\n7. **Strukturierte Präsentation** - Es wird ein klarer, logischer Aufbau verwendet.\n8. **Rhetorische Mittel vermeiden** - Keine rhetorischen Fragen oder Metaphern.\n9. **Professionelle Distanz wahren** - Der Ton ist beobachtend, nicht aktivistisch [1].\n\n## Anwendung und Entwicklung\n\nDie Entwicklung und Verfeinerung dieser Tone of Voice Richtlinien ist Teil eines kontinuierlichen Verbesserungsprozesses, der Feedback von Nutzern integriert, um die Qualität der Kommunikation zu steigern [6][7]. In praktischen Übungen wird auch empfohlen, den gewünschten Tone of Voice zu definieren und spezifische Anwendungsfälle zu identifizieren [4][8].\n\n## Limitations\n\nDie Beweise geben keine detaillierten Informationen darüber, wie diese Regeln konkret in der Praxis umgesetzt werden oder welche spezifischen Herausforderungen dabei auftreten können.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -2374,33 +2525,63 @@
           },
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
-            "pageNumber": 33,
-            "chunkId": "4c7e214e-f8bf-43b7-bb6c-f3d3ef1196a1",
-            "evidenceIndex": 3
+            "pageNumber": 16,
+            "chunkId": "44ca7ccb-e2b9-43ee-9c49-1678df958c11",
+            "evidenceIndex": 6
+          },
+          {
+            "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
+            "pageNumber": 40,
+            "chunkId": "f7f0c3bb-013e-40b8-92a2-cdeeecb6ec09",
+            "evidenceIndex": 7
+          },
+          {
+            "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
+            "pageNumber": 49,
+            "chunkId": "62929916-94b4-4f39-89a0-53a0771164cb",
+            "evidenceIndex": 4
+          },
+          {
+            "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
+            "pageNumber": 56,
+            "chunkId": "6d37c614-0b83-4383-ba6c-3c92a553ce38",
+            "evidenceIndex": 8
           }
         ],
         "insufficientEvidence": false,
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
-        "citationAccuracy": 0.5,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 0.2,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6581,
-        "cachedLatencyMs": 5994,
+        "uncachedLatencyMs": 7049,
+        "cachedLatencyMs": 5702,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.875,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-29"
+        }
+      ],
       "error": null
     },
     {
@@ -2491,49 +2672,49 @@
         ]
       },
       "answer": {
-        "text": "Wenn der Zwei-Schritt-Prozess nicht funktioniert, sollte ein Fallback-Plan in Betracht gezogen werden. Dieser sieht vor, dass ein intermediärer Schritt eingeführt wird, bei dem die KI 2 bis 3 verschiedene narrative Ansätze vorschlägt, aus denen der Benutzer den bevorzugten Ansatz auswählt, woraufhin die KI in diese Richtung weiterarbeitet [1]. \n\n## Fallback-Plan\nDer Fallback-Plan ist eine Maßnahme, die ergriffen werden kann, wenn der Zwei-Schritt-Prozess nicht ausreicht. Die KI generiert mehrere Narrative, um dem Benutzer eine Auswahl zu bieten, was die Flexibilität und Anpassungsfähigkeit des Prozesses erhöht [1].\n\n## Bedeutung der Konsistenz\nDie Notwendigkeit eines Zwei-Schritt-Prozesses ergibt sich aus der Herausforderung, dass unterschiedliche PDFs zu inkonsistenten Ergebnissen führen können. Der erste Schritt extrahiert alle relevanten Informationen in eine feste Struktur, was dem zweiten Schritt ermöglicht, konsistente Outputs zu liefern [2][6]. \n\n## Limitations\nDie Beweise geben keine spezifischen Anweisungen darüber, was genau zu tun ist, wenn der Zwei-Schritt-Prozess nicht funktioniert, außer den Vorschlag eines Fallback-Plans. Es bleibt unklar, ob es weitere Maßnahmen oder spezifische Probleme gibt, die in solchen Fällen zu berücksichtigen sind.",
+        "text": "Wenn der Zwei-Schritt-Prozess nicht funktioniert, sollte ein Fallback-Plan in Betracht gezogen werden. Dieser sieht vor, dass ein intermediärer Schritt eingeführt wird, bei dem die KI 2 bis 3 verschiedene narrative Ansätze vorschlägt, aus denen der Benutzer den bevorzugten Ansatz auswählt, woraufhin die KI in diese Richtung weiterarbeitet [1].",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
             "pageNumber": 45,
             "chunkId": "63021ace-bfe7-40a1-84ec-753e2cdb0008",
             "evidenceIndex": 1
-          },
-          {
-            "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
-            "pageNumber": 17,
-            "chunkId": "d834e539-8837-4c6f-8059-363925cc87a9",
-            "evidenceIndex": 2
-          },
-          {
-            "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
-            "pageNumber": 14,
-            "chunkId": "56986acc-fc60-4e82-8c05-fb9038f1b290",
-            "evidenceIndex": 6
           }
         ],
         "insufficientEvidence": false,
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
-        "citationAccuracy": 0.3333333333333333,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 1,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6334,
-        "cachedLatencyMs": 3774,
+        "uncachedLatencyMs": 3276,
+        "cachedLatencyMs": 5144,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.125,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-36"
+        }
+      ],
       "error": null
     },
     {
@@ -2624,7 +2805,7 @@
         ]
       },
       "answer": {
-        "text": "Die Hauptpunkte, die in der Plenardiskussion behandelt werden sollten, umfassen die Identifikation von Use Cases, Erkenntnisse zum Tone of Voice, die wichtigsten Stakeholder und die zu stellenden Feedback-Fragen. Diese Themen sollen in einer 20-minütigen gemeinsamen Diskussion zusammengetragen werden, in der die Teilnehmer ihre Ergebnisse teilen [1].\n\n## Themen der Diskussion\n\n### Use Case Identifikation\nDie Teilnehmer sollten den spezifischen Use Case identifizieren, den sie während der Einzelarbeit erarbeitet haben [1].\n\n### Tone of Voice\nEin zentraler Punkt ist die Reflexion über den gewünschten Tone of Voice, wobei die Teilnehmer drei Eigenschaften notieren sollen, die der Text haben sollte, sowie drei, die er nicht haben sollte [2].\n\n### Stakeholder\nDie Diskussion sollte auch die wichtigsten Stakeholder umfassen, die für den jeweiligen Use Case relevant sind [1].\n\n### Feedback-Fragen\nSchließlich sollten die Teilnehmer überlegen, welche Fragen sie stellen würden, um Feedback zu erhalten [1].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Feedback-Fragen oder die genauen Stakeholder, die in der Diskussion behandelt werden sollten.",
+        "text": "Die Hauptpunkte, die in der Plenardiskussion behandelt werden sollten, umfassen die Identifikation von Use Cases, Erkenntnisse zum Tone of Voice, die wichtigsten Stakeholder und die zu stellenden Feedback-Fragen. Diese Themen sollen in einer 20-minütigen gemeinsamen Diskussion zusammengetragen werden, in der die Teilnehmer ihre Ergebnisse teilen [1].\n\n## Themen der Diskussion\n\n### Use Case Identifikation\nDie Teilnehmer sollten den spezifischen Use Case identifizieren, den sie in ihrer Einzelarbeit erarbeitet haben [1].\n\n### Tone of Voice\nEin zentraler Punkt ist die Reflexion über den gewünschten Tone of Voice, wobei die Teilnehmer drei Eigenschaften benennen sollen, die der Text haben sollte, sowie drei, die er nicht haben sollte [2].\n\n### Stakeholder\nDie Diskussion sollte auch die wichtigsten Stakeholder umfassen, die für den jeweiligen Use Case relevant sind [1].\n\n### Feedback-Fragen\nSchließlich sollten die Teilnehmer überlegen, welche Fragen sie stellen würden, um Feedback zu erhalten [1].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Feedback-Fragen oder die genauen Stakeholder, die in der Diskussion behandelt werden sollten.",
         "citations": [
           {
             "documentId": "051209e7-affb-4483-94d7-045acfb76a65",
@@ -2643,24 +2824,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.5,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 1,
+        "verifiedCitationRate": null,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 4738,
-        "cachedLatencyMs": 4300,
+        "uncachedLatencyMs": 8899,
+        "cachedLatencyMs": 4933,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.25,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-051209e7-43"
+        }
+      ],
       "error": null
     },
     {
@@ -2751,7 +2944,7 @@
         ]
       },
       "answer": {
-        "text": "The Cambodia Safe Migration project, known as SaMiCa, is a comprehensive initiative led by Caritas Switzerland aimed at combating human trafficking and unsafe migration, particularly in Battambang and Banteay Meanchey provinces. The project is set to run from January 2025 to December 2027, with a total budget of CHF 3,260,951, and it aims to reach 49,219 vulnerable participants, including women, children, and youth, through prevention, protection, and reintegration strategies [1][4][7].\n\n## Project Objectives and Outcomes\n\n### Prevention\nThe project focuses on raising awareness about safe migration practices, particularly among undocumented and seasonal migrants, and building the capacity of local authorities and border police to manage migration flows effectively. It aims to engage local facilitators to provide skills development and job opportunities, thereby reducing reliance on unsafe migration routes [3][7].\n\n### Protection\nSaMiCa addresses the needs of vulnerable children and at-risk individuals by providing essential services such as shelter, food, and psychosocial support, particularly for victims of trafficking and abuse. The project aims to assist 6,270 individuals under this outcome [5][7].\n\n### Reintegration\nThe project supports returning migrants and vulnerable children by facilitating access to job placements, vocational training, and social support services, helping them reintegrate into their communities and achieve self-sufficiency. It specifically targets 2,290 individuals for these reintegration activities [5][7].\n\n## Capacity Building and Collaboration\nSaMiCa emphasizes capacity building for government officials, local authorities, and community organizations to promote local ownership and institutional strengthening. The project aims to establish partnerships with key checkpoints and local authorities to enhance the handling of vulnerable migrants and ensure a shared understanding of safe migration practices [2][6][7].\n\n## Limitations\nThe evidence does not provide specific details on the methodologies for implementing the project or the exact metrics for measuring success beyond participant numbers. Additionally, while the project outlines its goals and target groups, it does not clarify how it will address potential challenges in victim identification and reintegration processes.",
+        "text": "The Cambodia Safe Migration project, known as SaMiCa, is a comprehensive initiative led by Caritas Switzerland, aimed at combating human trafficking and unsafe migration, particularly in Battambang and Banteay Meanchey provinces. The project is set to run from January 2025 to December 2027, with a total budget of CHF 3,260,951, and it targets 49,219 vulnerable participants, including women, children, and youth, through prevention, protection, and reintegration strategies [1][4][7].\n\n## Project Objectives and Outcomes\n\n### Prevention\nThe first outcome focuses on raising awareness about safe migration practices among migrants and potential migrants, particularly in border communities. It aims to build the capacity of local authorities and border police to manage migration flows and protect migrants, while also providing skills development and job opportunities to reduce reliance on unsafe migration routes [3][7].\n\n### Protection\nThe second outcome addresses the needs of vulnerable children and at-risk individuals by providing essential services such as shelter, food, and psychosocial support, particularly for victims of trafficking and abuse [1][5][7].\n\n### Reintegration\nThe third outcome supports returning migrants and vulnerable children by facilitating access to job placements, vocational training, and social support services, helping them reintegrate into their communities and achieve self-sufficiency [1][5][7].\n\n## Capacity Building and Collaboration\nThe project emphasizes capacity building for government officials, local authorities, and community organizations to promote local ownership and institutional strengthening. It aims to establish robust connections with key checkpoints to facilitate the smooth transfer of migrants and enhance collaboration with local authorities [2][6][7].\n\n## Limitations\nThe evidence does not provide specific details on the methodologies or metrics for evaluating the project's success, nor does it clarify the exact nature of the Graduation Approach being implemented in the second phase. Additionally, while the project aims to reach a diverse range of participants, the specific strategies for engaging different demographic groups are not fully detailed.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -2809,23 +3002,26 @@
         ],
         "citationAccuracy": 0.14285714285714285,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 0.6,
+        "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8142,
-        "cachedLatencyMs": 8147,
+        "uncachedLatencyMs": 9072,
+        "cachedLatencyMs": 7944,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.9,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
           "failureType": "retrieval",
           "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
-          "remediationTicket": "TODO-EVAL-en-2e51c566-0"
-        },
-        {
-          "failureType": "citation",
-          "probableRootCause": "Citation verifier judged one or more cited sentences unsupported by their sources.",
           "remediationTicket": "TODO-EVAL-en-2e51c566-0"
         }
       ],
@@ -2919,19 +3115,13 @@
         ]
       },
       "answer": {
-        "text": "The key reasons for migration from Cambodia to Thailand include limited income opportunities, agricultural dependency, and inadequate educational prospects, which have made migration a crucial survival strategy for many Cambodians. Additionally, remittances from the approximately 2 million Cambodian workers in Thailand play a vital role in supporting families back home, despite the risks associated with irregular migration routes, including exploitation and trafficking, particularly for women and children [1][3][7][8]. \n\n## Economic Factors Driving Migration\nMigration is increasingly viewed as a preferable option due to the economic challenges faced in Cambodia, where around 37% of the population still works in agriculture and many are driven to migrate because of the impacts of climate change and limited job opportunities [1][8]. \n\n## Vulnerability and Exploitation Risks\nWhile migration offers potential economic benefits, it also exposes individuals to significant risks, including labor exploitation, inadequate working conditions, and violence, especially for women in low-wage jobs [3][7]. The lack of access to legal migration channels further exacerbates these vulnerabilities, as many migrants resort to informal routes that increase their risk of trafficking and abuse [2][3][6].\n\n## Gender Dynamics in Migration\nThere has been a notable increase in female migration to Thailand, with women now accounting for at least 45% of the migrant population, reflecting a shift in the labor market and the search for better work opportunities [1][8]. \n\n## Limitations\nThe evidence does not provide specific statistics on the exact number of migrants or detailed accounts of individual experiences beyond general trends. Additionally, while it highlights the risks and economic motivations, it does not delve into the personal stories or broader social implications of migration.",
+        "text": "The key reasons for migration from Cambodia to Thailand include limited income opportunities, agricultural dependency, and the impacts of climate change, which drive many Cambodians to seek better livelihoods abroad. Additionally, remittances from migrants play a crucial role in supporting families back home, with approximately 2 million Cambodian workers in Thailand, although less than 30% migrate through official channels with proper documentation [1][7][8].\n\n## Economic Factors\nMigration is increasingly viewed as a survival strategy due to the economic challenges faced by many Cambodians, particularly in rural areas where about 74.89% of the population resides [7][8]. The agricultural sector's struggles, exacerbated by climate change and inadequate infrastructure, leave many without stable income, prompting them to migrate for better job opportunities [7][8].\n\n## Gender Dynamics\nThere has been a significant increase in female migration to Thailand, with women now accounting for at least 45% of the migrant population, reflecting a six-fold rise over the past 20 years [1][8]. This trend indicates that women are increasingly seeking work opportunities abroad, often in low-wage jobs that expose them to risks of exploitation and trafficking [3][8].\n\n## Vulnerability and Risks\nDespite the economic benefits of migration, many Cambodians face significant risks, including labor exploitation, inadequate working conditions, and human trafficking, particularly women and children [3][7]. The lack of access to information and the complex process of obtaining legal documents further complicate safe migration, leading many to take unsafe routes [3][6].\n\n## Limitations\nThe evidence does not establish specific statistics on the exact number of migrants or detailed motivations beyond economic factors and gender dynamics. Additionally, while it highlights the risks associated with migration, it does not provide a comprehensive overview of all reasons for migration.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 4,
             "chunkId": "65f14dc4-757c-4246-bb23-2e4ea4b9c269",
             "evidenceIndex": 1
-          },
-          {
-            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 5,
-            "chunkId": "4456d853-1d90-43f7-8052-35fdf72b7b2b",
-            "evidenceIndex": 3
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -2947,9 +3137,9 @@
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 13,
-            "chunkId": "526f2c2d-ef7d-468d-8b67-b48d82d6f193",
-            "evidenceIndex": 2
+            "pageNumber": 5,
+            "chunkId": "4456d853-1d90-43f7-8052-35fdf72b7b2b",
+            "evidenceIndex": 3
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -2970,16 +3160,24 @@
           1,
           2
         ],
-        "citationAccuracy": 0.3333333333333333,
+        "citationAccuracy": 0.4,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7391,
-        "cachedLatencyMs": 7522,
+        "uncachedLatencyMs": 6642,
+        "cachedLatencyMs": 5466,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 0.9166666666666666,
+        "answerRelevance": 0.92,
+        "contextPrecision": 0.75,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 1
+      },
       "failures": [],
       "error": null
     },
@@ -3071,8 +3269,14 @@
         ]
       },
       "answer": {
-        "text": "The SaMiCa project implements several initiatives to support vulnerable households and promote safe migration, focusing on prevention, protection, and reintegration strategies.\n\n## Support for Vulnerable Households\nThe project employs the Graduation Approach, which provides long-term support to vulnerable households through vocational training, life skills training, and business start-up assistance, particularly targeting women to reduce reliance on unsafe migration as a livelihood strategy [4][6][8]. Additionally, the project offers cash transfers, psychological support, and access to protection services, which stabilize and empower these households [6][8]. \n\n## Promotion of Safe Migration\nTo promote safe migration, SaMiCa conducts comprehensive awareness-raising campaigns that utilize both face-to-face and digital outreach, specifically addressing the risks associated with unsafe migration for different audiences, including women and youth [4][6]. The project also focuses on building the capacity of local authorities and community organizations to enhance their effectiveness in protecting vulnerable populations and promoting safe migration practices [3][6][7]. \n\n## Direct Services and Community Engagement\nThe project provides direct services such as shelter, food, and psychosocial support to vulnerable children and at-risk individuals, particularly victims of trafficking [7]. Community engagement is further strengthened through initiatives like the mobile library program, which educates families about child rights and the dangers of unsafe migration [2]. The Kamrieng Migration Centre (KMC) plays a crucial role in providing legal documentation assistance and referrals for migrants seeking protection services [1][8].\n\n## Limitations\nThe evidence does not establish specific quantitative targets for the number of households supported or the exact impact of the awareness campaigns on migration decisions. Additionally, while the initiatives are described, the effectiveness of these strategies in achieving long-term behavioral change among the target populations remains unclear.",
+        "text": "The SaMiCa project implements several initiatives to support vulnerable households and promote safe migration, focusing on prevention, protection, and reintegration strategies.\n\n## Support for Vulnerable Households\nThe project employs the Graduation Approach, which provides long-term support to vulnerable households through vocational training, life skills training, and business start-up assistance, particularly targeting women to reduce reliance on unsafe migration as a livelihood strategy [1][4][6][8]. Additionally, the project offers cash transfers, psychological support, and access to protection services, which help stabilize and empower these households [6][8]. \n\n## Promotion of Safe Migration\nTo promote safe migration, SaMiCa conducts comprehensive awareness-raising campaigns that utilize both face-to-face and digital outreach, specifically addressing the risks associated with unsafe migration for different audiences, including women and youth [4][6]. The project also collaborates with local authorities and border guards to strengthen their capacity in safe migration practices and child protection [7]. \n\n## Direct Services and Community Engagement\nThe project provides essential services such as shelter, food, and psychosocial support to vulnerable children and at-risk individuals, particularly victims of trafficking [7]. Community outreach initiatives, including mobile libraries and drop-in centers, aim to educate families about safe migration and child rights, reaching thousands of children and adults [2][3]. The Kamrieng Migration Centre (KMC) plays a crucial role in offering legal documentation assistance and emergency support to migrants, enhancing community awareness of safe migration [1][8].\n\n## Limitations\nThe evidence does not establish specific quantitative outcomes for all initiatives or detail the long-term impacts of these programs on migration patterns. Additionally, while the project outlines various strategies, it does not provide comprehensive data on the effectiveness of each initiative in reducing unsafe migration.",
         "citations": [
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 6,
+            "chunkId": "d4d93e9f-8a37-48d4-bd18-02d181f47f55",
+            "evidenceIndex": 1
+          },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 15,
@@ -3093,12 +3297,6 @@
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 42,
-            "chunkId": "ad08e2be-1df9-48cb-ae33-4f6fbafc1087",
-            "evidenceIndex": 3
-          },
-          {
-            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 3,
             "chunkId": "8dad3ae0-e96d-4dce-b7f1-3d0babe991f6",
             "evidenceIndex": 7
@@ -3111,9 +3309,9 @@
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 6,
-            "chunkId": "d4d93e9f-8a37-48d4-bd18-02d181f47f55",
-            "evidenceIndex": 1
+            "pageNumber": 42,
+            "chunkId": "ad08e2be-1df9-48cb-ae33-4f6fbafc1087",
+            "evidenceIndex": 3
           }
         ],
         "insufficientEvidence": false,
@@ -3132,11 +3330,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7085,
-        "cachedLatencyMs": 7935,
+        "uncachedLatencyMs": 8067,
+        "cachedLatencyMs": 7639,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.93,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -3169,7 +3375,7 @@
             "sectionTitle": "PROJEKTAUFTRAG / Messbare Ergebnisse",
             "source": "vector",
             "retrievalScore": 0.016129032258064516,
-            "rerankScore": 0.6065188
+            "rerankScore": 0.6066652
           },
           {
             "chunkId": "e14ec08f-11fb-4978-8502-1bf74d7f6453",
@@ -3196,7 +3402,7 @@
             "sectionTitle": "Page 3",
             "source": "hybrid",
             "retrievalScore": 0.02332657200811359,
-            "rerankScore": 0.54261298
+            "rerankScore": 0.5424684
           },
           {
             "chunkId": "1c7660c0-a6b2-433e-9b7e-3f857835a1ad",
@@ -3228,19 +3434,13 @@
         ]
       },
       "answer": {
-        "text": "The main outcomes of the SaMiCa II project are prevention, protection, reintegration, and stakeholder coordination, which are measured through specific indicators related to each outcome area. These indicators include the number of individuals reached by awareness initiatives, the percentage of beneficiaries acquiring skills for safe migration, and the self-sufficiency of project participants, among others [1][2][4][6][7].\n\n## Project Outcomes\n\n### Prevention\nThe prevention outcome focuses on raising awareness about safe migration practices. It is measured by indicators such as the number of individuals reached by awareness-raising initiatives (I.1.a) and the percentage of project beneficiaries who acquire skills for safe migration practices (I.1.b) [2][6].\n\n### Protection\nThe protection outcome aims to provide essential services to vulnerable children and at-risk individuals. It is measured by the number of project participants receiving life-preserving services (I.2.a) and the percentage of vulnerable migrants and children reporting increased self-sufficiency (I.2.b) [6][7].\n\n### Reintegration\nThe reintegration outcome supports returning migrants and vulnerable children by facilitating access to job placements and vocational training. It is measured by the percentage of participants reporting increased self-sufficiency (I.3.a) and those who have remained with their families or in stable employment for at least one year (I.3.b) [4][6][7].\n\n### Stakeholder Coordination\nThe stakeholder coordination outcome focuses on enhancing collaboration among implementing partners. It is measured by the percentage of partners reporting increased collaboration and information sharing as a result of networking efforts [2][6].\n\n## Limitations\nThe evidence does not provide specific numerical targets for each indicator or detailed methodologies for how these measurements will be conducted. Additionally, while the outcomes are clearly defined, the evidence does not clarify how the overall effectiveness of the project will be evaluated beyond the individual indicators.",
+        "text": "The main outcomes of the SaMiCa II project are prevention, protection, reintegration, and stakeholder coordination, which are measured through specific indicators related to each outcome area [1][4][6]. \n\n## Project Outcomes\n1. **Prevention**: This outcome focuses on raising awareness about safe migration practices among potential migrants and local authorities. It is measured by the number of individuals reached by awareness initiatives and the percentage of beneficiaries acquiring skills for safe migration [2][7].\n   \n2. **Protection**: This outcome addresses the needs of vulnerable children and at-risk individuals by providing essential services such as shelter and psychosocial support. It is measured by the number of participants receiving these services and the percentage reporting increased self-sufficiency [4][6][7].\n\n3. **Reintegration**: This outcome supports returning migrants and vulnerable children by facilitating access to job placements and vocational training. It is measured by the percentage of participants reporting increased self-sufficiency and improved living conditions [4][6][7].\n\n4. **Stakeholder Coordination**: This outcome enhances collaboration among implementing partners and is measured by the percentage of partners reporting increased information sharing and collaboration as a result of networking efforts [2][6].\n\n## Measurement Indicators\nThe project employs various quantitative and qualitative indicators to assess progress across these outcomes, including demographic disaggregation for better understanding of impacts on different groups [6][7]. For example, the project aims to reach a total of 49,219 persons, with specific targets for each outcome area [7].\n\n## Limitations\nThe evidence does not provide detailed information on the specific methodologies used for measuring these outcomes or the exact timeline for evaluations. Additionally, while it outlines the intended reach and impact, it does not specify the actual results achieved thus far.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 12,
             "chunkId": "f13eeb38-aef8-4a19-a303-9706a8454607",
             "evidenceIndex": 1
-          },
-          {
-            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 14,
-            "chunkId": "e14ec08f-11fb-4978-8502-1bf74d7f6453",
-            "evidenceIndex": 2
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3253,6 +3453,12 @@
             "pageNumber": 14,
             "chunkId": "35248696-d710-4de2-8c40-dd4b0890d929",
             "evidenceIndex": 6
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 14,
+            "chunkId": "e14ec08f-11fb-4978-8502-1bf74d7f6453",
+            "evidenceIndex": 2
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3277,18 +3483,20 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 17307,
-        "cachedLatencyMs": 7500,
+        "uncachedLatencyMs": 6735,
+        "cachedLatencyMs": 5008,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [
-        {
-          "failureType": "latency",
-          "probableRootCause": "Query latency exceeded release threshold for cached or uncached execution.",
-          "remediationTicket": "TODO-EVAL-en-2e51c566-17"
-        }
-      ],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.93,
+        "contextPrecision": 0.875,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [],
       "error": null
     },
     {
@@ -3379,7 +3587,7 @@
         ]
       },
       "answer": {
-        "text": "The key indicators used to measure the outcomes of the project related to protection and reintegration include the following:\n\n1. For protection (Outcome 2), the indicators are:\n   - The number of project participants that have received life- and dignity-preserving services, disaggregated by gender, age, and migration status [1].\n   - The percentage of vulnerable migrants and children that report an increased self-sufficiency, also disaggregated by gender and age [1][2].\n\n2. For reintegration (Outcome 3), the indicators are:\n   - The percentage of migrants and children targeted by the project that report an increased self-sufficiency, disaggregated by gender, age, and migration status [1].\n   - The percentage of children and migrants who report having remained with their families, in stable employment, or in improved living conditions for at least one year [1].\n   - The percentage of project participants targeted through the Graduation Approach who report increased savings by at least 20% [1].\n\nThese indicators are designed to track improvements in self-sufficiency, service access, family stability, and savings among vulnerable migrants and children [1][2][3]. \n\n## Limitations\nThe evidence does not provide specific numerical targets or thresholds for these indicators, nor does it clarify how the data will be collected or analyzed.",
+        "text": "The key indicators used to measure the outcomes of the project related to protection and reintegration include the following:\n\n1. For protection (Outcome 2), the indicators are:\n   - The number of project participants that have received life- and dignity-preserving services, disaggregated by gender, age, and migration status [1].\n   - The percentage of vulnerable migrants and children that report an increased self-sufficiency, also disaggregated by gender and age [1][2].\n\n2. For reintegration (Outcome 3), the indicators are:\n   - The percentage of migrants and children targeted by the project that report an increased self-sufficiency, disaggregated by gender, age, and migration status [1].\n   - The percentage of children and migrants who report having remained with their families, in stable employment, or in improved living conditions for at least one year [1].\n   - The percentage of project participants targeted through the Graduation Approach who report increased savings by at least 20% [1].\n\nThese indicators are designed to track improvements in self-sufficiency, service access, family stability, and savings among vulnerable migrants and children [1][3]. \n\n## Limitations\nThe evidence does not provide specific numerical targets or thresholds for these indicators, nor does it clarify how these indicators will be monitored or evaluated over time.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3417,11 +3625,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8363,
-        "cachedLatencyMs": 4707,
+        "uncachedLatencyMs": 7200,
+        "cachedLatencyMs": 4872,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -3513,25 +3729,13 @@
         ]
       },
       "answer": {
-        "text": "The main goals of the SaMiCa II project related to youth inclusion include combating human trafficking and unsafe migration, enhancing awareness of safe migration practices, and providing support services to vulnerable youth, particularly those at risk of exploitation. The project aims to integrate insights from the Youth Connection pilot to effectively engage both in-school and dropout youth in these initiatives, ensuring their inclusion in the project's activities and strategies [1][3][7][8].\n\n## Project Goals and Strategies\nThe overall goal of SaMiCa II is to create a safer environment for vulnerable populations, especially women, children, and youth, by combating human trafficking and exploitative migration through prevention, protection, and reintegration services [3][8]. The project specifically targets 49,219 participants, focusing on raising awareness about safe migration among youth and providing essential services such as vocational training and job placements to facilitate their reintegration into communities [4][8].\n\n## Youth Connection Pilot\nThe Youth Connection pilot, in partnership with the Child’s Dream Foundation, is designed to identify effective strategies for engaging young people in safe migration awareness activities. This initiative emphasizes the importance of education and aims to raise awareness among dropout youth, with the insights gained to be integrated into SaMiCa II's broader strategies [1][7]. The project also plans to utilize online content created during the Youth Connection pilot to enhance its outreach efforts [1][7].\n\n## Limitations\nThe evidence does not provide specific details on the outcomes or metrics for measuring the success of youth inclusion efforts within the SaMiCa II project. Additionally, while the project outlines its goals and strategies, it does not clarify how these will be implemented or evaluated in practice.",
+        "text": "The main goals of the SaMiCa II project are to combat human trafficking and unsafe migration through a comprehensive approach that includes prevention, protection, reintegration services, and improved stakeholder coordination, particularly focusing on vulnerable populations such as women, children, and youth [3][8]. The project aims to reach a total of 49,219 direct participants and emphasizes raising awareness of safe migration practices, providing essential services, and facilitating access to job placements and vocational training for returning migrants and vulnerable children [8].\n\n## Key Developments\n\n### Integration of Youth Connection Insights\nThe SaMiCa II project will integrate insights from the Youth Connection pilot project, which focuses on engaging both in-school and dropout youth in safe migration awareness activities. This integration aims to enhance awareness-raising efforts and maximize outreach to youth [1][7].\n\n### Graduation Approach\nThe project incorporates the Graduation Approach, which provides a holistic framework for poverty reduction and aims to support vulnerable households in achieving self-sufficiency and resilience [3][4][7]. This approach is designed to address multiple barriers faced by these households through tailored interventions.\n\n### Expansion of Services\nSaMiCa II will build on the successes of its first phase by expanding services to additional districts and enhancing community awareness about safe migration practices [1][2][8]. The project also aims to strengthen partnerships with local organizations, such as the Child’s Dream Foundation, to broaden its impact [1].\n\n## Limitations\nThe evidence does not specify the exact methodologies or specific activities that will be implemented under the SaMiCa II project beyond the general goals and approaches mentioned. Additionally, while the project aims to integrate findings from the Youth Connection initiative, the specific outcomes of this integration are not detailed.",
         "citations": [
-          {
-            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 18,
-            "chunkId": "b9bb2bdf-6e14-4bb3-92c2-c5cee40e6284",
-            "evidenceIndex": 1
-          },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 12,
             "chunkId": "a9299008-aef8-4bd0-b05d-429096e23d34",
             "evidenceIndex": 3
-          },
-          {
-            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
-            "pageNumber": 8,
-            "chunkId": "fca3ffce-bd39-4dc8-b2d0-53ce35e5b5e5",
-            "evidenceIndex": 7
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3541,36 +3745,60 @@
           },
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 18,
+            "chunkId": "b9bb2bdf-6e14-4bb3-92c2-c5cee40e6284",
+            "evidenceIndex": 1
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 8,
+            "chunkId": "fca3ffce-bd39-4dc8-b2d0-53ce35e5b5e5",
+            "evidenceIndex": 7
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
             "pageNumber": 1,
             "chunkId": "71d495fa-535c-4fee-b8f0-c001ff4b72d0",
             "evidenceIndex": 4
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 6,
+            "chunkId": "d4d93e9f-8a37-48d4-bd18-02d181f47f55",
+            "evidenceIndex": 2
           }
         ],
         "insufficientEvidence": false,
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
-        "citationAccuracy": 0.2,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 0.16666666666666666,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 0.8,
+        "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8292,
-        "cachedLatencyMs": 7357,
+        "uncachedLatencyMs": 9967,
+        "cachedLatencyMs": 5358,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.9,
+        "contextPrecision": 0.75,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
-          "failureType": "citation",
-          "probableRootCause": "Citation verifier judged one or more cited sentences unsupported by their sources.",
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
           "remediationTicket": "TODO-EVAL-en-2e51c566-29"
         }
       ],
@@ -3664,7 +3892,7 @@
         ]
       },
       "answer": {
-        "text": "Measures being taken to support migrants in Battambang Province include the establishment of the Kamrieng Migrant Centre (KMC), which provides emergency support services, victim identification screenings, and reintegration assistance for returning migrants. The project aims to assist at least 6,000 migrants over three years, with a focus on vulnerable populations such as women and children [2][3][6].\n\n## Support Services at Kamrieng Migrant Centre\nThe KMC offers essential services including shelter, food, and health check-ups for highly vulnerable migrants. It also conducts initial interviews to identify at-risk individuals and provides emergency support to those in urgent need [2][7]. The project plans to assist at least 150 vulnerable migrants through these emergency services [2].\n\n## Training and Capacity Building\nKMC staff will receive training to implement reintegration standards and provide support to returning migrants. The project aims to reintegrate at least 1,500 migrants with their families in Battambang Province [6]. Additionally, training will be provided to border police to ensure proper handling of vulnerable migrants [8].\n\n## Awareness and Coordination Efforts\nThe project includes awareness-raising activities targeting local authorities and communities to promote safe migration practices. It aims to engage at least 180 local authority representatives in these efforts [8]. Furthermore, the project seeks to establish formal agreements with border checkpoints to facilitate the transfer of migrants to KMC [8].\n\n## Limitations\nThe evidence does not specify the exact nature of the emergency support services provided at KMC or the specific outcomes of the training for KMC staff and border police. Additionally, while the project outlines goals and target numbers, it does not provide detailed information on the implementation status or challenges faced.",
+        "text": "Measures being taken to support migrants in Battambang Province include the establishment of the Kamrieng Migrant Centre (KMC), which provides emergency support services, victim identification screenings, and reintegration assistance for returning migrants. The project aims to assist at least 6,000 migrants over three years, with a focus on vulnerable populations such as women and children [2][3][6].\n\n## Support Services at Kamrieng Migrant Centre\nThe KMC offers essential services including shelter, food, and health check-ups for highly vulnerable migrants. It also conducts initial interviews to identify at-risk individuals and provides emergency support to those in urgent need [2][7]. The project plans to assist at least 150 vulnerable migrants through these emergency services [2].\n\n## Training and Capacity Building\nKMC staff will receive training to implement reintegration standards and provide support to returning migrants. The project aims to reintegrate at least 1,500 migrants with their families in Battambang Province [6]. Additionally, training will be provided to border police to ensure the appropriate handling of vulnerable migrants [8].\n\n## Awareness and Coordination Efforts\nThe project includes awareness-raising activities targeting local authorities and communities to promote safe migration practices. It aims to engage at least 180 local authority representatives in these efforts [8]. Furthermore, the National Committee for Counter Trafficking (NCCT) will work to establish formal agreements with local stakeholders to enhance coordination and improve migrant flow management [4][5].\n\n## Limitations\nThe evidence does not specify the exact nature of the emergency support services provided at KMC or the specific outcomes of the training for border police. Additionally, while the project outlines goals and target numbers, it does not provide detailed metrics on the effectiveness of these measures.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3695,6 +3923,18 @@
             "pageNumber": 21,
             "chunkId": "fd0207d7-0a66-472b-b501-855f206a89b2",
             "evidenceIndex": 8
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 30,
+            "chunkId": "5e0de4a7-2e91-4f4c-a7bf-d47f5e5f8d49",
+            "evidenceIndex": 4
+          },
+          {
+            "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
+            "pageNumber": 32,
+            "chunkId": "f5d5e306-d796-4867-b129-0940987d52bb",
+            "evidenceIndex": 5
           }
         ],
         "insufficientEvidence": false,
@@ -3708,16 +3948,24 @@
         "relevantRanks": [
           2
         ],
-        "citationAccuracy": 0.2,
+        "citationAccuracy": 0.14285714285714285,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 0.7142857142857143,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 9026,
-        "cachedLatencyMs": 10876,
+        "uncachedLatencyMs": 8331,
+        "cachedLatencyMs": 6089,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 0.9230769230769231,
+        "answerRelevance": 0.92,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 1
+      },
       "failures": [
         {
           "failureType": "citation",
@@ -3815,7 +4063,7 @@
         ]
       },
       "answer": {
-        "text": "KMC provides various forms of support to vulnerable returning migrants for their reintegration, including training for staff, referral to vocational training, and emergency assistance. The goal is to ensure successful reintegration into families and communities, with a focus on addressing the needs of highly vulnerable migrants.\n\n## Staff Training and Reintegration Standards\nKMC staff are trained to implement the reintegration procedures established by the National Committee for Counter Trafficking (NCCT), which includes conducting interviews to assess the needs of returning migrants and ensuring they receive appropriate support. The project aims to reintegrate at least 1,500 migrants with their families in Battambang province over three years [1][2].\n\n## Vocational Training and Job Placement\nKMC refers returning migrants to government-run Technical and Vocational Education and Training (TVET) institutions, with a target of at least 10 referrals per year [1]. Additionally, the project aims to place at least 300 vulnerable migrants in sustainable jobs or further training programs over three years [5].\n\n## Emergency Support and Continuous Assistance\nKMC provides emergency support services to highly vulnerable migrants, including health check-ups and referrals to other service providers. The project plans to assist at least 150 vulnerable migrants through these emergency services [6]. Furthermore, monthly coaching visits are conducted to support migrants and their households in achieving self-reliance and reintegration [5].\n\n## Life Skills and Financial Literacy Training\nThe project includes life skills training for vulnerable migrants, focusing on essential topics such as budgeting, health, and safe migration practices. This training aims to improve self-reliance and overall well-being [1][5]. Additionally, financial literacy training is provided to help participants manage their finances effectively and accumulate savings [5].\n\n## Limitations\nThe evidence does not specify the exact nature of the support provided during the initial stages of reintegration or the specific outcomes achieved for each migrant. Additionally, while the project outlines various support mechanisms, it does not provide detailed information on the effectiveness of these interventions or the long-term impact on the migrants' lives.",
+        "text": "KMC provides various forms of support to vulnerable returning migrants for their reintegration, including training for staff, referral to vocational training, and emergency assistance.\n\n## Staff Training and Reintegration Standards\nKMC staff are trained to implement the reintegration procedures established by the National Committee for Counter Trafficking (NCCT), focusing on the needs of highly vulnerable migrants. The goal is to successfully reintegrate at least 1,500 migrants with their families in Battambang province, ensuring they receive necessary support for a successful reintegration [1][2].\n\n## Vocational Training and Job Placement\nKMC refers returning migrants to government-run Technical and Vocational Education and Training (TVET) institutions, aiming to refer at least 10 migrants per year [1]. Additionally, the project aims to place at least 300 vulnerable migrants in sustainable jobs or further training programs over three years [5].\n\n## Emergency Support and Victim Identification\nKMC provides emergency support services to highly vulnerable migrants, including health check-ups and referrals to other service providers. The project plans to assist at least 150 vulnerable migrants through these emergency services [6]. Furthermore, returning migrants undergo initial interviews for victim identification, ensuring that those at risk receive appropriate support [6].\n\n## Life Skills and Financial Support\nThe project includes life skills training for vulnerable migrants, focusing on essential topics such as budgeting and financial literacy, which aims to improve their self-reliance [1][5]. Monthly coaching visits are also provided to support migrants in their reintegration and self-reliance journey [5].\n\n## Limitations\nThe evidence does not specify the exact nature of the support provided during the reintegration process beyond training, referrals, and emergency assistance. Additionally, while targets for various activities are mentioned, the specific outcomes of these supports are not detailed.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3846,27 +4094,33 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 23322,
-        "cachedLatencyMs": 8440,
+        "uncachedLatencyMs": 9433,
+        "cachedLatencyMs": 9801,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.9,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
-          "failureType": "latency",
-          "probableRootCause": "Query latency exceeded release threshold for cached or uncached execution.",
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
           "remediationTicket": "TODO-EVAL-en-2e51c566-40"
         }
       ],
@@ -3960,7 +4214,7 @@
         ]
       },
       "answer": {
-        "text": "The National Committee for Counter Trafficking (NCCT) in Cambodia plays a crucial role in coordinating efforts to combat human trafficking and protect migrant workers. It serves as a national mechanism for gathering information and coordinating actions among various stakeholders, including ministries, NGOs, and the private sector, to enhance the safety of migrant workers and ensure their reintegration into society through initiatives like the Kamrieng Migrant Reception Center [1][6][8].\n\n## Coordination and Support for Migrant Workers\nThe NCCT is involved in the establishment and management of the Kamrieng Migrant Center (KMC), which provides essential services such as legal documentation, emergency assistance, and referrals for returning migrants. The center aims to raise awareness among potential and returning migrants about safe migration practices and offers support to help them reintegrate into their communities [1][8]. \n\n## Capacity Building and Community Engagement\nAdditionally, the NCCT has been strengthened through capacity-building initiatives that enhance its ability to respond to the needs of vulnerable populations, including migrants. This includes training on child protection policies and safe migration practices, which aim to improve community-based protection systems [5][6]. The NCCT also coordinates with local authorities and border forces to manage migrant flows and improve victim identification procedures [7].\n\n## Limitations\nThe evidence does not establish the full extent of the NCCT's impact on reducing human trafficking or the specific outcomes of its initiatives beyond the establishment of the KMC and capacity-building efforts. There is also ambiguity regarding the effectiveness of these measures in the face of declining migrant numbers since mid-2023 [8].",
+        "text": "The National Committee for Counter Trafficking (NCCT) in Cambodia plays a crucial role in coordinating efforts to combat human trafficking and protect migrant workers. It serves as a national mechanism for gathering information and coordinating actions among various stakeholders, including ministries, NGOs, and the private sector, to enhance the safety of migrant workers and ensure their reintegration into society through initiatives like the Kamrieng Migrant Reception Center [1][6][8].\n\n## Coordination and Support for Migrant Workers\nThe NCCT is involved in the establishment and management of the Kamrieng Migrant Center (KMC), which provides essential services such as legal documentation, emergency assistance, and referrals for returning migrants [1][8]. The center aims to raise awareness among potential and returning migrants about safe migration practices and offers support to help them reintegrate into their communities [6][8]. \n\n## Capacity Building and Community Engagement\nAdditionally, the NCCT has been strengthened through capacity-building initiatives that enhance its ability to respond to the needs of vulnerable populations, including training on child protection policies and safe migration practices [5][7]. This has led to improved community perceptions of migration and child protection, enabling local organizations to better support vulnerable migrants and their families [5][6].\n\n## Limitations\nThe evidence does not establish the full extent of NCCT's impact on all migrant workers or detail specific outcomes related to individual cases of trafficking or exploitation. Additionally, while the NCCT coordinates efforts, the effectiveness of these initiatives in addressing all challenges faced by migrant workers remains unclear.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -3997,27 +4251,33 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.2,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 0.8,
+        "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7156,
-        "cachedLatencyMs": 5906,
+        "uncachedLatencyMs": 7441,
+        "cachedLatencyMs": 5900,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
-          "failureType": "citation",
-          "probableRootCause": "Citation verifier judged one or more cited sentences unsupported by their sources.",
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
           "remediationTicket": "TODO-EVAL-en-2e51c566-47"
         }
       ],
@@ -4111,7 +4371,7 @@
         ]
       },
       "answer": {
-        "text": "In Kamrieng district, events related to safe migration and job services included a career fair at Kamrieng High School organized by the Youth Connections Project in collaboration with the Children Dream Foundation, where services were showcased to participants [1]. Additionally, the Graduation Approach pilot in Kamrieng featured an event on safe migration and job linking that saw 37 villagers attending, including 29 women [7][8]. \n\n## Overview of Events\nThe career fair aimed to raise awareness and provide information about job services and safe migration practices [1]. The Graduation Approach pilot focused on integrating business start-up activities to support sustainable household income, particularly for women, and included life skills training and safe migration awareness activities [7][8].\n\n## Limitations\nThe evidence does not provide specific dates or detailed descriptions of all events held, nor does it clarify the overall impact of these events on the community.",
+        "text": "Events related to safe migration and job services held in Kamrieng district include a career fair at Kamrieng High School, organized by the Youth Connections Project in collaboration with the Children Dream Foundation, where services were showcased to participants [1]. Additionally, the Graduation Approach pilot in Kamrieng demonstrated strong female participation in life skills training and safe migration awareness activities, with an event in August 2024 attracting 37 villagers, including 29 women [7][8]. \n\n## Overview of Events\nThe career fair aimed to promote job services and safe migration awareness among local youth [1]. The Graduation Approach pilot focused on providing vocational training and life skills, which are essential for sustainable income generation and reducing unsafe migration practices [7][8].\n\n## Limitations\nThe evidence does not provide a comprehensive list of all events or detailed outcomes from these activities, nor does it specify the frequency or broader context of such events beyond those mentioned.",
         "citations": [
           {
             "documentId": "2e51c566-86b0-49f3-827c-b0ccaa4a3380",
@@ -4136,24 +4396,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.3333333333333333,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 5524,
-        "cachedLatencyMs": 3999,
+        "uncachedLatencyMs": 5510,
+        "cachedLatencyMs": 3844,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.85,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-en-2e51c566-54"
+        }
+      ],
       "error": null
     },
     {
@@ -4194,7 +4466,7 @@
             "sectionTitle": "Page 1",
             "source": "vector",
             "retrievalScore": 0.01020408163265306,
-            "rerankScore": 0.20537329
+            "rerankScore": 0.20560412
           },
           {
             "chunkId": "c2eedefb-0e25-4ac9-ba33-354f04d1c869",
@@ -4230,7 +4502,7 @@
             "sectionTitle": "DZ ZH",
             "source": "vector",
             "retrievalScore": 0.008547008547008548,
-            "rerankScore": 0.19116359
+            "rerankScore": 0.191357954
           },
           {
             "chunkId": "51e44d25-2aaa-4dfb-b2b8-1c77aea7d9c1",
@@ -4244,7 +4516,7 @@
         ]
       },
       "answer": {
-        "text": "Das Gesamtprojekt „Caritas Forward“ ist ein strategisches Projekt, das von April 2024 bis Juni 2026 läuft und von Peter Lack, dem Direktor, geleitet wird. Es umfasst mehrere Handlungsfelder, darunter digitale Transformation und Organisationsentwicklung, mit spezifischen Zielen und Meilensteinen für die Jahre 2024 und 2025 [1][2].\n\n## Projektdaten und Organisation\nDas Projekt hat einen Starttermin am 01.04.2024 und endet am 30.06.2026. Die Projektorganisation umfasst ein Kernteam mit Leitenden für digitale Transformation und Organisationsentwicklung [1].\n\n## Projektziele\nFür das Jahr 2024 sind mehrere Ziele festgelegt, darunter die Etablierung der Projektorganisation und Governance, die Identifizierung wichtiger Stakeholder, der Beginn der internen Kommunikation und die Genehmigung des Projektbudgets [2]. Im Jahr 2025 sollen unter anderem ein neues Leitbild und eine Strategie für 2026+ vorliegen [2].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über die spezifischen Maßnahmen oder den finanziellen Rahmen des Projekts. Es bleibt unklar, wie die verschiedenen Handlungsfelder konkret umgesetzt werden sollen.",
+        "text": "Das Gesamtprojekt „Caritas Forward“ ist ein strategisches Projekt, das von April 2024 bis Juni 2026 läuft und von Peter Lack, dem Direktor, geleitet wird. Es umfasst mehrere Handlungsfelder, darunter digitale Transformation und Organisationsentwicklung, mit einem Kernteam, das spezifische Workstream-Leiter hat [1].\n\n## Projektdaten und Organisation\nDas Projekt hat einen klaren Zeitrahmen: Es beginnt am 01.04.2024 und endet am 30.06.2026. Die Projektorganisation sieht eine Projektleitung unter Peter Lack vor, unterstützt von Leitenden für digitale Transformation und Organisationsentwicklung [1].\n\n## Projektziele\nFür das Jahr 2024 sind mehrere Ziele festgelegt, darunter die Etablierung der Projektorganisation und Governance, die Identifizierung wichtiger Stakeholder, der Start der internen Kommunikation und die Genehmigung des Projektbudgets [2]. Im Jahr 2025 sollen unter anderem ein neues Leitbild und eine Strategie für 2026+ vorliegen [2].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Maßnahmen oder den genauen Inhalt der Strategien und Ziele des Projekts. Es bleibt unklar, wie die verschiedenen Handlungsfelder konkret umgesetzt werden sollen.",
         "citations": [
           {
             "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
@@ -4263,24 +4535,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.5,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7976,
-        "cachedLatencyMs": 7633,
+        "uncachedLatencyMs": 5993,
+        "cachedLatencyMs": 4555,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.92,
+        "contextPrecision": 0.25,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-41964cf3-0"
+        }
+      ],
       "error": null
     },
     {
@@ -4371,7 +4655,7 @@
         ]
       },
       "answer": {
-        "text": "Die wichtigsten Punkte zur Projektorganisation und den Fortschritten im Gesamtprojekt „Caritas Forward“ für 2024 umfassen die Etablierung der Projektorganisation und Governance, die Identifizierung wichtiger Stakeholder sowie den Start der internen Kommunikation. Zudem sind die Teilprojekt-Beschreibungen und der Projektbudget für 2024 erarbeitet und genehmigt worden [1][2].\n\n## Projektorganisation\nDie Projektorganisation ist durch die Etablierung von Sounding-Boards und Mitarbeitenden-Dialogen für das Gesamtprojekt gesichert. Das Kern-Projektteam ist operativ, und wichtige interne sowie externe Stakeholder wurden identifiziert, deren Einbezug geplant ist [1]. Die Projektleitung obliegt Peter Lack, und es gibt definierte Workstream-Leiter für die Bereiche Digitale Transformation und Organisationsentwicklung [8].\n\n## Fortschritte im Gesamtprojekt\nBis September 2024 sind mehrere Meilensteine erreicht, darunter der Abschluss der Strategieevaluation und der Start der Strategieerarbeitung für 2026+ [6]. Die interne Kommunikation zum Projekt hat begonnen, und die Sounding Boards sowie Mitarbeitenden-Dialoge finden wie geplant statt [1]. Zudem sind die messbaren Ergebnisse zur Verbesserung der Aufbau- und Prozessorganisation sowie zur Prüfung von Holakratie als alternatives Modell dokumentiert [5].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Fortschritte oder Herausforderungen im Projektverlauf oder über die genauen Inhalte der internen Kommunikation.",
+        "text": "Die wichtigsten Punkte zur Projektorganisation und den Fortschritten im Gesamtprojekt „Caritas Forward“ für 2024 umfassen die Etablierung der Projektorganisation und Governance, die Identifizierung wichtiger Stakeholder sowie den Start der internen Kommunikation. Zudem sind die Teilprojekt-Beschreibungen und der Projektbudget für 2024 erarbeitet und genehmigt worden [1][2].\n\n## Projektorganisation\nDie Projektorganisation ist etabliert, einschließlich Governance-Strukturen wie Sounding-Boards und Mitarbeitenden-Dialogen [1]. Das Kern-Projektteam ist operativ, und wichtige interne sowie externe Stakeholder wurden identifiziert, deren Einbezug geplant ist [1]. \n\n## Fortschritte im Gesamtprojekt\nDie interne Kommunikation zum Projekt hat begonnen, und die Sounding Boards sowie Mitarbeitende finden wie geplant statt [1]. Die Teilprojekt-Beschreibungen samt Zeitplan liegen vor, und das Projektbudget für 2024 ist erarbeitet und genehmigt [1]. \n\n## Meilensteine\nBis zum 1. September 2024 soll der Meilenstein zur Klärung der Wirkungsziele erreicht sein [3]. Zudem wurde die Strategieevaluation abgeschlossen, und die Strategieerarbeitung für 2026+ hat am 20. August 2024 begonnen [6]. \n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Fortschritte oder Herausforderungen im Projektverlauf an, abgesehen von den genannten Meilensteinen und der allgemeinen Projektorganisation.",
         "citations": [
           {
             "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
@@ -4387,46 +4671,51 @@
           },
           {
             "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
-            "pageNumber": 1,
-            "chunkId": "3e2a26bf-2731-401f-9f8a-019256c42bea",
-            "evidenceIndex": 8
+            "pageNumber": 5,
+            "chunkId": "2483f451-864c-4c88-b261-6f543e44c62d",
+            "evidenceIndex": 3
           },
           {
             "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
             "pageNumber": 4,
             "chunkId": "f3ceb31d-44f0-4041-ad82-a0463a8d9252",
             "evidenceIndex": 6
-          },
-          {
-            "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
-            "pageNumber": 4,
-            "chunkId": "dc04f295-d6d5-4edd-9fcf-05aab1948299",
-            "evidenceIndex": 5
           }
         ],
         "insufficientEvidence": false,
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 0.8175295903539445,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1,
-          7
-        ],
-        "citationAccuracy": 0.2,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6871,
-        "cachedLatencyMs": 6345,
+        "uncachedLatencyMs": 8802,
+        "cachedLatencyMs": 6692,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-41964cf3-3"
+        }
+      ],
       "error": null
     },
     {
@@ -4517,7 +4806,7 @@
         ]
       },
       "answer": {
-        "text": "Die Ergebnisse des Projekts in Bezug auf die unternehmerischen Schwächen und die Organisationsstruktur umfassen die Erfassung von Schwächen und Pain-Points der Mitarbeitenden sowie die Prüfung und Testung von Holakratie als alternatives Organisationsmodell. Ein Proof-of-Concept für die gesamte unternehmerische Organisation liegt vor, zusammen mit einem Umsetzungs- und Maßnahmenplan [1].\n\n## Unternehmerische Schwächen\nDas Projekt hat die unternehmerischen Schwächen und Pain-Points der Mitarbeitenden erfasst, was als Grundlage für Verbesserungen dient [1]. Zudem wird angestrebt, die Geschwindigkeit und Transparenz der Entscheidungsfindung zu erhöhen und die Arbeitsbelastung der Mitarbeitenden sowie weitere unternehmerische Risiken zu verringern [2].\n\n## Organisationsstruktur\nDie Aufbau- und Prozessorganisation wurde geprüft, und es wurden Anpassungen vorgenommen, die Teil des normalen Planungsprozesses sind [3]. Die Implementierung der Strategie 2026+ läuft, und es liegt ein Umsetzungsplan vor, der auch die Anpassungen in der Aufbau- und Prozessorganisation umfasst [5]. Die negative Auswirkung traditioneller hierarchischer Strukturen auf die Service-Qualität und Kundenzufriedenheit wird ebenfalls angesprochen, da Fragmentierung und Unklarheit die Wertschöpfung beeinträchtigen [8].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Schwächen oder die genauen Maßnahmen zur Verbesserung der Organisationsstruktur. Es bleibt unklar, welche spezifischen Schwächen identifiziert wurden und wie die Holakratie konkret implementiert wird.",
+        "text": "Die Ergebnisse des Projekts in Bezug auf die unternehmerischen Schwächen und die Organisationsstruktur umfassen die Erfassung von Schwächen und Pain-Points der Mitarbeitenden sowie die Prüfung und Testung von Holakratie als alternatives Organisationsmodell. Ein Proof-of-Concept für die gesamte unternehmerische Organisation liegt vor, zusammen mit einem Umsetzungs- und Maßnahmenplan [1].\n\n## Unternehmerische Schwächen\nDie unternehmerischen Schwächen und Pain-Points der Mitarbeitenden wurden erfasst und dienen als Grundlage für Verbesserungen [1]. Zudem wird angestrebt, die Geschwindigkeit und Transparenz der Entscheidungsfindung zu erhöhen und die Arbeitsbelastung der Mitarbeitenden sowie weitere unternehmerische Risiken zu verringern [2].\n\n## Organisationsstruktur\nDie Aufbau- und Prozessorganisation wurde geprüft, und es wurden Anpassungen vorgenommen, die Teil des normalen Planungsprozesses sind [3]. Die Implementierung der Strategie 2026+ läuft, und es liegt ein Umsetzungsplan für die Anpassungen der Aufbau- und Prozessorganisation vor [5]. Die Einführung agiler Arbeitsmodelle und die Klärung der Selbstorganisation als Modell der agilen Zusammenarbeit sind ebenfalls Teil der Ergebnisse [5].\n\n## Limitations\nDie Beweise geben keine detaillierten Informationen über spezifische Schwächen oder die genauen Auswirkungen der neuen Organisationsstruktur auf die Mitarbeitenden oder die Servicequalität. Es bleibt unklar, inwieweit die identifizierten Schwächen konkret angegangen wurden oder welche spezifischen Maßnahmen ergriffen wurden, um die Service-Erfahrung zu verbessern.",
         "citations": [
           {
             "documentId": "41964cf3-5012-4c20-97a0-a40c4c857b4d",
@@ -4542,12 +4831,6 @@
             "pageNumber": 3,
             "chunkId": "f885a9ee-8bd4-4162-bec4-93e397830c25",
             "evidenceIndex": 5
-          },
-          {
-            "documentId": "7b8b0ee3-8efe-4186-9725-8d3d371a5034",
-            "pageNumber": 7,
-            "chunkId": "85484c82-290a-49eb-b933-e885fdea99c1",
-            "evidenceIndex": 8
           }
         ],
         "insufficientEvidence": false,
@@ -4555,25 +4838,30 @@
       },
       "metrics": {
         "recallAt5": 1,
-        "ndcgAt10": 0.8477774488692931,
+        "ndcgAt10": 1,
         "mrr": 1,
         "firstRelevantRank": 1,
         "relevantRanks": [
-          1,
-          3,
-          6,
-          8
+          1
         ],
-        "citationAccuracy": 0.4,
+        "citationAccuracy": 0.5,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6313,
-        "cachedLatencyMs": 5578,
+        "uncachedLatencyMs": 6320,
+        "cachedLatencyMs": 5953,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.625,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -4665,7 +4953,7 @@
         ]
       },
       "answer": {
-        "text": "Um die Checklisten basierend auf dem Handbuch DZ des KSA Zürich effektiv zu verwenden, sollten folgende Punkte beachtet werden:\n\n1. Die Checklisten sind mit Hilfe von KI generiert und enthalten nur die Kapitel, bei denen nützliche Ergebnisse erzielt wurden. Bei Unklarheiten ist es ratsam, das kantonale Handbuch oder andere relevante Ressourcen zu konsultieren, um sicherzustellen, dass alle notwendigen Schritte unternommen werden [1].\n\n2. Die Checklisten bieten eine vereinfachte Darstellung der im Handbuch beschriebenen Prozesse und decken möglicherweise nicht alle Details ab. Daher ist es immer ratsam, das vollständige Handbuch für umfassende Anleitungen zu konsultieren [2][4][5][7][8].\n\n3. Bei der Durchführung von finanziellen Leistungen müssen diese im Auftrag des KSA ausgerichtet werden, und alle Zahlungen müssen nachvollziehbar dokumentiert sein [7]. \n\n4. Bei externen gemeinnützigen Einsätzen ist es wichtig, dass die Entschädigung nicht gewinnbringend ist und die Angebote dem KSA zur Bewilligung vorgelegt werden müssen [8].\n\n## Limitations\nDie Beweise geben keine spezifischen Anweisungen zur praktischen Anwendung der Checklisten oder zu den genauen Inhalten der einzelnen Checklisten. Es bleibt unklar, welche spezifischen Kapitel und Abschnitte in den Checklisten enthalten sind und wie diese konkret angewendet werden sollten.",
+        "text": "Beim Verwenden der Checklisten basierend auf dem Handbuch DZ des KSA Zürich sollte beachtet werden, dass diese Checklisten mit Hilfe von KI generiert wurden und nicht alle Details des Handbuchs enthalten. Es ist ratsam, das vollständige Handbuch zu konsultieren, um sicherzustellen, dass alle notwendigen Schritte unternommen werden [1][2][3][4][5][6][7][8].\n\n## Wichtige Hinweise zur Nutzung der Checklisten\n\n### Konsultation des Handbuchs\nDie Checklisten sind eine vereinfachte Darstellung der im Handbuch beschriebenen Prozesse und decken möglicherweise nicht alle Aspekte ab. Daher ist es wichtig, das vollständige Handbuch für umfassende Informationen zu konsultieren [2][3][4][7][8].\n\n### Dokumentation und Effizienz\nBei der Ausrichtung finanzieller Leistungen müssen alle Zahlungen nachvollziehbar dokumentiert werden. Ein Teil der finanziellen Leistungen kann ohne vorherige Absprache mit dem KSA geleistet werden, um die Effizienz zu steigern [7]. \n\n### Externe Einsätze\nFür externe gemeinnützige Einsätze müssen die Betreiberinnen die Eignung und Umsetzbarkeit der Angebote prüfen und die Entschädigung gemäß den KSA-Richtlinien berücksichtigen [8].\n\n## Limitations\nDie Beweise legen nicht fest, ob es spezifische Anforderungen oder Ausnahmen gibt, die bei der Nutzung der Checklisten zu beachten sind. Es bleibt unklar, ob es zusätzliche Richtlinien oder Verfahren gibt, die nicht in den Checklisten enthalten sind.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -4681,6 +4969,12 @@
           },
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 37,
+            "chunkId": "e0d985df-8a21-4990-9dba-697e3c51f35b",
+            "evidenceIndex": 3
+          },
+          {
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
             "pageNumber": 36,
             "chunkId": "4de62eb7-086e-48a2-8d0d-cc0f8f79a747",
             "evidenceIndex": 4
@@ -4690,6 +4984,12 @@
             "pageNumber": 38,
             "chunkId": "1dfd29bc-a1aa-4028-bdfb-a0486cb75f1e",
             "evidenceIndex": 5
+          },
+          {
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 46,
+            "chunkId": "dc0e25f7-0e16-45f5-a606-be67d081f77b",
+            "evidenceIndex": 6
           },
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -4708,24 +5008,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
-        "citationAccuracy": 0.16666666666666666,
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
+        "citationAccuracy": 0.125,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8347,
-        "cachedLatencyMs": 8520,
+        "uncachedLatencyMs": 7409,
+        "cachedLatencyMs": 4891,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.8,
+        "contextPrecision": 1,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-939ca640-0"
+        }
+      ],
       "error": null
     },
     {
@@ -4816,7 +5128,7 @@
         ]
       },
       "answer": {
-        "text": "Um finanzielle Unterstützung beim Migrationsamt zu beantragen, müssen Sie persönlich beim Migrationsamt des Kantons Zürich vorsprechen und die ausländerrechtliche Situation überprüfen lassen. Nach dieser Überprüfung erfolgt eine Überweisung an das Kantonale Sozialamt (KSA), wo die grundlegenden Voraussetzungen für die Gewährung von Nothilfe geprüft werden [1][2]. \n\n## Schritte zur Beantragung\n\n1. **Persönliches Vorsprechen**: Sie müssen persönlich beim Migrationsamt erscheinen, um Ihre Situation zu klären [1].\n2. **Überprüfung der Situation**: Das Migrationsamt wird Ihre ausländerrechtliche Situation überprüfen und Sie dann an das KSA überweisen [1].\n3. **Eintritt ins Rückkehrzentrum (RZ)**: Nach der Zuweisung zu einem RZ müssen Sie am Eintrittsgespräch teilnehmen, wo Sie den Unterstützungsantrag ausfüllen [1].\n4. **Einreichung des Antrags**: Der ausgefüllte Unterstützungsantrag muss elektronisch per E-Mail an das KSA gesendet werden, und zwar spätestens am Folgetag nach Ihrem Eintritt ins RZ [1][8].\n5. **Dokumentation**: Stellen Sie sicher, dass alle erforderlichen Unterlagen, wie persönliche Identifikationsdokumente und Nachweise über Einkommen oder Vermögen, beigefügt sind [5][8].\n\n## Wichtige Fristen\n\n- Der Unterstützungsantrag muss innerhalb von 14 Tagen nach Eintritt ins Durchgangszentrum eingereicht werden, wenn Sie in einem solchen sind [8].\n- Bei Nothilfe ist der Antrag bereits am Folgetag nach Eintritt einzureichen [8].\n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen über die genauen Dokumente, die für die Antragstellung erforderlich sind, außer dass persönliche Identifikationsdokumente und Nachweise über Einkommen oder Vermögen benötigt werden. Es bleibt unklar, welche weiteren spezifischen Unterlagen erforderlich sind.",
+        "text": "Um finanzielle Unterstützung beim Migrationsamt zu beantragen, müssen Sie persönlich beim Migrationsamt des Kantons Zürich vorsprechen und die ausländerrechtliche Situation überprüfen lassen. Nach dieser Überprüfung erfolgt eine Überweisung an das Kantonale Sozialamt (KSA), wo die grundlegenden Voraussetzungen für die Gewährung von Nothilfe geprüft werden [1]. \n\n## Schritte zur Beantragung\n\n1. **Vorbereitung**: Informieren Sie sich über die notwendigen Dokumente und Informationen, die für das Vorsprechen beim Migrationsamt benötigt werden [2].\n   \n2. **Eintrittsgespräch**: Führen Sie das Eintrittsgespräch im Rückkehrzentrum (RZ) durch, wo Sie den Unterstützungsantrag ausfüllen müssen. Dieser Antrag muss spätestens am Folgetag nach Ihrem Eintritt ins RZ eingereicht werden [1][3].\n\n3. **Einreichung des Antrags**: Scannen Sie den ausgefüllten Unterstützungsantrag und reichen Sie ihn per E-Mail an asylkoordination@sa.zh.ch ein. Achten Sie darauf, dass der E-Mail-Betreff korrekt ist, z.B. „Unterstützungsantrag N999’999 RZ Urdorf“ [1][3].\n\n4. **Nach der Einreichung**: Überwachen Sie den Eingang der Rückmeldung vom KSA. Wenn innerhalb von 30 Tagen keine Rückmeldung erfolgt, gilt der Antrag als genehmigt [7]. \n\n## Notwendige Unterlagen\n\nStellen Sie sicher, dass alle erforderlichen Unterlagen, wie persönliche Identifikationsdokumente und Nachweise über Einkommen oder Vermögen (falls vorhanden), dem Antrag beigefügt sind [5][8]. \n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen über die genauen Dokumente, die für die Beantragung erforderlich sind, oder über die Fristen für die Einreichung von Anträgen in anderen Kontexten.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -4831,16 +5143,28 @@
             "evidenceIndex": 2
           },
           {
-            "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
-            "pageNumber": 2,
-            "chunkId": "1b495eb1-2d50-46d5-b1f9-d9f433fcdbc0",
-            "evidenceIndex": 8
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 3,
+            "chunkId": "85d5fb22-11e8-4023-9589-3bb205f09a67",
+            "evidenceIndex": 3
+          },
+          {
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 4,
+            "chunkId": "ffa86209-79e0-46d7-ab26-c3d52b368806",
+            "evidenceIndex": 7
           },
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
             "pageNumber": 7,
             "chunkId": "4f6ee868-d107-43a5-a5d9-4bf4d0d1f1d1",
             "evidenceIndex": 5
+          },
+          {
+            "documentId": "373a9133-b253-4956-8f81-b59039d6a994",
+            "pageNumber": 2,
+            "chunkId": "1b495eb1-2d50-46d5-b1f9-d9f433fcdbc0",
+            "evidenceIndex": 8
           }
         ],
         "insufficientEvidence": false,
@@ -4852,20 +5176,33 @@
         "mrr": 1,
         "firstRelevantRank": 1,
         "relevantRanks": [
-          1,
-          2
+          1
         ],
-        "citationAccuracy": 0.5,
+        "citationAccuracy": 0.3333333333333333,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 1,
+        "verifiedCitationRate": 0.8333333333333334,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 10769,
-        "cachedLatencyMs": 7146,
+        "uncachedLatencyMs": 8391,
+        "cachedLatencyMs": 7510,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 0.9,
+        "answerRelevance": 0.92,
+        "contextPrecision": 0.75,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 1
+      },
+      "failures": [
+        {
+          "failureType": "citation",
+          "probableRootCause": "Citation verifier judged one or more cited sentences unsupported by their sources.",
+          "remediationTicket": "TODO-EVAL-de-939ca640-5"
+        }
+      ],
       "error": null
     },
     {
@@ -4956,7 +5293,7 @@
         ]
       },
       "answer": {
-        "text": "Um einen neuen Antrag zu stellen, muss eine Person folgende Schritte beachten:\n\n1. **Kontaktaufnahme**: Die Person sollte Kontakt mit den zuständigen Behörden aufnehmen und sicherstellen, dass sie versteht, dass ein neuer Antrag erforderlich ist. Es müssen die notwendigen Formulare und Informationen bereitgestellt werden, und es ist zu überprüfen, ob alle erforderlichen Unterlagen vorhanden sind [1].\n\n2. **Antragseinreichung**: Der Antrag muss vollständig und korrekt ausgefüllt werden, und alle notwendigen Begleitdokumente müssen beigefügt sein. Der Antrag ist bei der zuständigen Stelle einzureichen [1].\n\n3. **Zuweisung**: Die Person sollte darüber informiert werden, dass sie erneut zugewiesen wird, und es sollte erklärt werden, wie das Zuweisungsverfahren abläuft und wann mit einer Zuweisung gerechnet werden kann [1].\n\n4. **Beratung und Unterstützung**: Es ist wichtig, die Person über ihre Rechte und Pflichten im Rahmen des neuen Antragsverfahrens zu beraten und Informationen über Unterstützungsangebote bereitzustellen. Bei Bedarf sollte Unterstützung bei der Suche nach Unterkunft und grundlegenden Bedürfnissen angeboten werden [1].\n\n5. **Dokumentation und Nachverfolgung**: Alle relevanten Kommunikationen und die Wiederaufnahme des Verfahrens sollten dokumentiert werden [1].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über Fristen oder besondere Anforderungen für die Antragstellung an, die über die allgemeinen Schritte hinausgehen.",
+        "text": "Um einen neuen Antrag zu stellen, muss eine Person folgende Schritte beachten:\n\n1. **Erneute Kontaktaufnahme**: Die Person sollte Kontakt mit den zuständigen Behörden aufnehmen und sicherstellen, dass sie versteht, dass ein neuer Antrag erforderlich ist. Es müssen die notwendigen Formulare und Informationen bereitgestellt werden, und es ist zu überprüfen, ob alle erforderlichen Unterlagen vorhanden sind [1].\n\n2. **Einreichung des Antrags**: Der Antrag muss vollständig und korrekt ausgefüllt werden, und alle notwendigen Begleitdokumente müssen beigefügt sein. Anschließend ist der Antrag bei der zuständigen Stelle einzureichen [1].\n\n3. **Zuweisung**: Die Person sollte darüber informiert werden, dass sie erneut zugewiesen wird, und es sollte erklärt werden, wie das Zuweisungsverfahren abläuft und wann mit einer Zuweisung gerechnet werden kann [1].\n\n4. **Beratung und Unterstützung**: Es ist wichtig, die Person über ihre Rechte und Pflichten im Rahmen des neuen Antragsverfahrens zu beraten und Informationen über Unterstützungsangebote bereitzustellen. Bei Bedarf sollte Unterstützung bei der Suche nach Unterkunft und grundlegenden Bedürfnissen angeboten werden [1].\n\n5. **Dokumentation und Nachverfolgung**: Alle relevanten Kommunikationen und die Wiederaufnahme des Verfahrens sollten dokumentiert werden [1].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über Fristen oder besondere Anforderungen für die Einreichung des Antrags an, abgesehen von der allgemeinen Notwendigkeit, alle erforderlichen Unterlagen bereitzustellen.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -4969,25 +5306,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 0.9197207891481876,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1,
-          3
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 1,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 7486,
-        "cachedLatencyMs": 5677,
+        "uncachedLatencyMs": 8063,
+        "cachedLatencyMs": 5708,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-939ca640-11"
+        }
+      ],
       "error": null
     },
     {
@@ -5109,11 +5457,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6467,
-        "cachedLatencyMs": 4068,
+        "uncachedLatencyMs": 7759,
+        "cachedLatencyMs": 5552,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.85,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -5205,7 +5561,7 @@
         ]
       },
       "answer": {
-        "text": "In der Dokumentation sollten folgende Arten von Vorfällen erfasst werden: Gewaltvorfälle (selbst- oder fremdverletzendes Verhalten), psychische Krisen von Bewohnenden, öffentlichkeitsrelevante Vorfälle, Hinweise auf Radikalisierungstendenzen, unerlaubtes Eindringen in die Unterkunft durch Dritte sowie alle relevanten Polizeirapporte und Dokumentationen im Betreuungsdossier [1][2].\n\n## Arten von Vorfällen\n\n1. **Gewaltvorfälle**: Dazu zählen sowohl selbst- als auch fremdverletzendes Verhalten [1][2].\n2. **Psychische Krisen**: Vorfälle, die zu einem Hausverbot oder einer möglichen Sonderunterbringung führen [2].\n3. **Öffentlichkeitsrelevante Vorfälle**: Insbesondere solche, bei denen Blaulichtorganisationen wie Polizei, Feuerwehr oder Sanität involviert sind [1][2].\n4. **Radikalisierungstendenzen**: Hinweise auf extremistische Gedankengänge von Bewohnenden [1][2].\n5. **Unerlaubtes Eindringen**: Vorfälle, bei denen Dritte unbefugt in die Unterkunft eindringen oder Demonstrationen gegen die Unterkunft stattfinden [1][2].\n6. **Polizeirapporte**: Alle relevanten Berichte und Anzeigen, die im Zusammenhang mit den oben genannten Vorfällen stehen [1][2].\n\n## Dokumentationsanforderungen\n\nDie Dokumentation muss chronologisch erfolgen und klar identifizieren, welche Personen betroffen sind und wann die Vorfälle stattgefunden haben [3]. Zudem müssen alle relevanten Unterlagen, wie Zuweisungsschreiben und Gesprächsdokumentationen, im Betreuungsdossier abgelegt werden [2][3].\n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen über die genauen Verfahren zur Dokumentation oder die Formate, die verwendet werden sollten. Es bleibt unklar, ob es zusätzliche Arten von Vorfällen gibt, die ebenfalls dokumentiert werden sollten.",
+        "text": "In der Dokumentation sollten folgende Arten von Vorfällen erfasst werden: Gewaltvorfälle (selbst- oder fremdverletzendes Verhalten), psychische Krisen von Bewohnenden, öffentlichkeitsrelevante Vorfälle, Hinweise auf Radikalisierungstendenzen, unerlaubtes Eindringen in die Unterkunft durch Dritte sowie alle relevanten Polizeirapporte und Dokumentationen im Betreuungsdossier [1][2].\n\n## Arten von Vorfällen\n\n1. **Gewaltvorfälle**: Dazu zählen sowohl selbst- als auch fremdverletzendes Verhalten [1][2].\n2. **Psychische Krisen**: Vorfälle, die zu einem Hausverbot oder einer möglichen Sonderunterbringung führen [2].\n3. **Öffentlichkeitsrelevante Vorfälle**: Insbesondere solche, bei denen Blaulichtorganisationen wie Polizei, Feuerwehr oder Sanität involviert sind [1][2].\n4. **Radikalisierungstendenzen**: Hinweise auf extremistische Gedankengänge von Bewohnenden [1][2].\n5. **Unerlaubtes Eindringen**: Vorfälle, bei denen Dritte unbefugt in die Unterkunft eindringen oder Demonstrationen stattfinden [1][2].\n6. **Polizeirapporte**: Alle relevanten Berichte und Anzeigen, die im Zusammenhang mit den oben genannten Vorfällen stehen [1][2].\n\n## Dokumentationsanforderungen\n\nDie Dokumentation muss chronologisch erfolgen und klar identifizieren, wann das Ereignis stattgefunden hat und welche Person betroffen ist [3]. Zudem müssen alle relevanten Unterlagen im Betreuungsdossier abgelegt werden [2][3].\n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen über die genauen Verfahren zur Dokumentation oder die Formate, die verwendet werden sollten. Es bleibt unklar, ob es zusätzliche Arten von Vorfällen gibt, die ebenfalls dokumentiert werden sollten.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -5243,11 +5599,19 @@
         "verifiedCitationRate": 0.8888888888888888,
         "groundingScore": 0.9411764705882353,
         "hallucinationRate": 0.05882352941176472,
-        "uncachedLatencyMs": 8441,
-        "cachedLatencyMs": 6826,
+        "uncachedLatencyMs": 8755,
+        "cachedLatencyMs": 7324,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
           "failureType": "citation",
@@ -5345,7 +5709,7 @@
         ]
       },
       "answer": {
-        "text": "Um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen, sind folgende Schritte erforderlich:\n\n1. **Identifikation der betroffenen Person**: Notiere den Namen, Vornamen und das Geburtsdatum der Person, die die Leistung beantragt oder benötigt [1][2].\n2. **Bestimmung der vorgesehenen Leistung**: Beschreibe die Leistung, die vorgesehen ist [1][2].\n3. **Berechnung der vorgesehenen Kosten**: Füge einen Beleg oder Kostenvoranschlag für die vorgesehenen Kosten bei [1][2].\n4. **Begründung der Notwendigkeit**: Gib eine kurze Begründung für die Notwendigkeit der Leistung an [1][2].\n5. **Erstellung des E-Mails**: Der Betreff des E-Mails sollte den Namen der Unterkunft, den Status, die N-Nummer, das Kostengutsprachegesuch und das Thema / die Leistung enthalten. Der Inhalt des E-Mails sollte die oben genannten Punkte enthalten [1][2].\n6. **Versand des E-Mails**: Richte das E-Mail an kogu@sa.zh.ch [1][2].\n7. **Warten auf die Antwort**: Die Gesuche werden in der Regel wöchentlich bearbeitet, und die Antwort erfolgt in Abhängigkeit der Dringlichkeit, in der Regel innerhalb von 1-3 Wochen [1][2].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über zusätzliche Anforderungen oder mögliche Ausnahmen im Antragsprozess.",
+        "text": "Um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen, sind folgende Schritte erforderlich:\n\n1. **Identifikation der betroffenen Person**: Notiere den Namen, Vornamen und das Geburtsdatum der Person, die die Leistung beantragt oder benötigt [1][2].\n2. **Bestimmung der vorgesehenen Leistung**: Beschreibe die Leistung, die vorgesehen ist [1][2].\n3. **Berechnung der vorgesehenen Kosten**: Füge einen Beleg oder Kostenvoranschlag für die vorgesehenen Kosten bei [1][2].\n4. **Begründung der Notwendigkeit**: Gib eine kurze Begründung für die Notwendigkeit der Leistung an [1][2].\n5. **Erstellung des E-Mails**: Der Betreff des E-Mails sollte den Namen der Unterkunft, den Status, die N-Nummer, das Kostengutsprachegesuch und das Thema / die Leistung enthalten. Der Inhalt des E-Mails sollte die oben genannten Punkte enthalten [1][2].\n6. **Versand des E-Mails**: Richte das E-Mails an kogu@sa.zh.ch [1][2].\n7. **Warten auf die Antwort**: Die Gesuche werden in der Regel wöchentlich bearbeitet, und die Antwort erfolgt in Abhängigkeit der Dringlichkeit, in der Regel innerhalb von 1-3 Wochen [1][2].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über zusätzliche Anforderungen oder mögliche Ausnahmen im Antragsprozess.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -5376,11 +5740,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 8590,
-        "cachedLatencyMs": 6322,
+        "uncachedLatencyMs": 9198,
+        "cachedLatencyMs": 5762,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -5431,7 +5803,7 @@
             "sectionTitle": "DZ ZH / Quartalsweise Abrechnung",
             "source": "hybrid",
             "retrievalScore": 0.022482435597189696,
-            "rerankScore": 0.174480206
+            "rerankScore": 0.17431881
           },
           {
             "chunkId": "91bcb7ca-e841-44fb-b141-f04df98e0fa7",
@@ -5472,7 +5844,7 @@
         ]
       },
       "answer": {
-        "text": "Um die Zahnarztkosten erstattet zu bekommen, musst du mehrere Schritte befolgen. Zuerst solltest du einen Kostenvoranschlag von deinem behandelnden Zahnarzt oder der behandelnden Zahnärztin einholen und das Formular für Sozialzahnmedizin der VKZS (Vereinigung der Kantonszahnärztinnen und -ärzten der Schweiz) vollständig ausfüllen. Außerdem musst du sicherstellen, dass alle notwendigen Informationen und Dokumente, einschließlich aktueller Röntgenbilder, deinem Gesuch beigefügt sind. Schließlich reiche dein Kostengutsprachegesuch beim Kantonalen Sozialamt (KSA) ein, entweder per E-Mail oder schriftlich [1][8].\n\n## Schritte zur Kostenerstattung\n\n1. **Kostenvoranschlag einholen**: Stelle sicher, dass du einen Kostenvoranschlag von deinem Zahnarzt erhältst [1].\n2. **Formular ausfüllen**: Fülle das Formular für Sozialzahnmedizin der VKZS vollständig aus [1].\n3. **Dokumente beifügen**: Lege aktuelle Röntgenbilder und alle notwendigen Informationen deinem Gesuch bei [1].\n4. **Gesuch einreichen**: Reiche dein Kostengutsprachegesuch beim KSA ein, entweder per E-Mail an gesundheit@sa.zh.ch oder schriftlich [1][8].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über die Fristen oder die Höhe der Erstattung an. Es bleibt unklar, ob es zusätzliche Anforderungen oder Bedingungen gibt, die erfüllt werden müssen.",
+        "text": "Um die Zahnarztkosten erstattet zu bekommen, musst du mehrere Schritte befolgen. Zunächst musst du einen Kostenvoranschlag von deinem behandelnden Zahnarzt oder der behandelnden Zahnärztin einholen und das Formular für Sozialzahnmedizin der VKZS (Vereinigung der Kantonszahnärztinnen und -ärzten der Schweiz) vollständig ausfüllen. Außerdem ist es wichtig, die Vorgaben der VKZS einzuhalten und aktuelle Röntgenbilder deinem Gesuch beizulegen. Schließlich musst du dein Kostengutsprachegesuch beim Kantonalen Sozialamt (KSA) einreichen, entweder per E-Mail oder schriftlich [1][8].\n\n## Schritt-für-Schritt-Anleitung\n\n1. **Kostenvoranschlag einholen**: Stelle sicher, dass du einen Kostenvoranschlag von deinem Zahnarzt erhältst [1].\n2. **Formular ausfüllen**: Fülle das Formular für Sozialzahnmedizin der VKZS vollständig aus [1].\n3. **Vorgaben einhalten**: Achte darauf, die Vorgaben der VKZS zu befolgen [1].\n4. **Röntgenbilder beilegen**: Lege aktuelle Röntgenbilder deinem Gesuch bei [1].\n5. **Gesuch einreichen**: Reiche dein Kostengutsprachegesuch beim KSA ein, entweder per E-Mail an gesundheit@sa.zh.ch oder schriftlich [1][8].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über die Fristen oder die Höhe der Erstattung an. Es bleibt unklar, ob es zusätzliche Anforderungen oder Ausnahmen gibt, die je nach individueller Situation gelten könnten.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -5501,13 +5873,21 @@
         "citationAccuracy": 0.5,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
-        "groundingScore": 0.9285714285714286,
-        "hallucinationRate": 0.0714285714285714,
-        "uncachedLatencyMs": 7509,
-        "cachedLatencyMs": 7301,
+        "groundingScore": 0.9375,
+        "hallucinationRate": 0.0625,
+        "uncachedLatencyMs": 10117,
+        "cachedLatencyMs": 5203,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 1,
+        "contextPrecision": 0.25,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -5599,7 +5979,7 @@
         ]
       },
       "answer": {
-        "text": "Um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen, sind folgende Schritte zu befolgen:\n\n1. **Identifikation der betroffenen Person**: Notiere den Namen, Vornamen und das Geburtsdatum der Person, die die Leistung beantragt oder benötigt [1][2].\n2. **Bestimmung der vorgesehenen Leistung**: Beschreibe die Leistung, die vorgesehen ist [1][2].\n3. **Berechnung der vorgesehenen Kosten**: Füge einen Beleg oder Kostenvoranschlag für die vorgesehenen Kosten hinzu [1][2].\n4. **Begründung der Notwendigkeit der Leistung**: Gib eine kurze Begründung zur Notwendigkeit der Leistung an [1][2].\n5. **Formulierung des Antrags**: Stelle den Antrag der Betreiberin zusammen und achte darauf, dass der Betreff des E-Mails den Namen der Unterkunft, den Status, die N-Nummer und das Kostengutsprachegesuch enthält [1][2].\n6. **E-Mail senden**: Richte das E-Mail an kogu@sa.zh.ch und warte auf die Antwort, die in der Regel innerhalb von 1-3 Wochen erfolgt [1][2].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über zusätzliche Anforderungen oder mögliche Ausnahmen für bestimmte Arten von Leistungen, wie z.B. Zahnarztbehandlungen, die in einem anderen Abschnitt behandelt werden [2].",
+        "text": "Um eine Geldleistung außerhalb der Kompetenz der Betreiberin zu beantragen, sind folgende Schritte zu befolgen:\n\n1. **Identifikation der betroffenen Person**: Notiere den Namen, Vornamen und das Geburtsdatum der Person, die die Leistung beantragt oder benötigt. \n2. **Bestimmung der vorgesehenen Leistung**: Beschreibe die Leistung, die vorgesehen ist. \n3. **Berechnung der vorgesehenen Kosten**: Füge einen Beleg oder Kostenvoranschlag für die vorgesehenen Kosten hinzu. \n4. **Begründung der Notwendigkeit der Leistung**: Gib eine kurze Begründung zur Notwendigkeit der Leistung an. \n5. **Formulierung des Antrags**: Stelle den Antrag der Betreiberin zusammen und achte darauf, dass der Betreff des E-Mails den Namen der Unterkunft, den Status, die N-Nummer und das Kostengutsprachegesuch enthält. \n6. **E-Mail senden**: Richte das E-Mail an kogu@sa.zh.ch. \n7. **Warten auf die Antwort**: Die Gesuche werden in der Regel wöchentlich bearbeitet, und die Antwort erfolgt in Abhängigkeit von der Dringlichkeit, i.d.R. innerhalb von 1-3 Wochen [1][2].\n\n## Detaillierte Schritte\n\n### Identifikation und Beschreibung\nDie betroffene Person muss identifiziert werden, und die Art der beantragten Leistung muss klar beschrieben werden [1][2].\n\n### Kosten und Begründung\nEs ist notwendig, die Kosten zu berechnen und einen Beleg oder Kostenvoranschlag beizufügen, sowie die Notwendigkeit der beantragten Leistung zu begründen [1][2].\n\n### Antragstellung\nDer Antrag muss in einer bestimmten Formulierung erfolgen, die alle erforderlichen Informationen enthält, und dann per E-Mail an die zuständige Stelle gesendet werden [1][2].\n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über mögliche Ausnahmen oder besondere Umstände, die den Antrag beeinflussen könnten. Es wird auch nicht auf spezifische Fristen oder zusätzliche Anforderungen für besondere Leistungen eingegangen.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -5630,11 +6010,19 @@
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 6095,
-        "cachedLatencyMs": 6877,
+        "uncachedLatencyMs": 8110,
+        "cachedLatencyMs": 4988,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.95,
+        "contextPrecision": 0.375,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [],
       "error": null
     },
@@ -5658,7 +6046,7 @@
             "sectionTitle": "DZ ZH / Quartalsweise Abrechnung / 11.6.2 Coaching Wohnungssuche",
             "source": "hybrid",
             "retrievalScore": 0.03278688524590164,
-            "rerankScore": 0.9576849
+            "rerankScore": 0.9573986
           },
           {
             "chunkId": "f11b22d1-997a-4ada-96ea-beff6cdf00e1",
@@ -5667,7 +6055,7 @@
             "sectionTitle": "DZ ZH",
             "source": "hybrid",
             "retrievalScore": 0.026120660599932594,
-            "rerankScore": 0.29766156
+            "rerankScore": 0.29761508999999997
           },
           {
             "chunkId": "b116bbce-619e-4f44-a4dc-b70f84acbbde",
@@ -5676,7 +6064,7 @@
             "sectionTitle": "DZ ZH / DZ ZH / Weiteres Vorgehen / DZ ZH / Weiteres Vorgehen",
             "source": "hybrid",
             "retrievalScore": 0.02578981302385558,
-            "rerankScore": 0.27545359999999997
+            "rerankScore": 0.27515711
           },
           {
             "chunkId": "c441a29e-4881-4b93-9d2e-cb68f1db82a3",
@@ -5726,7 +6114,7 @@
         ]
       },
       "answer": {
-        "text": "Um Flüchtlinge beim Wohnungssuche zu coachen, sollten folgende Schritte beachtet werden:\n\n1. **Zielgruppe identifizieren**: Stelle sicher, dass die Person, die du coachst, einen anerkannten Flüchtlingsstatus (Ausweis B) oder vorläufigen Flüchtlingsstatus (Ausweis F) hat und in kantonalen Durchgangsunterkünften lebt. Auch erwachsene Flüchtlinge in Sonderunterbringung können zur Zielgruppe gehören [1].\n\n2. **Anmeldung beim Coaching Wohnungssuche (CWS)**: Als Betreiberin musst du die Anmeldung beim CWS sicherstellen [1].\n\n3. **Informationen zur Zielgruppe sammeln**: Regelmäßig Informationen über die Zielgruppe an die Anbieterin des CWS weitergeben, einschließlich Stammdaten, Haushaltsgröße, Alphabetisierungsgrad und gesundheitliche Faktoren [1].\n\n4. **Dokumentation der Wohnungssuche**: Bei der Unterstützung zur Wohnungssuche sollten alle relevanten Unterlagen, wie Mietverträge und Informationen zu Kautionen, dokumentiert werden [3].\n\n5. **Prüfung der Mietzinsrichtlinien**: Stelle sicher, dass der Mietzins den Richtlinien der zuständigen Sozialbehörde entspricht und dokumentiere dies schriftlich [7].\n\n6. **Mietzinsgarantie**: Wenn eine Mietzinsgarantie benötigt wird, sollte diese gemäß den Vorgaben des KSA erstellt und zusammen mit dem Mietvertragsentwurf eingereicht werden [7].\n\n7. **Jährliche Überprüfung der Unterstützungsbedürftigkeit**: Bei längerer Aufenthaltsdauer der anerkannten Flüchtlinge im DZ sollte die Unterstützungsbedürftigkeit jährlich überprüft werden, einschließlich der aktuellen Situation und des Stands der Wohnungssuche [8].\n\n## Limitations\nDie Beweise geben keine spezifischen Details zu den Methoden oder Techniken des Coachings an, sondern konzentrieren sich auf administrative und dokumentarische Anforderungen. Es bleibt unklar, welche praktischen Coaching-Methoden angewendet werden sollten.",
+        "text": "Um Flüchtlinge beim Wohnungssuche zu coachen, sollten folgende Schritte beachtet werden:\n\n1. **Zielgruppe identifizieren**: Stelle sicher, dass die Person, die du coachst, einen anerkannten Flüchtlingsstatus (Ausweis B) oder vorläufigen Flüchtlingsstatus (Ausweis F) hat und in kantonalen Durchgangsunterkünften lebt. Auch erwachsene Flüchtlinge in Sonderunterbringung können zur Zielgruppe gehören [1].\n\n2. **Anmeldung beim Coaching Wohnungssuche (CWS)**: Als Betreiberin musst du die Anmeldung beim CWS sicherstellen [1].\n\n3. **Informationen zur Zielgruppe sammeln**: Regelmäßig Informationen über die Zielgruppe an die Anbieterin des CWS weitergeben, einschließlich Stammdaten, Haushaltsgröße, Alphabetisierungsgrad und gesundheitliche Faktoren [1].\n\n4. **Dokumentation der Wohnungssuche**: Bei der Unterstützung der Wohnungssuche sollten alle relevanten Unterlagen, wie Mietverträge und Informationen zu Kautionen, dokumentiert werden [3].\n\n5. **Prüfung der Mietzinsrichtlinien**: Stelle sicher, dass der Mietzins den Richtlinien der zuständigen Sozialbehörde entspricht und dokumentiere dies schriftlich [7].\n\n6. **Mietzinsgarantie**: Wenn eine Mietzinsgarantie benötigt wird, sollte diese vom KSA erstellt werden, und alle erforderlichen Unterlagen müssen zusammengestellt und eingereicht werden [7].\n\n7. **Jährliche Überprüfung der Unterstützungsbedürftigkeit**: Bei längerer Aufenthaltsdauer im DZ sollte die Unterstützungsbedürftigkeit jährlich überprüft werden, einschließlich der aktuellen Situation und der Fortschritte bei der Wohnungssuche [8].\n\n## Limitations\nDie Beweise geben keine spezifischen Details zu den Methoden oder Techniken des Coachings an, sondern konzentrieren sich auf administrative und dokumentarische Anforderungen. Es bleibt unklar, welche praktischen Coaching-Methoden angewendet werden sollten.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
@@ -5757,24 +6145,36 @@
         "truncated": false
       },
       "metrics": {
-        "recallAt5": 1,
-        "ndcgAt10": 1,
-        "mrr": 1,
-        "firstRelevantRank": 1,
-        "relevantRanks": [
-          1
-        ],
+        "recallAt5": 0,
+        "ndcgAt10": 0,
+        "mrr": 0,
+        "firstRelevantRank": null,
+        "relevantRanks": [],
         "citationAccuracy": 0.25,
         "citationEvidenceHit": 1,
         "verifiedCitationRate": 1,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 9241,
-        "cachedLatencyMs": 8025,
+        "uncachedLatencyMs": 8868,
+        "cachedLatencyMs": 7921,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
-      "failures": [],
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.88,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
+      "failures": [
+        {
+          "failureType": "retrieval",
+          "probableRootCause": "Expected evidence was not retrieved within top-5 ranked chunks.",
+          "remediationTicket": "TODO-EVAL-de-939ca640-55"
+        }
+      ],
       "error": null
     },
     {
@@ -5865,13 +6265,25 @@
         ]
       },
       "answer": {
-        "text": "Die wichtigsten Punkte zur Abrechnung von Fallkostenpauschalen umfassen die Abrechnung pro Person und Nacht, die Notwendigkeit, alle Klienten unabhängig von der Kapazität aufzulisten, und die Möglichkeit, verschiedene Arten von Pauschalen abzurechnen. Zudem dürfen nur eine Pauschale pro Zeitraum abgerechnet und die Auslastung entsprechend berechnet werden, wobei Pauschalen, die 60 Plätze oder 60% der Kapazität überschreiten, vergütet werden müssen [1].\n\n## Abrechnungsdetails\n\n- **Pro Person und Nacht**: Die Abrechnung erfolgt pro Person und Nacht, wobei alle Personen und Pauschalen aufgeführt werden müssen, unabhängig davon, ob der Sockel von 60 Plätzen oder 60% der Kapazität erreicht wird [1].\n  \n- **Beginn- und Enddatum**: Jede Person muss mit Beginn- und Enddatum der Platzierung aufgeführt werden, und bei laufenden Platzierungen können Quartalsbeginn und -ende als Daten eingesetzt werden [1].\n\n- **Pauschalen**: Es können verschiedene Arten von Pauschalen abgerechnet werden, darunter die Fallkostenpauschale für reguläre Klienten, Pauschalen für Sonderunterbringung und für Klienten in Haft oder im Krankenhaus [1].\n\n- **Auslastung**: Die Berechnung der Auslastung erfolgt basierend auf den Nächten der regulären Fallkostenpauschalen, und nur Pauschalen, die die festgelegten Kapazitätsgrenzen überschreiten, werden vergütet [1].\n\n## Limitations\n\nDie Beweise geben keine spezifischen Informationen zu den genauen Beträgen oder weiteren Details der Abrechnungsmethoden, die möglicherweise variieren können.",
+        "text": "Die wichtigsten Punkte zur Abrechnung von Fallkostenpauschalen umfassen die Abrechnung pro Person und Nacht, die Notwendigkeit, alle Klienten aufzulisten, sowie die Angabe von Beginn- und Enddatum der Platzierung. Zudem kann pro Zeitraum nur eine Pauschale abgerechnet werden, und es gibt verschiedene Arten von Pauschalen, die abgerechnet werden können, wie die Fallkostenpauschale für reguläre Klienten und spezielle Pauschalen für Klienten in Pflegeheimen oder Haft [1].\n\n## Abrechnungsdetails\n- **Auflistung der Klienten**: Alle Personen und Pauschalen müssen aufgeführt werden, unabhängig davon, ob der Sockel von 60 Plätzen oder 60% der Kapazität erreicht wird [1].\n- **Zeitraum der Abrechnung**: Pro Zeitraum kann jeweils nur eine Pauschale abgerechnet werden [1].\n- **Berechnung der Auslastung**: Die Auslastung wird basierend auf den Nächten der regulären Fallkostenpauschalen berechnet, und nur Pauschalen, die 60 Plätze oder 60% der Kapazität überschreiten, werden vergütet [1].\n\n## Besondere Entschädigungen\nFür besondere Entschädigungen müssen die Bedingungen für die Anwendung der situativen Pauschalen erfüllt sein, und die Rechnung muss das betroffene Zentrum sowie die spezifische Pauschale angeben [3].\n\n## Weiterverrechnung von Kosten\nDie Abrechnung von effektiven Kosten erfordert die Erstellung von Einzelfallrechnungen und die Einreichung von Kontoauszügen, die detaillierte Ausgaben und Einnahmen auflisten [7]. \n\n## Limitations\nDie Beweise geben keine spezifischen Informationen über die genauen Beträge oder die genauen Verfahren zur Abrechnung von Fallkostenpauschalen, die in bestimmten Situationen variieren können.",
         "citations": [
           {
             "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
             "pageNumber": 45,
             "chunkId": "1abb670d-4391-41e6-9147-2da44a83ac75",
             "evidenceIndex": 1
+          },
+          {
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 48,
+            "chunkId": "f6ac26d6-73f2-4ca0-bd80-8c80bae4071f",
+            "evidenceIndex": 3
+          },
+          {
+            "documentId": "939ca640-853b-42ed-9b86-c3ed5825fcd4",
+            "pageNumber": 46,
+            "chunkId": "dc0e25f7-0e16-45f5-a606-be67d081f77b",
+            "evidenceIndex": 7
           }
         ],
         "insufficientEvidence": false,
@@ -5885,16 +6297,24 @@
         "relevantRanks": [
           1
         ],
-        "citationAccuracy": 1,
+        "citationAccuracy": 0.3333333333333333,
         "citationEvidenceHit": 1,
-        "verifiedCitationRate": 0.6,
+        "verifiedCitationRate": 0.8333333333333334,
         "groundingScore": 1,
         "hallucinationRate": 0,
-        "uncachedLatencyMs": 9647,
-        "cachedLatencyMs": 6274,
+        "uncachedLatencyMs": 7011,
+        "cachedLatencyMs": 8856,
         "cacheHitOnRepeat": true
       },
-      "judge": null,
+      "judge": {
+        "judged": true,
+        "faithfulness": 1,
+        "answerRelevance": 0.9,
+        "contextPrecision": 0.5,
+        "contextRecall": 1,
+        "abstained": false,
+        "unsupportedStatementCount": 0
+      },
       "failures": [
         {
           "failureType": "citation",

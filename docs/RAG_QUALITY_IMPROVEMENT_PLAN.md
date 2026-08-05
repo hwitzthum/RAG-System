@@ -1,8 +1,8 @@
 # RAG_QUALITY_IMPROVEMENT_PLAN.md
 
-Version: 1.1
+Version: 1.2
 Date: 2026-08-05
-Status: Wave 0 complete (PR #57). **Wave 1 complete (2026-08-05)** — 1.1 and 1.3 shipped (PR #60), 1.2 shipped (PR #61), 1.6 shipped (PR #62); 1.4 withdrawn and 1.5 deferred, both on measurement. Waves 2-3 not started; both require a corpus re-ingest.
+Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). Wave 3 not started; item 3.1 is now the prerequisite for any further retrieval A/B, having been the binding constraint on measurement three separate times this wave.
 
 ## Objective
 
@@ -375,7 +375,39 @@ All three items require re-ingestion and item 2.1 additionally requires a full r
 
 Order within the wave matters: PDF extraction changes page text → which changes chunk boundaries → which changes what the context generator sees → which changes the embedded string. Implement in that order, then re-ingest once.
 
-**Status (2026-08-05): code for 2.1, 2.2 and 2.3 is implemented and committed; the re-ingest has not run.** Retrieval and judge outcomes are therefore still open. What is settled is recorded per item below.
+**Status (2026-08-05): COMPLETE.** All three items shipped, the duplicate document was removed, the corpus was re-ingested (three passes — the second and third forced by defects recorded below), and the wave was measured against a judged control arm taken immediately before the first re-ingest. The embedding-drift baseline was re-adopted after failing once by design (centroid cosine 0.0973 vs 0.08).
+
+### Wave 2 outcome — measured
+
+Control arm `benchmark-2026-08-05T07-43-53-326Z` (judged, pool 100, n=40, post-dedup, pre-re-ingest); final treatment `-T13-25-30-604Z` (judged) and `-T13-35-11-164Z` (page-only). Strict retrieval metrics are unreadable across this wave — `expected_section` labels are stale for the re-chunked corpus (strict recall@5 read 0.425 while page-only read 0.950) — so retrieval is reported on the page-only slice and answer quality on the judge, which never touches labels.
+
+| page-only retrieval | control |  final |       delta |
+| ------------------- | ------: | -----: | ----------: |
+| overall recall@5    |  0.9250 | 0.9500 | **+0.0250** |
+| overall nDCG@10     |  0.8587 | 0.8779 | **+0.0192** |
+| overall MRR         |  0.8688 | 0.8744 |     +0.0057 |
+| **EN recall@5**     |  0.7857 | 0.8571 | **+0.0714** |
+| **EN nDCG@10**      |  0.7130 | 0.7806 | **+0.0675** |
+| **EN MRR**          |  0.7143 | 0.7602 | **+0.0459** |
+| DE nDCG@10          |  0.9371 | 0.9302 |     −0.0068 |
+| DE MRR              |  0.9519 | 0.9359 |     −0.0160 |
+
+| judge / gated                     | control |  final |       delta |
+| --------------------------------- | ------: | -----: | ----------: |
+| contextRecall                     |  0.9700 | 1.0000 | **+0.0300** |
+| citationEvidenceHitRate _(gated)_ |  0.9250 | 0.9500 | **+0.0250** |
+| faithfulness _(gated)_            |  0.9777 | 0.9868 |     +0.0091 |
+| verifiedCitationRate _(gated)_    |  0.9764 | 0.9813 |     +0.0049 |
+| answerRelevance                   |  0.9443 | 0.9390 |     −0.0052 |
+| contextPrecision                  |  0.6312 | 0.6219 |     −0.0094 |
+
+**The wave is net positive.** EN — the slice items 1.2, 1.4 and 2.1 were all aimed at — gained +0.071 recall@5 and +0.068 nDCG@10, driven by ProDoc (+0.093 nDCG over its 10 queries) and AI_Change (the table document, +0.029). contextRecall reached 1.0000: the retrieved evidence now contains everything needed to answer, on every query. Every gated metric improved. DE gave back ~0.016 MRR, all of it attributable to one document (below). **contextPrecision moved −0.009, inside the noise floor — item 2.2's whole-document context did not measurably improve the metric it was aimed at.** The honest reading: 2.2 is a proven cost fix (the cache works) and a plausible quality fix whose effect this harness cannot resolve at n=40.
+
+**An intermediate run showed faithfulness −0.016 and answerRelevance −0.015; both dissipated on the next re-ingest** (faithfulness ended +0.009 _above_ control). Per-query attribution traced the dip to regenerated answers over re-chunked evidence, concentrated on the document whose retrieval changed most, with the worst-hit answers ending in negative-existential Limitations sentences — the statement type item 1.6 documented as unsupported-by-construction under the current judge. Practical lesson: the measured ±0.01 judge floor holds for byte-identical chunks; once answers regenerate, run-to-run swings of ±0.02 on faithfulness are normal and single-run deltas at that scale should not be read.
+
+**One loss is real and unexplained: `Rollen-Basierte-Arbeit-Redesign.pdf`, −0.22 MRR over its 3 queries.** The adjacent-page merge fix was predicted to recover it and did not (0.5833 → 0.6111 of a 0.8333 control). Chunk granularity is ruled out — control had 11 chunks averaging 69 tokens, final has 12 averaging 68 — so the residual comes from the changed embedded text itself on this extremely sparse deck (812 tokens across 15 pages). Not pursued further: three queries against stale ground truth cannot support another tuning cycle. Revisit under item 3.1 if it persists against chunk-id ground truth.
+
+**Corrections made along the way, kept for the record:** the duplicate-document deletion was predicted to lift EN recall and did not (its measured value is +0.005 EN nDCG / +0.012 MRR — the duplicates ranked above correct evidence rather than displacing it); and the report that item 2.1 took Rollen from 756 to 3,219 tokens was wrong — that was the byte-scrape fallback picking up raw text, and the true figure is 756 → 812 (+7%).
 
 ### Corpus audit — the precondition for 2.3
 
