@@ -311,7 +311,19 @@ export type CandidateChunkTrace = Pick<
   | "source"
   | "retrievalScore"
   | "rerankScore"
+  | "relevanceScore"
+  | "scoreScale"
 >;
+
+/**
+ * Which score scale the retrieved chunks actually carry. "heuristic" on a
+ * cross-encoder-enabled run means the Cohere call failed or timed out and the
+ * silent fallback kept heuristic scores — which also swaps the evidence-gate
+ * threshold. Recorded per query so that fallback is visible in artifacts and
+ * threshold calibration can refuse contaminated runs.
+ */
+export type ScoreScaleComposition =
+  "cross_encoder" | "heuristic" | "mixed" | "unknown";
 
 export type QueryBenchmarkResult = {
   id: string;
@@ -327,6 +339,7 @@ export type QueryBenchmarkResult = {
       reranked: number;
     };
     chunks: CandidateChunkTrace[];
+    scoreScaleComposition: ScoreScaleComposition;
   };
   answer: {
     text: string;

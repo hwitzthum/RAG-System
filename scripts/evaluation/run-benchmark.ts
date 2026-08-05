@@ -22,6 +22,7 @@ import {
   type EvaluationQueryRecord,
   type QueryBenchmarkResult,
   type QueryFailure,
+  type ScoreScaleComposition,
 } from "../../lib/evaluation/types";
 
 type RunnerMode = "live" | "dry-run";
@@ -857,6 +858,21 @@ ${recommendation}
 `;
 }
 
+function deriveScoreScaleComposition(
+  chunks: RetrievedChunk[],
+): ScoreScaleComposition {
+  const scales = new Set(
+    chunks.map((chunk) => chunk.scoreScale).filter(Boolean),
+  );
+  if (scales.size === 0) {
+    return "unknown";
+  }
+  if (scales.size > 1) {
+    return "mixed";
+  }
+  return scales.has("cross_encoder") ? "cross_encoder" : "heuristic";
+}
+
 async function evaluateQuery(
   args: RunnerArgs,
   query: EvaluationQueryRecord,
@@ -922,7 +938,12 @@ async function evaluateQuery(
           source: chunk.source,
           retrievalScore: chunk.retrievalScore,
           rerankScore: chunk.rerankScore,
+          relevanceScore: chunk.relevanceScore,
+          scoreScale: chunk.scoreScale,
         })),
+        scoreScaleComposition: deriveScoreScaleComposition(
+          execution.uncached.chunks,
+        ),
       },
       answer: {
         text: execution.uncached.answer,
@@ -966,6 +987,7 @@ async function evaluateQuery(
           reranked: 0,
         },
         chunks: [],
+        scoreScaleComposition: "unknown",
       },
       answer: {
         text: "",
