@@ -325,6 +325,20 @@ export type CandidateChunkTrace = Pick<
 export type ScoreScaleComposition =
   "cross_encoder" | "heuristic" | "mixed" | "unknown";
 
+/**
+ * The answering service's three-way evidence read (Wave 4.3), persisted per
+ * query so ambiguous-band frequency and loop actions are measurable from
+ * artifacts. Null on the error path and for artifacts predating the loop.
+ */
+export type EvidenceAssessmentTrace = {
+  verdict: "sufficient" | "ambiguous" | "insufficient";
+  top1Relevance: number | null;
+  top3MeanRelevance: number | null;
+  scale: ScoreScaleComposition;
+  actionsTaken: string[];
+  loopEnabled: boolean;
+};
+
 export type QueryBenchmarkResult = {
   id: string;
   language: SupportedLanguage;
@@ -348,6 +362,7 @@ export type QueryBenchmarkResult = {
     /** Generator hit RAG_LLM_MAX_OUTPUT_TOKENS; a config bug, not a quality signal. */
     truncated: boolean;
   };
+  evidenceAssessment: EvidenceAssessmentTrace | null;
   metrics: QueryRetrievalMetrics &
     QueryAnswerMetrics &
     QueryLatencyMetrics & {

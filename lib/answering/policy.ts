@@ -25,7 +25,7 @@ export type EvidencePolicyInput = {
  * existed: those degrade to the old (permissive) behaviour rather than being
  * treated as zero-relevance and refused.
  */
-function resolveRelevance(chunk: RetrievedChunk): number {
+export function resolveRelevance(chunk: RetrievedChunk): number {
   return chunk.relevanceScore ?? chunk.rerankScore ?? chunk.retrievalScore;
 }
 
@@ -76,6 +76,94 @@ export function hasSufficientEvidence(input: EvidencePolicyInput): boolean {
     ) / topChunks.length;
 
   return avgScore >= avgThreshold * AVG_SCORE_THRESHOLD_RATIO;
+}
+
+export type EvidenceVerdict = "sufficient" | "ambiguous" | "insufficient";
+
+export type EvidenceAssessmentInput = EvidencePolicyInput & {
+  /** Top-3-mean bar for confident evidence, cross-encoder scale. */
+  sufficientTop3Mean: number;
+  /** The same bar on the heuristic-reranker scale. */
+  sufficientTop3MeanHeuristic: number;
+};
+
+/**
+ * Which score scale the assessed chunks actually carry. "mixed" happens on
+ * cached pools written under a different reranker configuration; "unknown"
+ * means no chunk carries a scoreScale at all (pre-instrumentation cache
+ * entries), so the top-3 mean is being compared against a threshold whose
+ * scale is a guess.
+ */
+export type EvidenceScaleComposition =
+  "cross_encoder" | "heuristic" | "mixed" | "unknown";
+
+export type EvidenceAssessment = {
+  verdict: EvidenceVerdict;
+  top1Relevance: number | null;
+  top3MeanRelevance: number | null;
+  scale: EvidenceScaleComposition;
+};
+
+/**
+ * Three-way refinement of the binary evidence gate for the CRAG loop:
+ *
+ * - `insufficient` is exactly `!hasSufficientEvidence` — the refusal band is
+ *   never widened or re-derived here, so enabling the loop cannot change
+ *   which queries are refused outright.
+ * - `sufficient` additionally requires the top-3 mean relevance to clear the
+ *   per-chunk-scale `sufficientTop3Mean*` bar, averaged the same way the
+ *   gate averages its own thresholds so mixed-scale cached pools behave
+ *   sanely.
+ * - everything between the two bands is `ambiguous`: answerable, but weakly
+ *   enough that the loop's corrective measures apply.
+ */
+export function assessEvidence(
+  input: EvidenceAssessmentInput,
+): EvidenceAssessment {
+  const topChunks = input.chunks.slice(0, Math.min(3, input.chunks.length));
+  const top1Relevance =
+    input.chunks.length > 0 ? resolveRelevance(input.chunks[0]!) : null;
+  const top3MeanRelevance =
+    topChunks.length > 0
+      ? topChunks.reduce((sum, c) => sum + resolveRelevance(c), 0) /
+        topChunks.length
+      : null;
+
+  const scales = new Set(
+    input.chunks.map((chunk) => chunk.scoreScale).filter(Boolean),
+  );
+  const scale: EvidenceScaleComposition =
+    scales.size === 0
+      ? "unknown"
+      : scales.size > 1
+        ? "mixed"
+        : scales.has("cross_encoder")
+          ? "cross_encoder"
+          : "heuristic";
+
+  if (!hasSufficientEvidence(input)) {
+    return { verdict: "insufficient", top1Relevance, top3MeanRelevance, scale };
+  }
+
+  const sufficientThreshold =
+    topChunks.reduce(
+      (sum, c) =>
+        sum +
+        (c.scoreScale === "cross_encoder"
+          ? input.sufficientTop3Mean
+          : input.sufficientTop3MeanHeuristic),
+      0,
+    ) / topChunks.length;
+
+  return {
+    verdict:
+      top3MeanRelevance !== null && top3MeanRelevance >= sufficientThreshold
+        ? "sufficient"
+        : "ambiguous",
+    top1Relevance,
+    top3MeanRelevance,
+    scale,
+  };
 }
 
 /**
