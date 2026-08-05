@@ -5,9 +5,15 @@ import type {
 } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
 import {
+  assessEvidence,
   hasSufficientEvidence,
+  resolveRelevance,
   selectChunkIndexesMeetingThreshold,
+  type EvidenceAssessment,
+  type EvidenceScaleComposition,
+  type EvidenceVerdict,
 } from "@/lib/answering/policy";
+import { checkEntityGrounding } from "@/lib/answering/entity-terms";
 import { resolveCitedChunks } from "@/lib/answering/citations";
 import { orderEvidenceIndexes } from "@/lib/answering/evidence-order";
 import {
@@ -20,6 +26,7 @@ import {
   type PiiRedactionOptions,
 } from "@/lib/security/output-filter";
 import {
+  answerBeginsWithAbstentionToken,
   buildGroundedAnswerUserPrompt,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
   INSUFFICIENT_EVIDENCE_MESSAGE,
@@ -89,10 +96,36 @@ export type GenerateGroundedAnswerResult = {
    * benchmark run is a configuration bug, not a quality signal.
    */
   answerTruncated: boolean;
+  /**
+   * The CRAG loop's three-way evidence read, populated on every grounded
+   * result including refusals. Always recorded — with the loop disabled the
+   * verdict is observability only and `ambiguous` behaves exactly like
+   * `sufficient`. The web-augmented path records the assessment with no
+   * band actions.
+   */
+  evidenceAssessment: {
+    verdict: EvidenceVerdict;
+    top1Relevance: number | null;
+    top3MeanRelevance: number | null;
+    scale: EvidenceScaleComposition;
+    actionsTaken: string[];
+    loopEnabled: boolean;
+  } | null;
 };
 
 export type AnswerServiceDependencies = {
   llmProvider: LlmProvider;
+  /** Injectable citation verifier; defaults to verifyCitedStatements. */
+  verifyCitations: typeof verifyCitedStatements;
+  /**
+   * Ambiguous-band second retrieval pass. Wired by callers only when
+   * RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED, so the answering layer never
+   * imports the retrieval pipeline itself.
+   */
+  correctiveRetrieve?: (
+    query: string,
+    language: SupportedLanguage,
+  ) => Promise<RetrievedChunk[]>;
 };
 
 // Used for the early-return paths (insufficient evidence, leakage, blocked
@@ -125,6 +158,28 @@ function uniqueCitations(citations: Citation[]): Citation[] {
   }
 
   return output;
+}
+
+/**
+ * Merge corrective-retrieval results into the existing pool: dedupe by
+ * chunkId keeping the entry with the best absolute relevance, sorted by that
+ * relevance descending so the re-assessment (and its top-3 mean) reads the
+ * strongest merged evidence rather than whatever happened to sit first.
+ */
+function mergeCorrectiveChunks(
+  existing: RetrievedChunk[],
+  incoming: RetrievedChunk[],
+): RetrievedChunk[] {
+  const byChunkId = new Map<string, RetrievedChunk>();
+  for (const chunk of [...existing, ...incoming]) {
+    const kept = byChunkId.get(chunk.chunkId);
+    if (!kept || resolveRelevance(chunk) > resolveRelevance(kept)) {
+      byChunkId.set(chunk.chunkId, chunk);
+    }
+  }
+  return [...byChunkId.values()].sort(
+    (a, b) => resolveRelevance(b) - resolveRelevance(a),
+  );
 }
 
 const SENTENCE_BOUNDARY_PATTERN = /^[\s\S]*?[.!?][)"'»\]]*\s+/;
@@ -224,39 +279,108 @@ export async function generateGroundedAnswer(
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
-  const protectedChunks = protectRetrievedChunks(input.chunks);
+  const verifyCitations = overrides.verifyCitations ?? verifyCitedStatements;
 
-  const citations = uniqueCitations(buildCitations(input.chunks));
-  const sufficientEvidence = hasSufficientEvidence({
-    chunks: protectedChunks.chunks,
-    minEvidenceChunks: input.minEvidenceChunks,
-    minRerankScore: input.minRerankScore,
-    minHeuristicRelevance: input.minHeuristicRelevance,
-    documentScoped: Boolean(input.documentScopeId),
+  let rawChunks = input.chunks;
+  let protectedChunks = protectRetrievedChunks(rawChunks);
+  let citations = uniqueCitations(buildCitations(rawChunks));
+
+  const loopEnabled = env.RAG_CRAG_LOOP_ENABLED;
+  const actionsTaken: string[] = [];
+  const assess = (chunks: RetrievedChunk[]): EvidenceAssessment =>
+    assessEvidence({
+      chunks,
+      minEvidenceChunks: input.minEvidenceChunks,
+      minRerankScore: input.minRerankScore,
+      minHeuristicRelevance: input.minHeuristicRelevance,
+      documentScoped: Boolean(input.documentScopeId),
+      sufficientTop3Mean: env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN,
+      sufficientTop3MeanHeuristic:
+        env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC,
+    });
+
+  let assessment = assess(protectedChunks.chunks);
+  // Snapshot at return time so late-pushed actions are never lost.
+  const evidenceAssessmentResult = (): NonNullable<
+    GenerateGroundedAnswerResult["evidenceAssessment"]
+  > => ({
+    verdict: assessment.verdict,
+    top1Relevance: assessment.top1Relevance,
+    top3MeanRelevance: assessment.top3MeanRelevance,
+    scale: assessment.scale,
+    actionsTaken: [...actionsTaken],
+    loopEnabled,
   });
 
-  if (!sufficientEvidence) {
-    return {
-      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
-      citations: citations.slice(0, 3),
-      insufficientEvidence: true,
-      answerTruncated: false,
-      promptInjection: {
-        suspiciousChunkCount: protectedChunks.suspiciousCount,
-        blockedChunkCount: protectedChunks.blockedCount,
-        suspiciousWebSourceCount: 0,
-        blockedWebSourceCount: 0,
-        blockedUserQuery: false,
-      },
-      outputFilter: {
-        blocked: false,
-        filtered: false,
-        reasons: [],
-        redactionCount: 0,
-      },
-      citationAttribution: UNATTRIBUTED,
-      citationVerification: null,
-    };
+  const insufficientRefusal = (
+    reasons: string[],
+    answerTruncated: boolean,
+    citationVerification: CitationVerification | null = null,
+  ): GenerateGroundedAnswerResult => ({
+    answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+    citations: citations.slice(0, 3),
+    insufficientEvidence: true,
+    answerTruncated,
+    promptInjection: {
+      suspiciousChunkCount: protectedChunks.suspiciousCount,
+      blockedChunkCount: protectedChunks.blockedCount,
+      suspiciousWebSourceCount: 0,
+      blockedWebSourceCount: 0,
+      blockedUserQuery: false,
+    },
+    outputFilter: {
+      blocked: false,
+      filtered: false,
+      reasons,
+      redactionCount: 0,
+    },
+    citationAttribution: UNATTRIBUTED,
+    citationVerification,
+    evidenceAssessment: evidenceAssessmentResult(),
+  });
+
+  if (assessment.verdict === "insufficient") {
+    return insufficientRefusal([], false);
+  }
+
+  // With the loop off, `ambiguous` behaves exactly like `sufficient`: the
+  // assessment above is observability only, and everything below is
+  // bit-identical to the pre-loop behavior.
+  const ambiguousBand = loopEnabled && assessment.verdict === "ambiguous";
+
+  if (
+    ambiguousBand &&
+    env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED &&
+    overrides.correctiveRetrieve
+  ) {
+    const correctiveChunks = await overrides.correctiveRetrieve(
+      input.query,
+      input.language,
+    );
+    actionsTaken.push("corrective_retrieval");
+    rawChunks = mergeCorrectiveChunks(rawChunks, correctiveChunks);
+    protectedChunks = protectRetrievedChunks(rawChunks);
+    citations = uniqueCitations(buildCitations(rawChunks));
+    // Re-assess once on the merged pool; corrective retrieval never runs
+    // twice. A pool that now fails the hard gate is refused outright.
+    assessment = assess(protectedChunks.chunks);
+    if (assessment.verdict === "insufficient") {
+      return insufficientRefusal([], false);
+    }
+  }
+
+  let evidenceCaution: { missingTerms: string[] } | undefined;
+  if (ambiguousBand && env.RAG_CRAG_PROMPT_GUARD_ENABLED) {
+    // Checked against the sanitized chunks — the evidence the model will
+    // actually see. Only the action string travels into the assessment
+    // metadata; the terms themselves stay in the prompt.
+    const grounding = checkEntityGrounding({
+      query: input.query,
+      language: input.language,
+      chunks: protectedChunks.chunks,
+    });
+    evidenceCaution = { missingTerms: grounding.missingTerms };
+    actionsTaken.push("prompt_guard");
   }
 
   // Evidence placement happens AFTER the gate (which reads score order) and
@@ -266,12 +390,13 @@ export async function generateGroundedAnswer(
   const promptChunks = evidenceOrder.map(
     (index) => protectedChunks.chunks[index]!,
   );
-  const attributionChunks = evidenceOrder.map((index) => input.chunks[index]!);
+  const attributionChunks = evidenceOrder.map((index) => rawChunks[index]!);
 
   const prompt = buildGroundedAnswerUserPrompt({
     query: input.query,
     language: input.language,
     chunks: promptChunks,
+    evidenceCaution,
   });
 
   // Addresses the caller's own RBAC-scoped evidence already contains are not
@@ -297,27 +422,18 @@ export async function generateGroundedAnswer(
   // user — resolveCitedChunks and the output filter would otherwise pass the
   // bare sentinel straight through as the answer text.
   if (isModelAbstention(answer)) {
-    return {
-      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
-      citations: citations.slice(0, 3),
-      insufficientEvidence: true,
-      answerTruncated: generated.truncated,
-      promptInjection: {
-        suspiciousChunkCount: protectedChunks.suspiciousCount,
-        blockedChunkCount: protectedChunks.blockedCount,
-        suspiciousWebSourceCount: 0,
-        blockedWebSourceCount: 0,
-        blockedUserQuery: false,
-      },
-      outputFilter: {
-        blocked: false,
-        filtered: false,
-        reasons: ["model_abstention"],
-        redactionCount: 0,
-      },
-      citationAttribution: UNATTRIBUTED,
-      citationVerification: null,
-    };
+    return insufficientRefusal(["model_abstention"], generated.truncated);
+  }
+
+  // Ambiguous band only: the prompt guard makes some models emit the token
+  // and then keep explaining. A token-prefixed answer is still an abstention
+  // and gets the same structured refusal.
+  if (ambiguousBand && answerBeginsWithAbstentionToken(answer)) {
+    actionsTaken.push("model_abstention_prefix");
+    return insufficientRefusal(
+      ["model_abstention_prefix"],
+      generated.truncated,
+    );
   }
 
   if (containsSensitiveLeakage(answer)) {
@@ -341,6 +457,7 @@ export async function generateGroundedAnswer(
       },
       citationAttribution: UNATTRIBUTED,
       citationVerification: null,
+      evidenceAssessment: evidenceAssessmentResult(),
     };
   }
 
@@ -359,11 +476,32 @@ export async function generateGroundedAnswer(
 
   const citationVerification =
     env.RAG_CITATION_VERIFICATION_ENABLED && !filteredOutput.blocked
-      ? await verifyCitedStatements({
+      ? await verifyCitations({
           answer: filteredOutput.answer,
           chunks: attributionChunks,
         })
       : null;
+
+  // Self-RAG reflection, ambiguous band only: when the verifier actually ran
+  // over a large enough sample and judged too great a share of the cited
+  // sentences unsupported, the answer is retracted rather than annotated.
+  // The verification travels with the refusal so the retraction is auditable.
+  if (
+    ambiguousBand &&
+    env.RAG_CRAG_REFLECTION_ENABLED &&
+    citationVerification &&
+    !citationVerification.unverified &&
+    citationVerification.checkedCount >= env.RAG_CRAG_REFLECTION_MIN_CHECKED &&
+    citationVerification.unsupportedCount / citationVerification.checkedCount >=
+      env.RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE
+  ) {
+    actionsTaken.push("reflection_unsupported_citations");
+    return insufficientRefusal(
+      ["reflection_unsupported_citations"],
+      generated.truncated,
+      citationVerification,
+    );
+  }
 
   return {
     answer: filteredOutput.answer,
@@ -389,6 +527,7 @@ export async function generateGroundedAnswer(
       fellBack: attribution.fellBack,
     },
     citationVerification,
+    evidenceAssessment: evidenceAssessmentResult(),
   };
 }
 
@@ -407,6 +546,7 @@ export async function generateWebAugmentedAnswer(
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
+  const verifyCitations = overrides.verifyCitations ?? verifyCitedStatements;
   const protectedChunks = protectRetrievedChunks(input.chunks);
   const protectedWebSources = protectWebSources(input.webSources);
 
@@ -418,6 +558,28 @@ export async function generateWebAugmentedAnswer(
     minHeuristicRelevance: input.minHeuristicRelevance,
     documentScoped: Boolean(input.documentScopeId),
   });
+
+  // Recorded for observability only: the web path takes no band actions —
+  // web evidence already has its own gate (minWebSources) below.
+  const assessment = assessEvidence({
+    chunks: protectedChunks.chunks,
+    minEvidenceChunks: input.minEvidenceChunks,
+    minRerankScore: input.minRerankScore,
+    minHeuristicRelevance: input.minHeuristicRelevance,
+    documentScoped: Boolean(input.documentScopeId),
+    sufficientTop3Mean: env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN,
+    sufficientTop3MeanHeuristic:
+      env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC,
+  });
+  const evidenceAssessment: GenerateGroundedAnswerResult["evidenceAssessment"] =
+    {
+      verdict: assessment.verdict,
+      top1Relevance: assessment.top1Relevance,
+      top3MeanRelevance: assessment.top3MeanRelevance,
+      scale: assessment.scale,
+      actionsTaken: [],
+      loopEnabled: env.RAG_CRAG_LOOP_ENABLED,
+    };
 
   const minWebSources = Math.max(1, input.minWebSources ?? 2);
   if (
@@ -444,6 +606,7 @@ export async function generateWebAugmentedAnswer(
       },
       citationAttribution: UNATTRIBUTED,
       citationVerification: null,
+      evidenceAssessment,
     };
   }
 
@@ -519,6 +682,7 @@ export async function generateWebAugmentedAnswer(
       },
       citationAttribution: UNATTRIBUTED,
       citationVerification: null,
+      evidenceAssessment,
     };
   }
 
@@ -543,6 +707,7 @@ export async function generateWebAugmentedAnswer(
       },
       citationAttribution: UNATTRIBUTED,
       citationVerification: null,
+      evidenceAssessment,
     };
   }
 
@@ -560,7 +725,7 @@ export async function generateWebAugmentedAnswer(
 
   const citationVerification =
     env.RAG_CITATION_VERIFICATION_ENABLED && !filteredOutput.blocked
-      ? await verifyCitedStatements({
+      ? await verifyCitations({
           answer: filteredOutput.answer,
           chunks: attributionChunks,
         })
@@ -590,5 +755,6 @@ export async function generateWebAugmentedAnswer(
       fellBack: attribution.fellBack,
     },
     citationVerification,
+    evidenceAssessment,
   };
 }

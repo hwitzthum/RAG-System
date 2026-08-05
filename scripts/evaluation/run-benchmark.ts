@@ -20,6 +20,7 @@ import {
   DEFAULT_BENCHMARK_THRESHOLDS,
   JUDGE_NOISE_FLOOR,
   type EvaluationQueryRecord,
+  type EvidenceAssessmentTrace,
   type QueryBenchmarkResult,
   type QueryFailure,
   type ScoreScaleComposition,
@@ -85,6 +86,8 @@ type RunCapture = {
    * faithfulness for a reason unrelated to grounding.
    */
   answerTruncated: boolean;
+  /** The CRAG loop's evidence read for this answer; null on the error path. */
+  evidenceAssessment: EvidenceAssessmentTrace | null;
 };
 
 type QueryExecution = {
@@ -96,6 +99,7 @@ type LiveDependencies = {
   retrieveRankedCandidates: typeof import("../../lib/retrieval/service").retrieveRankedCandidates;
   retrieveRankedCandidatesWithRouting: typeof import("../../lib/retrieval/router").retrieveRankedCandidatesWithRouting;
   generateGroundedAnswer: typeof import("../../lib/answering/service").generateGroundedAnswer;
+  correctiveRetrieve: typeof import("../../lib/retrieval/corrective").correctiveRetrieve;
   judgeQueryResult: typeof import("../../lib/evaluation/llm-judge").judgeQueryResult;
   retrievalConfigFingerprint: string;
   env: typeof import("../../lib/config/env").env;
@@ -109,6 +113,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
       import("../../lib/retrieval/service"),
       import("../../lib/retrieval/router"),
       import("../../lib/answering/service"),
+      import("../../lib/retrieval/corrective"),
       import("../../lib/evaluation/llm-judge"),
       import("../../lib/config/env"),
     ]).then(
@@ -116,6 +121,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
         retrievalModule,
         routerModule,
         answerModule,
+        correctiveModule,
         judgeModule,
         envModule,
       ]) => ({
@@ -123,6 +129,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
         retrieveRankedCandidatesWithRouting:
           routerModule.retrieveRankedCandidatesWithRouting,
         generateGroundedAnswer: answerModule.generateGroundedAnswer,
+        correctiveRetrieve: correctiveModule.correctiveRetrieve,
         judgeQueryResult: judgeModule.judgeQueryResult,
         retrievalConfigFingerprint:
           retrievalModule.RETRIEVAL_CONFIG_FINGERPRINT,
@@ -305,6 +312,16 @@ function executeDryRun(
 
   // The mock system behaves correctly: it abstains on unanswerable questions.
   const unanswerable = query.question_type === "unanswerable";
+  // Fabricated to match: the mock chunks carry no relevance scores, so the
+  // stats stay null and the scale stays "unknown".
+  const evidenceAssessment: EvidenceAssessmentTrace = {
+    verdict: unanswerable ? "insufficient" : "sufficient",
+    top1Relevance: null,
+    top3MeanRelevance: null,
+    scale: "unknown",
+    actionsTaken: [],
+    loopEnabled: false,
+  };
   const answerText = unanswerable
     ? "Insufficient evidence."
     : `${query.acceptable_answer_points[0]}. ${query.acceptable_answer_points[1]}. ${query.acceptable_answer_points[2]}.`;
@@ -341,6 +358,7 @@ function executeDryRun(
             unverified: false,
           },
       answerTruncated: false,
+      evidenceAssessment,
     },
     cached: {
       chunks,
@@ -364,6 +382,7 @@ function executeDryRun(
             unverified: false,
           },
       answerTruncated: false,
+      evidenceAssessment,
     },
   };
 }
@@ -375,6 +394,12 @@ async function executeLive(
   cacheNamespace: string,
 ): Promise<QueryExecution> {
   const deps = await loadLiveDependencies();
+
+  // Mirrors the API route: the corrective pass is wired only when its flag
+  // is on, so a disabled configuration cannot reach the second retrieval.
+  const answerOverrides = deps.env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
+    ? { correctiveRetrieve: deps.correctiveRetrieve }
+    : {};
 
   const uncachedStart = Date.now();
   // Route through the router (the production entry point) so query expansion,
@@ -397,15 +422,18 @@ async function executeLive(
         }),
     },
   );
-  const uncachedAnswer = await deps.generateGroundedAnswer({
-    query: query.question,
-    language: uncachedRetrieval.trace.language,
-    chunks: uncachedRetrieval.chunks,
-    minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
-    minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
-    minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
-    maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
-  });
+  const uncachedAnswer = await deps.generateGroundedAnswer(
+    {
+      query: query.question,
+      language: uncachedRetrieval.trace.language,
+      chunks: uncachedRetrieval.chunks,
+      minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
+      minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
+      minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
+      maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
+    },
+    answerOverrides,
+  );
   const uncachedLatencyMs = Date.now() - uncachedStart;
 
   const cachedStart = Date.now();
@@ -416,15 +444,18 @@ async function executeLive(
     enableQueryExpansion: expansion,
     cacheNamespace,
   });
-  const cachedAnswer = await deps.generateGroundedAnswer({
-    query: query.question,
-    language: cachedRetrieval.trace.language,
-    chunks: cachedRetrieval.chunks,
-    minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
-    minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
-    minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
-    maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
-  });
+  const cachedAnswer = await deps.generateGroundedAnswer(
+    {
+      query: query.question,
+      language: cachedRetrieval.trace.language,
+      chunks: cachedRetrieval.chunks,
+      minEvidenceChunks: deps.env.RAG_MIN_EVIDENCE_CHUNKS,
+      minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
+      minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
+      maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
+    },
+    answerOverrides,
+  );
   const cachedLatencyMs = Date.now() - cachedStart;
 
   return {
@@ -438,6 +469,7 @@ async function executeLive(
       latencyMs: uncachedLatencyMs,
       citationVerification: uncachedAnswer.citationVerification,
       answerTruncated: uncachedAnswer.answerTruncated,
+      evidenceAssessment: uncachedAnswer.evidenceAssessment,
     },
     cached: {
       chunks: cachedRetrieval.chunks,
@@ -449,6 +481,7 @@ async function executeLive(
       latencyMs: cachedLatencyMs,
       citationVerification: cachedAnswer.citationVerification,
       answerTruncated: cachedAnswer.answerTruncated,
+      evidenceAssessment: cachedAnswer.evidenceAssessment,
     },
   };
 }
@@ -487,6 +520,14 @@ type RunConfig = {
   multiQueryVariations: number;
   evidencePlacement: string;
   citationVerificationEnabled: boolean;
+  cragLoopEnabled: boolean;
+  evidenceSufficientTop3Mean: number;
+  evidenceSufficientTop3MeanHeuristic: number;
+  cragPromptGuardEnabled: boolean;
+  cragReflectionEnabled: boolean;
+  cragReflectionMinChecked: number;
+  cragReflectionMaxUnsupportedShare: number;
+  cragCorrectiveRetrievalEnabled: boolean;
   webSearchEnabled: boolean;
   webMinSources: number;
 };
@@ -538,6 +579,16 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
     evidencePlacement: env.RAG_EVIDENCE_PLACEMENT,
     citationVerificationEnabled: env.RAG_CITATION_VERIFICATION_ENABLED,
+    cragLoopEnabled: env.RAG_CRAG_LOOP_ENABLED,
+    evidenceSufficientTop3Mean: env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN,
+    evidenceSufficientTop3MeanHeuristic:
+      env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC,
+    cragPromptGuardEnabled: env.RAG_CRAG_PROMPT_GUARD_ENABLED,
+    cragReflectionEnabled: env.RAG_CRAG_REFLECTION_ENABLED,
+    cragReflectionMinChecked: env.RAG_CRAG_REFLECTION_MIN_CHECKED,
+    cragReflectionMaxUnsupportedShare:
+      env.RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE,
+    cragCorrectiveRetrievalEnabled: env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED,
     webSearchEnabled: env.RAG_WEB_SEARCH_ENABLED,
     webMinSources: env.RAG_WEB_MIN_SOURCES,
   };
@@ -959,6 +1010,7 @@ async function evaluateQuery(
         insufficientEvidence: execution.uncached.insufficientEvidence,
         truncated: execution.uncached.answerTruncated,
       },
+      evidenceAssessment: execution.uncached.evidenceAssessment,
       metrics: {
         ...retrievalMetrics,
         ...answerMetrics,
@@ -1003,6 +1055,7 @@ async function evaluateQuery(
         insufficientEvidence: false,
         truncated: false,
       },
+      evidenceAssessment: null,
       metrics: {
         recallAt5: 0,
         ndcgAt10: 0,

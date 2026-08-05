@@ -78,6 +78,66 @@ const envSchema = z.object({
   // off-topic query stayed below 0.05, so re-calibrate if the corpus gains
   // languages. Script: scratchpad/calibrate-relevance.ts.
   RAG_MIN_HEURISTIC_RELEVANCE: z.coerce.number().nonnegative().default(0.14),
+  // --- CRAG/Self-RAG adaptive answering loop (Wave 4 item 4.3) -------------
+  // Answering-side flags only: none of them enter the retrieval config
+  // fingerprint, because they change what happens AFTER retrieval returns.
+  RAG_CRAG_LOOP_ENABLED: z.preprocess(
+    (val) => val === "true" || val === "1" || val === true,
+    z.boolean().default(false),
+  ),
+  // Top-3-mean relevance at or above which evidence counts as confidently
+  // sufficient (cross-encoder scale); below it, gate-passing evidence is
+  // "ambiguous" and the CRAG loop's corrective measures apply. 0.30 is an
+  // UNCALIBRATED PLACEHOLDER until
+  // scripts/evaluation/calibrate-evidence-thresholds.ts has been run on a
+  // post-4.2 artifact — and it must be re-derived after any change that
+  // affects ordering (reranker config, evidence placement, diversity cap).
+  RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN: z.coerce
+    .number()
+    .nonnegative()
+    .default(0.3),
+  // The same bar on the heuristic-reranker scale. Deliberately equal to
+  // RAG_MIN_HEURISTIC_RELEVANCE's default so that in heuristic mode (CI, and
+  // the cross-encoder fallback path) every gate-passer classifies as
+  // sufficient and the loop no-ops rather than acting on an uncalibrated
+  // scale.
+  RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC: z.coerce
+    .number()
+    .nonnegative()
+    .default(0.14),
+  // Ambiguous-band caution appended to the user prompt (never the system
+  // prompt), pointing the model at the existing rule-14 abstention path when
+  // the named entity is absent from the evidence.
+  RAG_CRAG_PROMPT_GUARD_ENABLED: z.preprocess(
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
+  ),
+  // Ambiguous-band post-generation reflection: retract the answer when the
+  // citation verifier finds too large a share of cited sentences unsupported.
+  RAG_CRAG_REFLECTION_ENABLED: z.preprocess(
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
+  ),
+  // Reflection needs a minimum sample: one unsupported sentence out of one
+  // checked is a 100% share and would retract on a single verifier judgement.
+  RAG_CRAG_REFLECTION_MIN_CHECKED: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2),
+  RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .default(0.5),
+  // Ambiguous-band second retrieval pass over query variations. Off by
+  // default: it adds embedding + rerank cost per ambiguous query and is
+  // gated on its own A/B.
+  RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED: z.preprocess(
+    (val) => val === "true" || val === "1" || val === true,
+    z.boolean().default(false),
+  ),
+  // -------------------------------------------------------------------------
   RAG_DEFAULT_TOP_K: z.coerce.number().int().positive().default(8),
   RAG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
   RAG_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
@@ -216,6 +276,18 @@ const parsed = envSchema.safeParse({
   RAG_MIN_EVIDENCE_CHUNKS: process.env.RAG_MIN_EVIDENCE_CHUNKS,
   RAG_MIN_RERANK_SCORE: process.env.RAG_MIN_RERANK_SCORE,
   RAG_MIN_HEURISTIC_RELEVANCE: process.env.RAG_MIN_HEURISTIC_RELEVANCE,
+  RAG_CRAG_LOOP_ENABLED: process.env.RAG_CRAG_LOOP_ENABLED,
+  RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN:
+    process.env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN,
+  RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC:
+    process.env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC,
+  RAG_CRAG_PROMPT_GUARD_ENABLED: process.env.RAG_CRAG_PROMPT_GUARD_ENABLED,
+  RAG_CRAG_REFLECTION_ENABLED: process.env.RAG_CRAG_REFLECTION_ENABLED,
+  RAG_CRAG_REFLECTION_MIN_CHECKED: process.env.RAG_CRAG_REFLECTION_MIN_CHECKED,
+  RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE:
+    process.env.RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE,
+  RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED:
+    process.env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED,
   RAG_DEFAULT_TOP_K: process.env.RAG_DEFAULT_TOP_K,
   RAG_CACHE_TTL_SECONDS: process.env.RAG_CACHE_TTL_SECONDS,
   RAG_MAX_UPLOAD_BYTES: process.env.RAG_MAX_UPLOAD_BYTES,

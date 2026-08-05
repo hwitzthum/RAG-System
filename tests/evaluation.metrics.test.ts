@@ -274,6 +274,7 @@ function buildResult(
       insufficientEvidence: false,
       truncated: false,
     },
+    evidenceAssessment: null,
     metrics: {
       recallAt5: 1,
       ndcgAt10: 1,

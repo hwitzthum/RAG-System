@@ -20,6 +20,7 @@ import {
   markUserOpenAiApiKeyUsed,
   resolveUserOpenAiApiKey,
 } from "@/lib/providers/openai-vault";
+import { correctiveRetrieve } from "@/lib/retrieval/corrective";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { retrieveRankedCandidatesWithRouting } from "@/lib/retrieval/router";
@@ -177,6 +178,14 @@ function buildQueryStreamResponse(input: {
       supportedCount: number;
       unsupportedCount: number;
       unverified: boolean;
+    } | null;
+    evidenceAssessment: {
+      verdict: "sufficient" | "ambiguous" | "insufficient";
+      top1Relevance: number | null;
+      top3MeanRelevance: number | null;
+      scale: "cross_encoder" | "heuristic" | "mixed" | "unknown";
+      actionsTaken: string[];
+      loopEnabled: boolean;
     } | null;
     answerTruncated: boolean;
   };
@@ -388,6 +397,7 @@ export async function POST(request: NextRequest) {
         fellBack: false,
       },
       citationVerification: null,
+      evidenceAssessment: null,
       answerTruncated: false,
     };
 
@@ -442,6 +452,7 @@ export async function POST(request: NextRequest) {
         fellBack: false,
       },
       citationVerification: null,
+      evidenceAssessment: null,
       answerTruncated: false,
     };
 
@@ -588,6 +599,7 @@ export async function POST(request: NextRequest) {
           },
           citationVerification: null as
             AnswerResult["citationVerification"] | null,
+          evidenceAssessment: null as AnswerResult["evidenceAssessment"],
           answerTruncated: false,
         });
 
@@ -602,6 +614,7 @@ export async function POST(request: NextRequest) {
           outputFilter: answerResult.outputFilter,
           citationAttribution: answerResult.citationAttribution,
           citationVerification: answerResult.citationVerification,
+          evidenceAssessment: answerResult.evidenceAssessment,
           answerTruncated: answerResult.answerTruncated,
         });
 
@@ -720,6 +733,7 @@ export async function POST(request: NextRequest) {
               queryExpansion: retrievalResult.queryExpansion,
               citationAttribution: answerResult.citationAttribution,
               citationVerification: answerResult.citationVerification,
+              evidenceAssessment: answerResult.evidenceAssessment,
               citationCount: answerResult.citations.length,
               resolvedConversationId: conversationId,
               openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
@@ -774,18 +788,26 @@ export async function POST(request: NextRequest) {
                       onSentence: (sentence) =>
                         emit("token", { queryId, token: sentence }),
                     })
-                  : await generateGroundedAnswer({
-                      query: requestBody.query,
-                      language: retrievalResult.trace.language,
-                      chunks: retrievalResult.chunks,
-                      minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-                      minRerankScore: env.RAG_MIN_RERANK_SCORE,
-                      minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
-                      maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                      documentScopeId: explicitScopeId,
-                      onSentence: (sentence) =>
-                        emit("token", { queryId, token: sentence }),
-                    });
+                  : await generateGroundedAnswer(
+                      {
+                        query: requestBody.query,
+                        language: retrievalResult.trace.language,
+                        chunks: retrievalResult.chunks,
+                        minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                        minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                        minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
+                        maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                        documentScopeId: explicitScopeId,
+                        onSentence: (sentence) =>
+                          emit("token", { queryId, token: sentence }),
+                      },
+                      // The corrective pass is wired only when its flag is
+                      // on, so the disabled configuration cannot even reach
+                      // the second retrieval path.
+                      env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
+                        ? { correctiveRetrieve }
+                        : {},
+                    );
               const latencyMs = Date.now() - startedAt;
 
               emitQueryLatency(latencyMs, { userId: authUser.id });
