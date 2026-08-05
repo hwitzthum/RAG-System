@@ -17,6 +17,8 @@ import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { applyDocumentDiversity } from "@/lib/retrieval/diversity";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { generateHypotheticalDocument } from "@/lib/retrieval/hyde";
+import { decomposeQueryMemoized } from "@/lib/retrieval/decomposition";
+import { mergeCandidatePools } from "@/lib/retrieval/corrective";
 
 type QueryExpansionTrace = {
   requested: boolean;
@@ -27,8 +29,16 @@ type QueryExpansionTrace = {
   branchCount: number;
 };
 
+type QueryDecompositionTrace = {
+  requested: boolean;
+  applied: boolean;
+  subQueryCount: number;
+  subQueries: string[];
+};
+
 export type RoutedRetrievalResult = RetrieveRankedCandidatesResult & {
   queryExpansion: QueryExpansionTrace;
+  queryDecomposition: QueryDecompositionTrace;
 };
 
 type RoutedRetrievalDependencies = {
@@ -43,6 +53,10 @@ type RoutedRetrievalDependencies = {
     query: string;
     language: SupportedLanguage;
   }) => Promise<string | null>;
+  decomposeQuery: (
+    query: string,
+    language: SupportedLanguage,
+  ) => Promise<string[]>;
   rerankCandidates: (input: {
     normalizedQuery: string;
     candidates: RetrievedChunk[];
@@ -67,6 +81,7 @@ function getDefaultDependencies(): RoutedRetrievalDependencies {
     retrieveBase: retrieveRankedCandidates,
     generateVariations: generateQueryVariations,
     generateHyde: generateHypotheticalDocument,
+    decomposeQuery: decomposeQueryMemoized,
     rerankCandidates: providers.reranker.rerank,
   };
 }
@@ -161,7 +176,9 @@ export async function retrieveRankedCandidatesWithRouting(
   const shouldExpand = Boolean(input.enableQueryExpansion);
 
   if (!shouldExpand) {
-    const base = await deps.retrieveBase({
+    // Start the base retrieval first so the decomposition LLM call (when
+    // enabled) overlaps it instead of extending the critical path.
+    const basePromise = deps.retrieveBase({
       query: input.query,
       topK: input.topK,
       languageHint: input.languageHint,
@@ -170,15 +187,149 @@ export async function retrieveRankedCandidatesWithRouting(
       disableMultiQuery: input.disableMultiQuery,
     });
 
+    const standardExpansionTrace: QueryExpansionTrace = {
+      requested: shouldExpand,
+      applied: false,
+      strategy: "standard",
+      variationCount: 0,
+      hydeUsed: false,
+      branchCount: 1,
+    };
+
+    // Decomposition targets cross-document multi-topic queries, so a scope of
+    // exactly one document cannot benefit and skips the LLM call.
+    const decompositionEligible =
+      env.RAG_QUERY_DECOMPOSITION_ENABLED && scopedDocumentIds.length !== 1;
+
+    let subQueries: string[] = [];
+    if (decompositionEligible) {
+      const normalizedQuery = normalizeQuery(input.query);
+      const language = detectQueryLanguage(normalizedQuery, input.languageHint);
+      try {
+        subQueries = await deps.decomposeQuery(normalizedQuery, language);
+      } catch {
+        subQueries = [];
+      }
+
+      if (subQueries.length >= 2) {
+        // A failed sub-query branch degrades to an empty pool rather than
+        // failing a request whose base retrieval succeeded.
+        const subResults = (
+          await Promise.all(
+            subQueries.map((subQuery) =>
+              deps
+                .retrieveBase({
+                  query: subQuery,
+                  topK: input.topK,
+                  // Short sub-queries misdetect easily; the blended original
+                  // is the reliable language signal.
+                  languageHint: language,
+                  documentIds: scopedDocumentIds,
+                  cacheNamespace: buildBranchCacheNamespace(
+                    input.cacheNamespace,
+                    "decomp",
+                  ),
+                  // The sub-queries ARE the branches; expanding each again
+                  // would multiply embedding calls (same reason as the
+                  // expansion path below).
+                  disableMultiQuery: true,
+                })
+                .catch(() => null),
+            ),
+          )
+        ).filter(
+          (result): result is RetrieveRankedCandidatesResult => result !== null,
+        );
+
+        const base = await basePromise;
+
+        // Merge on per-pool RANK (weighted RRF), not absolute relevance:
+        // Cohere scores are not comparable across query texts — the arm-1 A/B
+        // (benchmark-2026-08-05T20-33-31-181Z) measured focused sub-queries
+        // scoring their chunks 0.85-0.91 while the blended base query scored
+        // its own golden window 0.4-0.5, so a relevance-max merge buried the
+        // base window wholesale and EN nDCG fell. RRF's corroboration
+        // property also keeps a bad split from displacing base results. The
+        // base branch outweighs sub-queries for the same reason it outweighs
+        // variations on the expansion path: it is the user's actual question.
+        const fusedOrder = fuseBranchCandidates([
+          {
+            branch: { kind: "base", weight: 1, query: input.query },
+            result: base,
+          },
+          ...subResults.map((result) => ({
+            branch: {
+              kind: "variation" as const,
+              weight: 0.9,
+              query: result.trace.normalizedQuery,
+            },
+            result,
+          })),
+        ]);
+
+        // RRF decides the order; each chunk's absolute scores are rebuilt
+        // from its best-scoring pool so the evidence gate and diversity
+        // promotion still read honest cross-encoder relevance.
+        const bestByChunkId = new Map(
+          mergeCandidatePools([
+            base.chunks,
+            ...subResults.map((result) => result.chunks),
+          ]).map((chunk) => [chunk.chunkId, chunk]),
+        );
+        let merged = fusedOrder.map((chunk) => ({
+          ...(bestByChunkId.get(chunk.chunkId) ?? chunk),
+          retrievalScore: chunk.retrievalScore,
+        }));
+
+        // Each branch capped itself per document, but the union can
+        // concentrate more than the cap at the top; re-apply over the merge.
+        if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
+          merged = applyDocumentDiversity(merged, {
+            topK: input.topK,
+            maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+            relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
+          });
+        }
+
+        const mergedWindow = merged.slice(0, input.topK);
+        const candidateCounts = summarizeCandidateCounts(
+          [{ result: base }, ...subResults.map((result) => ({ result }))],
+          merged.length,
+          mergedWindow.length,
+        );
+
+        return {
+          chunks: mergedWindow,
+          trace: {
+            ...base.trace,
+            // Label only, mirroring the expansion path's `::expanded`; the
+            // merged window is never written to the cache under this key.
+            cacheKey: `${base.trace.cacheKey}::decomposed`,
+            cacheHit:
+              base.trace.cacheHit &&
+              subResults.every((result) => result.trace.cacheHit),
+            candidateCounts,
+          },
+          queryExpansion: standardExpansionTrace,
+          queryDecomposition: {
+            requested: true,
+            applied: true,
+            subQueryCount: subQueries.length,
+            subQueries,
+          },
+        };
+      }
+    }
+
+    const base = await basePromise;
     return {
       ...base,
-      queryExpansion: {
-        requested: shouldExpand,
+      queryExpansion: standardExpansionTrace,
+      queryDecomposition: {
+        requested: decompositionEligible,
         applied: false,
-        strategy: "standard",
-        variationCount: 0,
-        hydeUsed: false,
-        branchCount: 1,
+        subQueryCount: 0,
+        subQueries: [],
       },
     };
   }
@@ -308,6 +459,14 @@ export async function retrieveRankedCandidatesWithRouting(
       variationCount: uniqueVariations.length,
       hydeUsed: branches.some((branch) => branch.kind === "hyde"),
       branchCount: branches.length,
+    },
+    // Expansion already broadens the query; the two mechanisms stay
+    // orthogonal, so decomposition is never attempted on this path.
+    queryDecomposition: {
+      requested: false,
+      applied: false,
+      subQueryCount: 0,
+      subQueries: [],
     },
   };
 }

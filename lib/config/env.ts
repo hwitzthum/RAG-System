@@ -229,6 +229,21 @@ const envSchema = z.object({
     z.boolean().default(false),
   ),
   RAG_MULTI_QUERY_VARIATIONS: z.coerce.number().int().positive().default(3),
+  // Splits a multi-topic query into per-topic sub-queries, each retrieved and
+  // cross-encoder-reranked independently, then merged on absolute relevance
+  // (Wave 5). Router-level branch composition like RAG_HYDE_ENABLED:
+  // deliberately absent from the retrieval config fingerprint — see
+  // lib/retrieval/trace.ts. Default off pending the Wave 5 A/B.
+  RAG_QUERY_DECOMPOSITION_ENABLED: z.preprocess(
+    (val) => val === "true" || val === "1" || val === true,
+    z.boolean().default(false),
+  ),
+  RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES: z.coerce
+    .number()
+    .int()
+    .min(2)
+    .max(4)
+    .default(3),
   RAG_QUERY_EMBEDDING_DIMENSIONS: z.coerce
     .number()
     .int()
@@ -317,6 +332,9 @@ const parsed = envSchema.safeParse({
   COHERE_API_KEY: process.env.COHERE_API_KEY || undefined,
   RAG_MULTI_QUERY_ENABLED: process.env.RAG_MULTI_QUERY_ENABLED,
   RAG_MULTI_QUERY_VARIATIONS: process.env.RAG_MULTI_QUERY_VARIATIONS,
+  RAG_QUERY_DECOMPOSITION_ENABLED: process.env.RAG_QUERY_DECOMPOSITION_ENABLED,
+  RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES:
+    process.env.RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES,
   RAG_QUERY_EMBEDDING_DIMENSIONS: process.env.RAG_QUERY_EMBEDDING_DIMENSIONS,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
   ANTHROPIC_BYOK_VAULT_KEY: process.env.ANTHROPIC_BYOK_VAULT_KEY || undefined,

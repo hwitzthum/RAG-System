@@ -2,7 +2,7 @@
 
 Version: 1.2
 Date: 2026-08-05
-Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). **Wave 3 complete (2026-08-05): item 3.2 done (PR #64 + follow-up)** — that first zero turned out to be measured at drifted local config (pool 20 / CE 3000); the production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json` (pool 100 / CE 6000), where only two gates fail: nDCG@10 [EN] 0.705 and falseAnswerRate 0.40 — the single largest open defect, config-independent. Pool 100 re-confirmed on the chunk-id basis; drift baseline re-adopted and verified. See the 3.2 outcome section. **Wave 4 complete (2026-08-05)** — falseAnswerRate 0.40 → **0.067 (gate PASS)** via the CRAG/Self-RAG loop (calibrated three-way evidence verdict + ambiguous-band prompt guard; corrective retrieval built, default-off); EN nDCG@10 0.7051 → **0.7973** via grouping-off + per-document cap (adjacency boost measured net-negative for both languages; CE-context measured and rejected). The new zero is `benchmark-2026-08-05T19-30-08-179Z.json` (fingerprint `8ce4f19276f9`): **one failing gate remains** — nDCG@10 [EN] 0.7973 vs 0.8, pinned on one blended multi-hop query whose fix is query decomposition. See the Wave 4 outcome sections.
+Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). **Wave 3 complete (2026-08-05): item 3.2 done (PR #64 + follow-up)** — that first zero turned out to be measured at drifted local config (pool 20 / CE 3000); the production-config zero is `benchmark-2026-08-05T16-22-33-915Z.json` (pool 100 / CE 6000), where only two gates fail: nDCG@10 [EN] 0.705 and falseAnswerRate 0.40 — the single largest open defect, config-independent. Pool 100 re-confirmed on the chunk-id basis; drift baseline re-adopted and verified. See the 3.2 outcome section. **Wave 4 complete (2026-08-05)** — falseAnswerRate 0.40 → **0.067 (gate PASS)** via the CRAG/Self-RAG loop (calibrated three-way evidence verdict + ambiguous-band prompt guard; corrective retrieval built, default-off); EN nDCG@10 0.7051 → **0.7973** via grouping-off + per-document cap (adjacency boost measured net-negative for both languages; CE-context measured and rejected). The new zero is `benchmark-2026-08-05T19-30-08-179Z.json` (fingerprint `8ce4f19276f9`): **one failing gate remains** — nDCG@10 [EN] 0.7973 vs 0.8, pinned on one blended multi-hop query whose fix is query decomposition. See the Wave 4 outcome sections. **Wave 5 complete (2026-08-05)** — nDCG@10 [EN] 0.7973 → **0.8161 (gate PASS)** via query decomposition with per-sub-query reranking, merged by weighted RRF over pool ranks (arm 1's absolute-relevance merge measured net-negative and reverted — CE scores are not comparable across query texts). The new zero is `benchmark-2026-08-05T21-17-29-376Z.json`: **all gates PASS, the first fully green judged run.** Watched residuals: DE 0.9397 (margin ~0.010 to its floor) and contextPrecision's third consecutive decline (0.6250). See the Wave 5 outcome sections.
 
 ## Objective
 
@@ -764,6 +764,49 @@ Shipped: `RAG_CRAG_LOOP_ENABLED=true` + `RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN=0.214
 - **nDCG@10 [EN] 0.7973 is the one open gate** — a 0.0027 hair-fail pinned on one query (`mh-en-32fb0a96-15-2e51c566-41`); the next lever is query decomposition with per-sub-query reranking (see the 4.2 residual). Do not chase it with final-cut tuning.
 - **contextPrecision 0.6406** vs 0.6536 at the Wave 3 zero — the watched residual persists at −0.013 but note the confound: this wave changed window composition (cap promotes lower-relevance cross-document chunks by design). This is the second of the "next two judged runs" from the 3.2 note; the pool-100 question stays closed — the delta here is attributable to the cap, which recall/nDCG gains pay for. Keep watching, report-only.
 - Metric basis unchanged from Wave 3 (same golden set, fingerprint `7125c124…`); deltas against the Wave 3 zero are legitimate.
+
+---
+
+## Wave 5 — Query Decomposition with Per-Sub-Query Reranking
+
+### 5.1 The change
+
+`RAG_QUERY_DECOMPOSITION_ENABLED` (default off) + `RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES` (default 3). In the router's standard (non-expansion) path, an LLM (`lib/retrieval/decomposition.ts`) splits a genuinely multi-topic query into 2–3 self-contained per-topic sub-queries; each runs the full pipeline via `deps.retrieveBase` (cross-encoded against its own text — per-sub-query reranking), and the windows are merged by **weighted RRF over per-pool ranks** (base weight 1.0, sub-queries 0.9, reusing `fuseBranchCandidates`) with each chunk's absolute scores rebuilt from its best pool, then the per-document cap re-applied. Single-topic queries return `[]` from the LLM and are bit-identical to flag-off. Latency guards: queries under 12 words skip the LLM (shortest golden-set multi-hop is 20 words), results are memoized per (language, query), and the decomposition call overlaps base retrieval. Deliberately absent from the config fingerprint (HyDE precedent — router branch composition; sub-queries cache under their own keys; the merged window is never cached; tripwire documented in `lib/retrieval/trace.ts`).
+
+### 5.2 outcome — measured (2026-08-05), including a failed arm kept for the record
+
+Control (`-T20-16-51-150Z`, flag off) reproduced the Wave 4 zero exactly (EN 0.7973, fingerprint `8ce4f19276f9`) — the refactor is a no-op when disabled.
+
+**Arm 1 (`-T20-33-31-181Z`) FAILED and was diagnosed, not shipped.** It merged pools on absolute `relevanceScore` (`mergeCandidatePools`) and used a looser prompt. Three measured lessons:
+
+1. **Cohere relevance scores are not comparable across query texts.** Focused sub-queries scored their chunks 0.85–0.91 while the blended base query scored its own golden window 0.4–0.5; relevance-max merging buried the base window wholesale (q41 0.387 → 0.204, recall@5 1.000 → 0.979, EN nDCG down). Same failure class as the Wave 0 multiplicative boost: plausible score reasoning, refuted only by the live benchmark. **Do not merge cross-query pools on absolute CE scores.**
+2. The LLM split one query along its enumeration ("migrants" vs "youth") while keeping the blended frame in both sub-queries, and restated another query whole as its own first sub-query — hence prompt rules 4–5 (one topic per sub-query; never restate the whole query; never split enumerations within one topic).
+3. The decomposition LLM call (~1.2s) on every query broke both p50 latency gates; hence the 12-word gate, memoization, and the shorter prompt.
+
+**Arm 2 (`-T20-53-49-739Z`, RRF merge + tightened prompt + latency guards) passed every hard gate** and is the shipped design. Recalibration on its artifact returned `RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN = 0.214` — unchanged, with the answerable floor rising 0.222 → 0.239 (margin widened).
+
+**Pre-registration deviation, recorded honestly:** the over-decomposition tripwire fired (14 queries decomposed; 3 moved down). Diagnosis showed the trigger's assumed mechanism — arm-1-style false splits — was absent: the two DE regressions were _genuine_ multi-hop decompositions where RRF reordered already-near-perfect windows (−0.226 / −0.080), and the EN single-hop (−0.200) had swung +0.369 in arm 1, i.e. it is unstable under any window change. Prompt tightening targets a mechanism that was not the one observed, and further prompt iteration against n=63 risks overfitting, so arm 2 proceeded unchanged. DE's gate margin (0.9397 vs 0.93) is the cost being watched.
+
+### 5.3 The new zero — all gates PASS (first fully green judged run)
+
+**`benchmark-2026-08-05T21-17-29-376Z.json`** — judged, run from the env files with no CLI overrides (fingerprint `8ce4f19276f9`; the decomposition flag is deliberately outside the fingerprint), `RAG_QUERY_DECOMPOSITION_ENABLED=true`.
+
+|                     | Wave 4 zero (`-T19-30-08-179Z`) | Wave 5 zero (`-T21-17-29-376Z`) |
+| ------------------- | ------------------------------: | ------------------------------: |
+| nDCG@10 [EN]        |                   0.7973 (FAIL) |               **0.8161 (PASS)** |
+| nDCG@10 [DE]        |                          0.9509 |                 0.9397 (≥ 0.93) |
+| nDCG@10 overall     |                          0.8932 |                          0.8934 |
+| recall@5            |                           1.000 |                           1.000 |
+| MRR                 |                          0.8844 |                          0.8861 |
+| falseAnswerRate     |                           0.067 |                           0.067 |
+| falseAbstentionRate |                          0.0208 |                          0.0208 |
+| faithfulness        |                          0.9490 |                          0.9482 |
+| contextPrecision    |                          0.6406 |                          0.6250 |
+| p50 / p95 (ms)      |                    6215 / 10155 |                    7110 / 11025 |
+
+- **nDCG@10 [EN] 0.8161 — the last open gate is closed.** q41 (`mh-en-32fb0a96-15-2e51c566-41`) 0.387 → 0.613 (its present golden promoted to rank 1); `mh-en-2e51c566-14-32fb0a96-6` 0.580 → 0.850 (second golden entered the window — the designed mechanism working end-to-end).
+- **Residuals, honestly:** q41's _second_ golden is still absent from the window (0.613 is a partial fix; a full fix needs its doc-A chunk to win within its own sub-pool). DE gave back 0.011 (0.9509 → 0.9397, margin to the 0.93 gate ≈ 0.010 — about one query-rank of noise; watch it in the next judged run). **contextPrecision 0.6250** continues its slide (0.6536 → 0.6406 → 0.6250, −0.029 cumulative): the same confound as Wave 4 (decomposition, like the cap, deliberately promotes cross-document chunks), but three consecutive declines now warrant a look if it drops again. Uncached p50 rose ~0.9s (7110 vs 6215; gate 8000) — the decomposition LLM call on first-seen long queries; cached p50 5806 benefits from the memo.
+- Metric basis unchanged (golden set fingerprint `7125c124…`); deltas against the Wave 4 zero are legitimate.
 
 ---
 

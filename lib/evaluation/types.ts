@@ -326,6 +326,18 @@ export type ScoreScaleComposition =
   "cross_encoder" | "heuristic" | "mixed" | "unknown";
 
 /**
+ * The router's query-decomposition trace (Wave 5), persisted per query so an
+ * A/B artifact shows exactly which queries decomposed and into what. Null on
+ * the error path, in dry-run mode, and for artifacts predating the feature.
+ */
+export type QueryDecompositionTrace = {
+  requested: boolean;
+  applied: boolean;
+  subQueryCount: number;
+  subQueries: string[];
+};
+
+/**
  * The answering service's three-way evidence read (Wave 4.3), persisted per
  * query so ambiguous-band frequency and loop actions are measurable from
  * artifacts. Null on the error path and for artifacts predating the loop.
@@ -354,6 +366,7 @@ export type QueryBenchmarkResult = {
     };
     chunks: CandidateChunkTrace[];
     scoreScaleComposition: ScoreScaleComposition;
+    queryDecomposition: QueryDecompositionTrace | null;
   };
   answer: {
     text: string;

@@ -25,6 +25,13 @@ const CACHE_KEY_SCHEMA_VERSION = 2;
  * `RAG_HYDE_ENABLED` is deliberately absent: HyDE adds a retrieval *branch* in
  * the router, each of which already caches under its own namespace, and does
  * not change what any single branch returns.
+ *
+ * `RAG_QUERY_DECOMPOSITION_*` is deliberately absent for the same reason:
+ * decomposition composes router branches (sub-queries cache under their own
+ * query text), the base branch's call is argument-identical to the flag-off
+ * world, and the merged window is never written to the cache. Tripwire: if
+ * the merged window is ever cached under the base query's key, the flag must
+ * move into this config and `CACHE_KEY_SCHEMA_VERSION` must bump.
  */
 export type RetrievalConfig = {
   crossEncoderEnabled: boolean;
