@@ -101,6 +101,8 @@ This system prioritizes **correctness and trustworthiness** over speed or exhaus
 
 **Query Expansion + HyDE** — Rewrites your query into multiple sub-queries or generates a hypothetical ideal document to improve semantic match on short or ambiguous inputs.
 
+**Query Decomposition** — Questions that blend two distinct topics ("How does X in one document relate to Y in another?") are automatically split into per-topic sub-queries, each retrieved and reranked independently, so evidence for _both_ topics reaches the answer.
+
 **Web Research** — Blends live Tavily web results with document retrieval so answers stay current beyond your upload date.
 
 **Multi-language Support** — Auto-detects and supports EN / DE / FR / IT / ES. Ask in one language, source in another.
@@ -369,43 +371,48 @@ All variables are validated at startup via Zod. Missing required variables throw
 
 ### RAG Tuning
 
-| Variable                          | Required | Default                  | Description                                          |
-| --------------------------------- | -------- | ------------------------ | ---------------------------------------------------- |
-| `RAG_QUERY_EMBEDDING_MODEL`       | No       | `text-embedding-3-large` | OpenAI embedding model used at query time            |
-| `RAG_LLM_MODEL`                   | No       | `gpt-4o-mini`            | Chat model used for answer synthesis                 |
-| `RAG_LLM_MAX_OUTPUT_TOKENS`       | No       | `700`                    | Maximum tokens in the LLM response                   |
-| `RAG_DEFAULT_TOP_K`               | No       | `8`                      | Number of chunks to retrieve before reranking        |
-| `RAG_RRF_K`                       | No       | `60`                     | RRF dampening constant                               |
-| `RAG_RERANK_POOL_SIZE`            | No       | `40`                     | Minimum candidate pool size before reranking         |
-| `RAG_MIN_EVIDENCE_CHUNKS`         | No       | `2`                      | Minimum chunks required before generating an answer  |
-| `RAG_MIN_RERANK_SCORE`            | No       | `0.25`                   | Minimum rerank score for evidence sufficiency        |
-| `RAG_CACHE_TTL_SECONDS`           | No       | `86400`                  | TTL for cached retrieval results (24 hours)          |
-| `RAG_RETRIEVAL_VERSION`           | No       | `1`                      | Increment to invalidate the entire retrieval cache   |
-| `RAG_MAX_UPLOAD_BYTES`            | No       | `52428800`               | Maximum file size per upload (50 MB)                 |
-| `RAG_CONTEXTUAL_GROUPING_ENABLED` | No       | `true`                   | Boost adjacent chunks from the same document section |
+| Variable                          | Required | Default                  | Description                                                                    |
+| --------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------ |
+| `RAG_QUERY_EMBEDDING_MODEL`       | No       | `text-embedding-3-large` | OpenAI embedding model used at query time                                      |
+| `RAG_LLM_MODEL`                   | No       | `gpt-4o-mini`            | Chat model used for answer synthesis                                           |
+| `RAG_LLM_MAX_OUTPUT_TOKENS`       | No       | `700`                    | Maximum tokens in the LLM response                                             |
+| `RAG_DEFAULT_TOP_K`               | No       | `8`                      | Number of chunks to retrieve before reranking                                  |
+| `RAG_RRF_K`                       | No       | `60`                     | RRF dampening constant                                                         |
+| `RAG_RERANK_POOL_SIZE`            | No       | `100`                    | Minimum candidate pool size before reranking                                   |
+| `RAG_ADJACENCY_BOOST`             | No       | `0.05`                   | Per-neighbour ordering boost applied by contextual grouping                    |
+| `RAG_MAX_CHUNKS_PER_DOCUMENT`     | No       | `0`                      | Soft cap on chunks per document in the final top-K (0 = off)                   |
+| `RAG_DIVERSITY_RELEVANCE_FLOOR`   | No       | `0.25`                   | Minimum cross-encoder relevance for a chunk to claim a reserved diversity slot |
+| `RAG_MIN_EVIDENCE_CHUNKS`         | No       | `2`                      | Minimum chunks required before generating an answer                            |
+| `RAG_MIN_RERANK_SCORE`            | No       | `0.25`                   | Minimum rerank score for evidence sufficiency                                  |
+| `RAG_CACHE_TTL_SECONDS`           | No       | `86400`                  | TTL for cached retrieval results (24 hours)                                    |
+| `RAG_RETRIEVAL_VERSION`           | No       | `1`                      | Increment to invalidate the entire retrieval cache                             |
+| `RAG_MAX_UPLOAD_BYTES`            | No       | `52428800`               | Maximum file size per upload (50 MB)                                           |
+| `RAG_CONTEXTUAL_GROUPING_ENABLED` | No       | `true`                   | Boost adjacent chunks from the same document section                           |
 
 ### Optional Features
 
-| Variable                            | Required | Default       | Description                                                                                                    |
-| ----------------------------------- | -------- | ------------- | -------------------------------------------------------------------------------------------------------------- |
-| `RAG_CROSS_ENCODER_ENABLED`         | No       | `true`        | Cohere cross-encoder reranking (no-op without a Cohere key)                                                    |
-| `RAG_CROSS_ENCODER_TIMEOUT_MS`      | No       | `3000`        | Cross-encoder timeout; heuristic order on expiry                                                               |
-| `COHERE_API_KEY`                    | No       | —             | Enables cross-encoder reranking when set                                                                       |
-| `COHERE_BYOK_VAULT_KEY`             | No       | —             | AES vault key for per-user Cohere key encryption                                                               |
-| `RAG_MULTI_QUERY_ENABLED`           | No       | `false`       | Multi-query retrieval in the standard (non-expansion) path                                                     |
-| `RAG_MULTI_QUERY_VARIATIONS`        | No       | `3`           | Number of expanded query variations to generate                                                                |
-| `RAG_HYDE_ENABLED`                  | No       | `true`        | HyDE branch inside the "Broaden search" expansion path                                                         |
-| `RAG_WEB_MIN_SOURCES`               | No       | `2`           | Web sources required to answer without local evidence                                                          |
-| `RAG_EVIDENCE_PLACEMENT`            | No       | `ends`        | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order |
-| `RAG_CITATION_VERIFICATION_ENABLED` | No       | `true`        | Post-answer LLM check that cited sentences are supported (annotate-only)                                       |
-| `RAG_EVAL_JUDGE_MODEL`              | No       | `claude-opus-5` | Offline benchmark judge. Must differ from `RAG_LLM_MODEL` — `faithfulness` is a release gate. A `claude-*` value routes via `ANTHROPIC_API_KEY`; anything else via OpenAI |
-| `RAG_CITATION_VERIFIER_MODEL`       | No       | `gpt-4o-mini` | Production citation verifier (answer path, 3.5s timeout)                                                       |
-| `RAG_DATASET_GENERATOR_MODEL`       | No       | `gpt-4o-mini` | Offline generator for the corpus-derived evaluation dataset                                                    |
-| `RAG_WEB_SEARCH_ENABLED`            | No       | `false`       | Enable Tavily web-augmented retrieval globally                                                                 |
-| `RAG_WEB_SEARCH_API_KEY`            | No       | —             | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`                                                     |
-| `RAG_WEB_SEARCH_MAX_RESULTS`        | No       | `5`           | Maximum web results per query                                                                                  |
-| `ANTHROPIC_API_KEY`                 | No       | —             | Enables Anthropic Claude as an alternative LLM backend                                                         |
-| `ANTHROPIC_BYOK_VAULT_KEY`          | No       | —             | AES vault key for per-user Anthropic key encryption                                                            |
+| Variable                                 | Required | Default         | Description                                                                                                                                                               |
+| ---------------------------------------- | -------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RAG_CROSS_ENCODER_ENABLED`              | No       | `true`          | Cohere cross-encoder reranking (no-op without a Cohere key)                                                                                                               |
+| `RAG_CROSS_ENCODER_TIMEOUT_MS`           | No       | `3000`          | Cross-encoder timeout; heuristic order on expiry                                                                                                                          |
+| `COHERE_API_KEY`                         | No       | —               | Enables cross-encoder reranking when set                                                                                                                                  |
+| `COHERE_BYOK_VAULT_KEY`                  | No       | —               | AES vault key for per-user Cohere key encryption                                                                                                                          |
+| `RAG_MULTI_QUERY_ENABLED`                | No       | `false`         | Multi-query retrieval in the standard (non-expansion) path                                                                                                                |
+| `RAG_MULTI_QUERY_VARIATIONS`             | No       | `3`             | Number of expanded query variations to generate                                                                                                                           |
+| `RAG_QUERY_DECOMPOSITION_ENABLED`        | No       | `false`         | Split multi-topic queries into per-topic sub-queries, each retrieved and reranked independently, merged by weighted rank fusion                                           |
+| `RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES` | No       | `3`             | Maximum sub-queries per decomposed query (2–4)                                                                                                                            |
+| `RAG_HYDE_ENABLED`                       | No       | `true`          | HyDE branch inside the "Broaden search" expansion path                                                                                                                    |
+| `RAG_WEB_MIN_SOURCES`                    | No       | `2`             | Web sources required to answer without local evidence                                                                                                                     |
+| `RAG_EVIDENCE_PLACEMENT`                 | No       | `ends`          | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order                                                            |
+| `RAG_CITATION_VERIFICATION_ENABLED`      | No       | `true`          | Post-answer LLM check that cited sentences are supported (annotate-only)                                                                                                  |
+| `RAG_EVAL_JUDGE_MODEL`                   | No       | `claude-opus-5` | Offline benchmark judge. Must differ from `RAG_LLM_MODEL` — `faithfulness` is a release gate. A `claude-*` value routes via `ANTHROPIC_API_KEY`; anything else via OpenAI |
+| `RAG_CITATION_VERIFIER_MODEL`            | No       | `gpt-4o-mini`   | Production citation verifier (answer path, 3.5s timeout)                                                                                                                  |
+| `RAG_DATASET_GENERATOR_MODEL`            | No       | `gpt-4o-mini`   | Offline generator for the corpus-derived evaluation dataset                                                                                                               |
+| `RAG_WEB_SEARCH_ENABLED`                 | No       | `false`         | Enable Tavily web-augmented retrieval globally                                                                                                                            |
+| `RAG_WEB_SEARCH_API_KEY`                 | No       | —               | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`                                                                                                                |
+| `RAG_WEB_SEARCH_MAX_RESULTS`             | No       | `5`             | Maximum web results per query                                                                                                                                             |
+| `ANTHROPIC_API_KEY`                      | No       | —               | Enables Anthropic Claude as an alternative LLM backend                                                                                                                    |
+| `ANTHROPIC_BYOK_VAULT_KEY`               | No       | —               | AES vault key for per-user Anthropic key encryption                                                                                                                       |
 
 ### Observability
 
@@ -661,6 +668,11 @@ Query
           ├─▶ [Opt-in "Broaden search"] Query Expansion — base query +
           │        LLM variations + HyDE passage as weighted retrieval branches
           │
+          ├─▶ [RAG_QUERY_DECOMPOSITION_ENABLED, standard path] Query
+          │        Decomposition — multi-topic queries split into per-topic
+          │        sub-queries, each retrieved + cross-encoder-reranked
+          │        independently, merged by weighted rank fusion
+          │
           ├─▶ Parallel Hybrid Search (per branch)
           │       ├─ Vector Search   (pgvector HNSW cosine similarity)
           │       └─ Keyword Search  (PostgreSQL tsvector, all dictionaries)
@@ -674,7 +686,12 @@ Query
           ├─▶ Cross-Encoder Reranking over full pool (Cohere rerank-v3.5,
           │        default on, configurable timeout, heuristic fallback)
           │
-          ├─▶ Contextual Grouping (+0.05 per page-adjacent chunk)
+          ├─▶ Contextual Grouping (RAG_CONTEXTUAL_GROUPING_ENABLED —
+          │        +RAG_ADJACENCY_BOOST per page-adjacent chunk; disabled
+          │        in the tuned production config)
+          │
+          ├─▶ Per-Document Diversity Cap (RAG_MAX_CHUNKS_PER_DOCUMENT,
+          │        0 = off)
           │
           └─▶ Slice to top-K → Cache Write → Return
 ```
@@ -687,15 +704,19 @@ Query
 
 **HyDE (part of expansion, `RAG_HYDE_ENABLED`)** — The LLM writes a short hypothetical answer passage that is embedded as an additional retrieval branch. The embedding of a verbose answer sits geometrically closer to relevant document chunks than the embedding of a short question, improving cosine matching for under-specified queries.
 
+**Query Decomposition (`RAG_QUERY_DECOMPOSITION_ENABLED`)** — In the standard (non-expansion) path, a query that blends two or more distinct topics — the shape of cross-document multi-hop questions, where a single cross-encoder pass against the blended text compresses scores and the second topic's evidence never reaches the window — is split by the LLM into 2–3 self-contained per-topic sub-queries (`RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES`). Each sub-query runs the full pipeline and is cross-encoder-reranked against its own text; the resulting windows are merged with the base query's window by weighted Reciprocal Rank Fusion over per-pool ranks (base 1.0, sub-queries 0.9 — absolute cross-encoder scores are not comparable across query texts), and the per-document cap is re-applied to the merged pool. Single-topic queries are returned unsplit and behave exactly as if the feature were off. Queries under 12 words skip the LLM call, decomposition results are memoized per query, and any LLM failure degrades silently to normal retrieval.
+
 **Parallel Hybrid Search** — Vector search (pgvector cosine) and keyword search (tsvector) execute concurrently. Vector search captures paraphrases and synonyms; keyword search captures exact terms, product codes, and identifiers that vector similarity dilutes.
 
 **Reciprocal Rank Fusion** — `score = 1/(K + vector_rank) + 1/(K + keyword_rank)` with K=60. Penalises rank inflation from a single list and rewards documents that rank highly in both — a more robust fusion strategy than averaging raw similarity scores on incomparable scales.
 
-**Heuristic Reranking** — A fast weighted blend over the full candidate pool (`RAG_RERANK_POOL_SIZE`, default 40): pool-normalised retrieval score (0.55) + lexical overlap (0.30) + absolute cosine similarity (0.10) + exact phrase bonus (0.05) + same-language nudge (0.04). Also emits a pool-independent `relevanceScore` that the evidence gate reads.
+**Heuristic Reranking** — A fast weighted blend over the full candidate pool (`RAG_RERANK_POOL_SIZE`, default 100): pool-normalised retrieval score (0.55) + lexical overlap (0.30) + absolute cosine similarity (0.10) + exact phrase bonus (0.05) + same-language nudge (0.04). Also emits a pool-independent `relevanceScore` that the evidence gate reads.
 
 **Cross-Encoder Reranking (`RAG_CROSS_ENCODER_ENABLED`, default on)** — Cohere `rerank-v3.5` reads the query and every pool candidate together, re-ordering the entire pool — not just the final top-K — so a relevant chunk ranked anywhere in the pool can still reach the final set. `RAG_CROSS_ENCODER_TIMEOUT_MS` (default 3000) bounds latency; on timeout, error, or a missing Cohere key the heuristic order stands.
 
-**Contextual Grouping** — Chunks page-adjacent to another retrieved chunk from the same document receive a +0.05 ordering boost per neighbour. Runs before the top-K slice so adjacency can pull a borderline chunk into the final set; it never touches the gate's `relevanceScore`.
+**Contextual Grouping (`RAG_CONTEXTUAL_GROUPING_ENABLED`)** — Chunks page-adjacent to another retrieved chunk from the same document receive a `RAG_ADJACENCY_BOOST` (default +0.05) ordering boost per neighbour. Runs before the top-K slice so adjacency can pull a borderline chunk into the final set; it never touches the gate's `relevanceScore`. The tuned production configuration disables it: the boost was measured net-negative for ranking quality in both languages because it concentrates the final window into one document — the opposite of what cross-document questions need.
+
+**Per-Document Diversity Cap (`RAG_MAX_CHUNKS_PER_DOCUMENT`, 0 = off)** — A soft cap on how many chunks a single document may occupy in the final top-K. Reserved slots are filled only by cross-encoder-scored chunks from other documents at or above `RAG_DIVERSITY_RELEVANCE_FLOOR`; when no other document qualifies, the cap backfills and degrades to a no-op, so legitimately single-document queries are unaffected. The tuned production configuration sets the cap to 5, which measurably improved cross-document multi-hop retrieval.
 
 **Cache Write** — Awaited before the response is returned (a failed write logs and degrades gracefully); entries expire after `RAG_CACHE_TTL_SECONDS` and are flushed globally when ingestion completes.
 
@@ -822,13 +843,13 @@ Even when an injection attempt evades the scanner and manipulates the LLM, the r
 
 Detected content is replaced with `[REDACTED]`, and the response includes a `redactions_count` integer field. A non-zero count is a signal worth monitoring — it indicates an injection attempt reached the LLM and partially succeeded.
 
-**PII redaction is deliberately not maximal.** In a retrieval system, "looks like a phone number" and "looks like the figure the user asked for" are the same shape: a generic grouped-numeral pattern turns `Total: 12 500 000 units shipped.` into `Total: [REDACTED] units shipped.`, and it does so *after* citations are attached, leaving a `[n]` marker pointing at a number the reader can no longer see. `RAG_PII_REDACTION` selects the trade-off:
+**PII redaction is deliberately not maximal.** In a retrieval system, "looks like a phone number" and "looks like the figure the user asked for" are the same shape: a generic grouped-numeral pattern turns `Total: 12 500 000 units shipped.` into `Total: [REDACTED] units shipped.`, and it does so _after_ citations are attached, leaving a `[n]` marker pointing at a number the reader can no longer see. `RAG_PII_REDACTION` selects the trade-off:
 
-| Mode | Behaviour |
-| --- | --- |
-| `off` | No PII redaction. Secret and prompt-leak filtering still apply. |
+| Mode                     | Behaviour                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `off`                    | No PII redaction. Secret and prompt-leak filtering still apply.                                                                                                                                                                                                                                                   |
 | `numbers_safe` (default) | SSNs always redacted. A grouped numeral is treated as a phone number only with an explicit cue (`Tel.`, `phone`, `Fax`, …) or a `+CC` prefix. Email addresses are redacted **unless they appear in the retrieved evidence** — an address inside the caller's own RBAC-scoped documents is the answer, not a leak. |
-| `strict` | Every pattern applied unconditionally. Choose this only when the corpus is known to be numeral-light and false redactions are preferable to any exposure. |
+| `strict`                 | Every pattern applied unconditionally. Choose this only when the corpus is known to be numeral-light and false redactions are preferable to any exposure.                                                                                                                                                         |
 
 ---
 
