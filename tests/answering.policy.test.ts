@@ -324,3 +324,63 @@ test("hasSufficientEvidence falls back to rerankScore for chunks without a relev
 
   assert.equal(result, true);
 });
+
+// Item 1.6 gives the model an explicit abstention path. The token must never
+// reach a user: resolveCitedChunks and the output filter would otherwise pass
+// the bare sentinel straight through as the answer text.
+async function askWith(answerText: string) {
+  process.env.SUPABASE_URL ??= "https://example.supabase.co";
+  process.env.SUPABASE_ANON_KEY ??= "anon-key";
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-key";
+  process.env.OPENAI_API_KEY ??= "test-openai-key";
+
+  const { generateGroundedAnswer } = await import("../lib/answering/service");
+
+  return generateGroundedAnswer(
+    {
+      query: "What is the refund window?",
+      language: "EN",
+      chunks: [
+        buildChunk({ rerankScore: 0.9, relevanceScore: 0.9 }),
+        buildChunk({ chunkId: "chunk-2", rerankScore: 0.8, relevanceScore: 0.8 }),
+      ],
+      minEvidenceChunks: 1,
+      minRerankScore: 0.1,
+      minHeuristicRelevance: 0.1,
+      maxOutputTokens: 2000,
+    },
+    {
+      llmProvider: {
+        async generateAnswer() {
+          return { text: answerText, truncated: false };
+        },
+      },
+    },
+  );
+}
+
+test("a model-side INSUFFICIENT_EVIDENCE token becomes a structured abstention", async () => {
+  for (const raw of [
+    "INSUFFICIENT_EVIDENCE",
+    "  INSUFFICIENT_EVIDENCE  ",
+    "INSUFFICIENT_EVIDENCE.",
+    "```\nINSUFFICIENT_EVIDENCE\n```",
+  ]) {
+    const result = await askWith(raw);
+
+    assert.equal(result.insufficientEvidence, true, `not abstained for ${raw}`);
+    assert.equal(result.answer.includes("INSUFFICIENT_EVIDENCE"), false);
+    assert.ok(result.outputFilter.reasons.includes("model_abstention"));
+    assert.equal(result.citationVerification, null);
+  }
+});
+
+test("an answer that merely discusses insufficient evidence is not an abstention", async () => {
+  const result = await askWith(
+    "The evidence is unclear on the refund window [1]. Marking a case INSUFFICIENT_EVIDENCE is the documented escalation step [2].",
+  );
+
+  assert.equal(result.insufficientEvidence, false);
+  assert.ok(result.answer.includes("INSUFFICIENT_EVIDENCE"));
+  assert.equal(result.outputFilter.reasons.includes("model_abstention"), false);
+});

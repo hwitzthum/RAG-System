@@ -23,6 +23,7 @@ import {
   buildGroundedAnswerUserPrompt,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
   INSUFFICIENT_EVIDENCE_MESSAGE,
+  INSUFFICIENT_EVIDENCE_TOKEN,
 } from "@/lib/answering/prompts";
 import {
   buildWebAugmentedUserPrompt,
@@ -127,6 +128,26 @@ function uniqueCitations(citations: Citation[]): Citation[] {
 }
 
 const SENTENCE_BOUNDARY_PATTERN = /^[\s\S]*?[.!?][)"'»\]]*\s+/;
+
+/**
+ * Did the model take the abstention path the prompt gives it?
+ *
+ * Matched on the whole answer rather than searched for, so an answer that
+ * merely *discusses* insufficient evidence is not mistaken for a refusal.
+ * Trailing punctuation and surrounding whitespace or code fences are tolerated
+ * because small models add them; anything more substantial than that is a real
+ * answer and is treated as one.
+ */
+function isModelAbstention(answer: string): boolean {
+  const stripped = answer
+    .trim()
+    .replace(/^```[a-z]*\s*/i, "")
+    .replace(/\s*```$/, "")
+    .replace(/[.!?*_\s]+$/g, "")
+    .trim();
+
+  return stripped === INSUFFICIENT_EVIDENCE_TOKEN;
+}
 
 /**
  * Generates the answer, streaming per-sentence when both a callback and a
@@ -270,6 +291,34 @@ export async function generateGroundedAnswer(
     onSentence: input.onSentence,
   });
   const answer = generated.text;
+
+  // The model took the prompt's abstention path. Give it the same structured
+  // treatment the score gate gets, and strip the token before it can reach a
+  // user — resolveCitedChunks and the output filter would otherwise pass the
+  // bare sentinel straight through as the answer text.
+  if (isModelAbstention(answer)) {
+    return {
+      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: citations.slice(0, 3),
+      insufficientEvidence: true,
+      answerTruncated: generated.truncated,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: 0,
+        blockedWebSourceCount: 0,
+        blockedUserQuery: false,
+      },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: ["model_abstention"],
+        redactionCount: 0,
+      },
+      citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
+    };
+  }
 
   if (containsSensitiveLeakage(answer)) {
     return {
@@ -444,6 +493,34 @@ export async function generateWebAugmentedAnswer(
     onSentence: input.onSentence,
   });
   const answer = generated.text;
+
+  // The model took the prompt's abstention path. Give it the same structured
+  // treatment the score gate gets, and strip the token before it can reach a
+  // user — resolveCitedChunks and the output filter would otherwise pass the
+  // bare sentinel straight through as the answer text.
+  if (isModelAbstention(answer)) {
+    return {
+      answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: citations.slice(0, 3),
+      insufficientEvidence: true,
+      answerTruncated: generated.truncated,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
+        blockedWebSourceCount: protectedWebSources.blockedCount,
+        blockedUserQuery: false,
+      },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: ["model_abstention"],
+        redactionCount: 0,
+      },
+      citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
+    };
+  }
 
   if (containsSensitiveLeakage(answer)) {
     return {
