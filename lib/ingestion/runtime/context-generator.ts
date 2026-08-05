@@ -14,7 +14,14 @@ import type {
 const CONTEXT_SYSTEM_PROMPT =
   "Create a concise retrieval context summary that situates this document chunk within the overall document. " +
   "State what the chunk covers and how it relates to the document's subject. " +
-  "Keep factual entities and key qualifiers. Max 2 sentences.";
+  "Keep factual entities and key qualifiers. Max 2 sentences. " +
+  // The context string is concatenated into the embedded text and the
+  // tsvector. A heading like "**Retrieval Context Summary:**" — which the model
+  // emits unprompted — is then prepended to every chunk's vector, identically,
+  // which is pure noise in the embedding space.
+  "Output the summary sentences only: no heading, no preamble, no markdown.";
+
+const CONTEXT_MODEL = "claude-haiku-4-5-20251001";
 
 const DOCUMENT_SUMMARY_SYSTEM_PROMPT =
   "Summarize this document in one paragraph (max 4 sentences). " +
@@ -24,7 +31,73 @@ const DOCUMENT_SUMMARY_SYSTEM_PROMPT =
 export type DocumentContextMeta = {
   title: string | null;
   summary: string | null;
+  /**
+   * Full extracted document text. Anthropic's contextual-retrieval recipe puts
+   * the whole document behind a cache breakpoint so every chunk is situated
+   * against the real thing; the summary path below situates a page-40 clause
+   * against a summary of page 1, which is how generated context degenerates
+   * into restating the chunk. Absent when the document is outside the size
+   * window below, in which case the summary is used as before.
+   */
+  text?: string | null;
 };
+
+/*
+ * The minimum cacheable prefix for claude-haiku-4-5 is 4,096 tokens. Below
+ * that a `cache_control` breakpoint silently creates no entry — no error,
+ * `cache_creation_input_tokens: 0` — and the document would be re-billed in
+ * full for every chunk. ~3.5 characters per token puts the floor near 14,300;
+ * 16,000 leaves margin for tokenizer variation across languages.
+ *
+ * The ceiling keeps the request clear of the model's 200K context once chunk
+ * text and the reply are added.
+ */
+const MIN_CACHEABLE_DOCUMENT_CHARS = 16_000;
+const MAX_CACHEABLE_DOCUMENT_CHARS = 400_000;
+
+/**
+ * Excerpt for the document summary when the full text is not being cached.
+ *
+ * A flat head slice described only the first page or two, so a summary of a
+ * fifty-page handbook was a summary of its cover. Head plus tail plus the
+ * heading outline covers what the document opens with, what it concludes, and
+ * what lies between.
+ */
+function buildSummaryExcerpt(text: string): string {
+  const compact = text.replace(/[ \t]+/g, " ").trim();
+  if (compact.length <= 6_000) {
+    return compact.replace(/\s+/g, " ").trim();
+  }
+
+  const head = compact.slice(0, 4_000);
+  const tail = compact.slice(-2_000);
+  const outline = compact
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line.length > 0 &&
+        line.length <= 120 &&
+        /^(?:\d+(?:\.\d+)*\s+)?[A-ZÀ-Ü]/.test(line),
+    )
+    .slice(0, 60);
+
+  return [
+    head,
+    outline.length > 0 ? `\n\nSection outline:\n${outline.join("\n")}` : "",
+    `\n\nDocument ending:\n${tail}`,
+  ].join("");
+}
+
+function isCacheableDocument(text: string | null | undefined): text is string {
+  if (!text) {
+    return false;
+  }
+  return (
+    text.length >= MIN_CACHEABLE_DOCUMENT_CHARS &&
+    text.length <= MAX_CACHEABLE_DOCUMENT_CHARS
+  );
+}
 
 type OpenAiChatCompletionResponse = {
   choices?: Array<{
@@ -138,27 +211,112 @@ export class ContextGenerator {
     return content;
   }
 
+  /**
+   * The cached prefix: the whole document, identical for every chunk of it.
+   * Must be byte-stable — any variation invalidates the entry and re-bills the
+   * document at the write rate.
+   */
+  private buildDocumentBlock(document: DocumentContextMeta): string {
+    return [
+      document.title ? `Document title: ${document.title}` : null,
+      "Full document text:",
+      document.text ?? "",
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+  }
+
+  /**
+   * Writes the document into the cache with a single request before the
+   * per-chunk batches run.
+   *
+   * `enrich` processes chunks five at a time with `Promise.all`, and a cache
+   * entry only becomes readable once the first response begins streaming — so
+   * without this, all five of the first batch miss and each pays the write.
+   * `max_tokens: 0` runs prefill, writes the entry, returns immediately with an
+   * empty content array, and bills no output tokens.
+   */
+  private async prewarmDocumentCache(
+    document: DocumentContextMeta,
+  ): Promise<void> {
+    try {
+      const response = await this.anthropicClient!.messages.create({
+        model: CONTEXT_MODEL,
+        max_tokens: 0,
+        system: CONTEXT_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: this.buildDocumentBlock(document),
+                cache_control: { type: "ephemeral", ttl: "1h" },
+              },
+            ],
+          },
+        ],
+      });
+      this.logger.info("context_cache_prewarmed", {
+        cacheCreationInputTokens: response.usage.cache_creation_input_tokens,
+        cacheReadInputTokens: response.usage.cache_read_input_tokens,
+      });
+    } catch (error) {
+      // A failed pre-warm costs cache writes on the first batch, nothing more.
+      this.logger.warn("context_cache_prewarm_failed", {
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+  }
+
   private async claudeContext(
     chunk: ChunkCandidate,
     document: DocumentContextMeta,
   ): Promise<string> {
+    const cacheable = isCacheableDocument(document.text);
+
+    /*
+     * The breakpoint sits on the document block, not the system prompt.
+     * `CONTEXT_SYSTEM_PROMPT` is ~45 tokens against a 4,096-token minimum, so
+     * the marker it used to carry never created a cache entry at all — no
+     * error, and full price paid per chunk.
+     */
+    const content = cacheable
+      ? [
+          {
+            type: "text" as const,
+            text: this.buildDocumentBlock(document),
+            cache_control: { type: "ephemeral" as const, ttl: "1h" as const },
+          },
+          {
+            type: "text" as const,
+            text: this.buildChunkPromptBody(chunk, document),
+          },
+        ]
+      : [
+          {
+            type: "text" as const,
+            text: this.buildChunkPromptBody(chunk, document),
+          },
+        ];
+
     const response = await this.anthropicClient!.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: CONTEXT_MODEL,
       max_tokens: 140,
-      system: [
-        {
-          type: "text",
-          text: CONTEXT_SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: this.buildChunkPromptBody(chunk, document),
-        },
-      ],
+      system: CONTEXT_SYSTEM_PROMPT,
+      messages: [{ role: "user", content }],
     });
+
+    if (cacheable) {
+      // The acceptance test for this whole item: reads staying at zero means
+      // the document is being re-billed per chunk, not cached.
+      this.logger.info("context_cache", {
+        chunkIndex: chunk.chunkIndex,
+        cacheCreationInputTokens: response.usage.cache_creation_input_tokens,
+        cacheReadInputTokens: response.usage.cache_read_input_tokens,
+        inputTokens: response.usage.input_tokens,
+      });
+    }
 
     const textBlock = response.content.find((b) => b.type === "text");
     if (textBlock && textBlock.type === "text") {
@@ -227,6 +385,15 @@ export class ContextGenerator {
     const BATCH_SIZE = 5;
     const enriched: ChunkWithContext[] = [];
 
+    if (
+      this.settings.contextEnabled &&
+      this.anthropicApiKey &&
+      chunks.length > 1 &&
+      isCacheableDocument(document.text)
+    ) {
+      await this.prewarmDocumentCache(document);
+    }
+
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
@@ -252,7 +419,7 @@ export class ContextGenerator {
     title: string | null;
     text: string;
   }): Promise<string> {
-    const excerpt = input.text.replace(/\s+/g, " ").trim().slice(0, 6_000);
+    const excerpt = buildSummaryExcerpt(input.text);
     if (!excerpt) {
       return input.title ?? "";
     }
@@ -267,7 +434,7 @@ export class ContextGenerator {
     if (this.settings.contextEnabled && this.anthropicApiKey) {
       try {
         const response = await this.anthropicClient!.messages.create({
-          model: "claude-haiku-4-5-20251001",
+          model: CONTEXT_MODEL,
           max_tokens: 220,
           system: DOCUMENT_SUMMARY_SYSTEM_PROMPT,
           messages: [{ role: "user", content: userContent }],

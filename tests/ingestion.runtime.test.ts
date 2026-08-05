@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   chunkSections,
   splitIntoSections,
+  splitPagesIntoSections,
 } from "../lib/ingestion/runtime/chunking";
 import { IngestionPipeline } from "../lib/ingestion/runtime/pipeline";
 import { extractPages } from "../lib/ingestion/runtime/pdf-extractor";
@@ -58,8 +59,45 @@ test("splitIntoSections detects uppercase headings and preserves page metadata",
   });
 
   assert.equal(sections.length >= 2, true);
-  assert.equal(sections[0]?.sectionTitle, "Overview");
+  // Kept verbatim: the lowercase/title-case round-trip mangled acronyms and
+  // German compounds (`Mandat ZüRich`) and truncated `Capacity Building`.
+  assert.equal(sections[0]?.sectionTitle, "OVERVIEW");
   assert.equal(sections[0]?.pageNumber, 1);
+  // The heading also leads the body, so it reaches the embedded vector.
+  assert.equal(sections[0]?.text.startsWith("OVERVIEW"), true);
+});
+
+test("splitPagesIntoSections carries the heading path across page boundaries", () => {
+  // Sectioning used to restart per page, so a continuation page fell back to
+  // the title `Page N` and lost its ancestry entirely.
+  const sections = splitPagesIntoSections([
+    { pageNumber: 3, text: "5 MELDUNG VERHAELTNISSE\nIntro paragraph here." },
+    { pageNumber: 4, text: "Continuation of the same section." },
+  ]);
+
+  assert.equal(sections.length, 2);
+  assert.equal(sections[0]?.sectionTitle, "5 MELDUNG VERHAELTNISSE");
+  assert.equal(sections[1]?.pageNumber, 4);
+  assert.equal(sections[1]?.sectionTitle, "5 MELDUNG VERHAELTNISSE");
+});
+
+test("splitPagesIntoSections nests headings by numbering depth", () => {
+  const sections = splitPagesIntoSections([
+    {
+      pageNumber: 1,
+      text: "5 Meldung Veraenderter Verhaeltnisse\nIntro.\n5.4 Mutationen Krankenversicherung\nDetail text.",
+    },
+  ]);
+
+  assert.equal(sections.length, 2);
+  assert.equal(
+    sections[0]?.sectionTitle,
+    "5 Meldung Veraenderter Verhaeltnisse",
+  );
+  assert.equal(
+    sections[1]?.sectionTitle,
+    "5 Meldung Veraenderter Verhaeltnisse / 5.4 Mutationen Krankenversicherung",
+  );
 });
 
 test("splitIntoSections keeps a numeric table header row in the chunk body", () => {
@@ -72,7 +110,7 @@ test("splitIntoSections keeps a numeric table header row in the chunk body", () 
   });
 
   assert.equal(sections.length, 1);
-  assert.equal(sections[0]?.sectionTitle, "Revenue");
+  assert.equal(sections[0]?.sectionTitle, "REVENUE");
   assert.equal(sections[0]?.text.includes("2024 2025 2026"), true);
 });
 
@@ -695,4 +733,51 @@ test("runIngestionBatch passes completed document language to markJobCompleted",
   assert.deepEqual(repository.completedJobs, [
     { jobId: "job-lang", language: "DE" },
   ]);
+});
+
+test("chunkSections bounds a merged section to adjacent pages", () => {
+  // A merged section inherits the first section's pageNumber, so unbounded
+  // merging relabels content: Rollen-Basierte-Arbeit-Redesign.pdf collapsed to
+  // 5 chunks all claiming page 1. Forbidding cross-page merges outright then
+  // cost retrieval — 15 chunks of ~54 tokens, -0.25 MRR. One page of span is
+  // the compromise, and it must not chain across three pages.
+  const chunks = chunkSections({
+    sections: [
+      { pageNumber: 1, sectionTitle: "Intro", text: "Short text on page one." },
+      { pageNumber: 2, sectionTitle: "Next", text: "Short text on page two." },
+      { pageNumber: 3, sectionTitle: "Last", text: "Short text on page three." },
+      { pageNumber: 4, sectionTitle: "More", text: "Short text on page four." },
+    ],
+    language: "EN",
+    targetTokens: 700,
+    overlapTokens: 120,
+    minChars: 200,
+  });
+
+  // Pages 1+2 merge, then 3+4 — never 1..3, which would put page-3 content
+  // under page 1.
+  assert.equal(chunks.length, 2);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.pageNumber),
+    [1, 3],
+  );
+  assert.equal(chunks[0]?.content.includes("page two"), true);
+  assert.equal(chunks[1]?.content.includes("page four"), true);
+});
+
+test("chunkSections still merges short sections within one page", () => {
+  const chunks = chunkSections({
+    sections: [
+      { pageNumber: 4, sectionTitle: "Overview", text: "Short introduction." },
+      { pageNumber: 4, sectionTitle: "Scope", text: "Short scope note here." },
+    ],
+    language: "EN",
+    targetTokens: 700,
+    overlapTokens: 120,
+    minChars: 200,
+  });
+
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.pageNumber, 4);
+  assert.equal(chunks[0]?.sectionTitle, "Overview / Scope");
 });

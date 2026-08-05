@@ -1,3 +1,8 @@
+import {
+  assemblePage,
+  type AssembledPage,
+  type PageTextItem,
+} from "@/lib/ingestion/runtime/page-layout";
 import type {
   ExtractedPage,
   RuntimeLogger,
@@ -21,6 +26,12 @@ const MAX_INFLATED_STREAM_BYTES = 25 * 1024 * 1024;
 type PdfJsTextItem = {
   str?: string;
   transform?: number[];
+  /**
+   * Horizontal extent of the item. Read alongside `transform[4]` so the
+   * assembler can tell a column gutter from a word space — the previous
+   * assembler read neither and joined a whole baseline with single spaces.
+   */
+  width?: number;
 };
 
 type PdfJsPage = {
@@ -421,53 +432,25 @@ function extractTextFromPdfOperators(
   return sanitizeExtractedText(extracted.join("\n"));
 }
 
-function assemblePageText(items: PdfJsTextItem[]): string {
-  const lines: string[] = [];
-  let current: string[] = [];
-  let lastY: number | null = null;
+function assemblePageText(items: PdfJsTextItem[]): AssembledPage {
+  const textItems: PageTextItem[] = [];
 
   for (const item of items) {
-    const raw = item.str ?? "";
-    const text = raw.replace(/\s+/g, " ").trim();
+    const text = (item.str ?? "").replace(/\s+/g, " ").trim();
     if (!text) {
       continue;
     }
 
-    const y =
-      Array.isArray(item.transform) && item.transform.length > 5
-        ? item.transform[5]
-        : null;
-    if (
-      lastY !== null &&
-      y !== null &&
-      Math.abs(y - lastY) > 2 &&
-      current.length > 0
-    ) {
-      lines.push(
-        current
-          .join(" ")
-          .replace(/[ \t]+/g, " ")
-          .trim(),
-      );
-      current = [];
-    }
-
-    current.push(text);
-    if (y !== null) {
-      lastY = y;
-    }
+    const transform = Array.isArray(item.transform) ? item.transform : null;
+    textItems.push({
+      text,
+      x: transform && transform.length > 4 ? (transform[4] ?? 0) : 0,
+      y: transform && transform.length > 5 ? (transform[5] ?? 0) : 0,
+      width: typeof item.width === "number" ? item.width : 0,
+    });
   }
 
-  if (current.length > 0) {
-    lines.push(
-      current
-        .join(" ")
-        .replace(/[ \t]+/g, " ")
-        .trim(),
-    );
-  }
-
-  return lines.join("\n").trim();
+  return assemblePage(textItems);
 }
 
 async function extractPagesWithPdfJs(
@@ -495,9 +478,11 @@ async function extractPagesWithPdfJs(
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
+      const assembled = assemblePageText(content.items ?? []);
       pages.push({
         pageNumber,
-        text: assemblePageText(content.items ?? []),
+        text: assembled.text,
+        hasTables: assembled.hasTables,
       });
     }
 
@@ -514,20 +499,52 @@ export async function extractPages(
   enableOcrFallback: boolean,
   logger: RuntimeLogger,
 ): Promise<ExtractedPage[]> {
-  try {
-    const pages = await extractPagesWithPdfJs(new Uint8Array(pdfBytes), logger);
-    if (pages.some((page) => page.text.trim().length > 0)) {
-      return pages.map((page) => ({ ...page, method: "pdfjs" as const }));
-    }
+  /*
+   * pdfjs is retried once before giving up on it.
+   *
+   * The byte-scrape fallback collapses the whole document to a single page, so
+   * a document that falls back loses every page number — content from page 14
+   * is stored, cited and rendered as page 1. That is a serious quality event,
+   * and it is silent: the job still completes, and nothing downstream can tell
+   * the difference.
+   *
+   * It has been observed intermittently in the long-lived worker (two documents
+   * out of seven in one run) while the same documents parse cleanly, in the
+   * same process, on every attempt from a fresh one. Cause unidentified —
+   * likely resource state inside pdfjs. A single retry is cheap next to
+   * silently indexing a document with no page provenance.
+   */
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const pages = await extractPagesWithPdfJs(
+        new Uint8Array(pdfBytes),
+        logger,
+      );
+      if (pages.some((page) => page.text.trim().length > 0)) {
+        if (attempt > 1) {
+          logger.warn("pdfjs_extraction_recovered_on_retry", {
+            pageCount: pages.length,
+          });
+        }
+        return pages.map((page) => ({ ...page, method: "pdfjs" as const }));
+      }
 
-    logger.warn("pdfjs_extraction_empty_result", {
-      pageCount: pages.length,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "unknown_pdfjs_error";
-    logger.warn("pdfjs_extraction_failed", { message });
+      logger.warn("pdfjs_extraction_empty_result", {
+        attempt,
+        pageCount: pages.length,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "unknown_pdfjs_error";
+      logger.warn("pdfjs_extraction_failed", { attempt, message });
+    }
   }
+
+  // Loud: this is a downgrade to a single-page document, not a routine path.
+  logger.error("pdf_extraction_degraded_to_byte_scrape", {
+    reason: "pdfjs returned no text after 2 attempts",
+    consequence: "page numbers are lost; all content is attributed to page 1",
+  });
 
   // Only build the fallback binary text if pdfjs failed or returned empty.
   const fallbackBinaryText = Buffer.from(pdfBytes).toString("latin1");

@@ -33,6 +33,12 @@ export type ExtractedPage = {
   text: string;
   /** How the text was obtained. Absent on injected test fixtures. */
   method?: ExtractionMethod;
+  /**
+   * Whether layout reconstruction replaced any run of lines with a Markdown
+   * pipe table. Provenance only, so a bad reconstruction is attributable
+   * rather than invisible.
+   */
+  hasTables?: boolean;
 };
 
 export type Section = {

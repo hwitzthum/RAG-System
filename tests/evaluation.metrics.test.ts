@@ -401,3 +401,58 @@ const PASSING_SUMMARY: BenchmarkSummaryMetrics = {
   abstentionRate: 0,
   truncationRate: 0,
 };
+
+test("ignoreExpectedSection rescues a correct chunk whose section label moved", () => {
+  // Item 2.1 stops the destructive recasing of section titles, so a record
+  // storing today's mangled label ("Pacity Building") stops matching a chunk
+  // that is otherwise exactly the expected evidence. Strict judging reads that
+  // as a retrieval collapse; the page-only mode is how a re-chunk is A/B'd.
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  const chunks = [
+    buildChunk({
+      chunkId: "expected",
+      documentId: record.expected_document,
+      pageNumber: record.expected_pages[0],
+      sectionTitle: "A completely different heading after re-chunking",
+    }),
+  ];
+
+  assert.equal(computeRetrievalMetrics(record, chunks).recallAt5, 0);
+  assert.equal(
+    computeRetrievalMetrics(record, chunks, { ignoreExpectedSection: true })
+      .recallAt5,
+    1,
+  );
+});
+
+test("ignoreExpectedSection still requires the expected document and page", () => {
+  const record = records.find(
+    (item) => item.id === "en-doc_company_profile-01",
+  );
+  assert.ok(record);
+
+  const wrongDocument = [
+    buildChunk({
+      chunkId: "wrong-doc",
+      documentId: "some_other_document",
+      pageNumber: record.expected_pages[0],
+      sectionTitle: record.expected_section,
+    }),
+  ];
+  const wrongPage = [
+    buildChunk({
+      chunkId: "wrong-page",
+      documentId: record.expected_document,
+      pageNumber: 9999,
+      sectionTitle: record.expected_section,
+    }),
+  ];
+
+  const options = { ignoreExpectedSection: true };
+  assert.equal(computeRetrievalMetrics(record, wrongDocument, options).recallAt5, 0);
+  assert.equal(computeRetrievalMetrics(record, wrongPage, options).recallAt5, 0);
+});

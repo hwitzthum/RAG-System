@@ -39,6 +39,16 @@ type RunnerArgs = {
   /** LLM-judge metrics; defaults on for live mode, always off for dry-run. */
   judge: boolean;
   /**
+   * Judge retrieval relevance on document + page only, ignoring
+   * `expected_section`.
+   *
+   * Strictly an A/B instrument for changes that alter `section_title`, where
+   * the golden set's stored labels no longer describe the corpus and the
+   * substring match fails for reasons unrelated to retrieval. Defaults off:
+   * release gates are judged on the strict definition, and this loosens it.
+   */
+  ignoreExpectedSection: boolean;
+  /**
    * Per-run retrieval cache namespace. Without it the "cached" pass measured
    * whatever a previous run (possibly under a different ranking config) had
    * left in `retrieval_cache` rather than this run's own cache latency.
@@ -138,6 +148,7 @@ function parseArgs(argv: string[]): RunnerArgs {
     failOnGate: true,
     expansion: false,
     judge: true,
+    ignoreExpectedSection: false,
     cacheNamespace: `benchmark:${new Date().toISOString()}`,
   };
 
@@ -186,6 +197,8 @@ function parseArgs(argv: string[]): RunnerArgs {
       args.expansion = true;
     } else if (token === "--no-judge") {
       args.judge = false;
+    } else if (token === "--ignore-expected-section") {
+      args.ignoreExpectedSection = true;
     }
   }
 
@@ -428,6 +441,8 @@ type RunConfig = {
   topK: number;
   expansion: boolean;
   judge: boolean;
+  /** Recorded so a page-only run can never be mistaken for a strict one. */
+  ignoreExpectedSection: boolean;
   cacheNamespace: string;
   retrievalConfigFingerprint: string;
   generatorModel: string;
@@ -474,6 +489,7 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     topK: args.topK,
     expansion: args.expansion,
     judge: args.judge,
+    ignoreExpectedSection: args.ignoreExpectedSection,
     cacheNamespace: args.cacheNamespace,
     retrievalConfigFingerprint: deps.retrievalConfigFingerprint,
     generatorModel: env.RAG_LLM_MODEL,
@@ -776,6 +792,7 @@ async function evaluateQuery(
     const retrievalMetrics = computeRetrievalMetrics(
       query,
       execution.uncached.chunks,
+      { ignoreExpectedSection: args.ignoreExpectedSection },
     );
     const answerMetrics = computeAnswerMetrics(
       query,
