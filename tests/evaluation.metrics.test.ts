@@ -256,8 +256,11 @@ function buildResult(
           source: "hybrid",
           retrievalScore: 0.9,
           rerankScore: 0.8,
+          relevanceScore: 0.8,
+          scoreScale: "cross_encoder",
         },
       ],
+      scoreScaleComposition: "cross_encoder",
     },
     answer: {
       text: "Ownership model is documented.",
