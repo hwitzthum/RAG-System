@@ -178,6 +178,7 @@ function buildQueryStreamResponse(input: {
       unsupportedCount: number;
       unverified: boolean;
     } | null;
+    answerTruncated: boolean;
   };
   webSources?: WebSource[];
   queryHistoryId?: string;
@@ -387,6 +388,7 @@ export async function POST(request: NextRequest) {
         fellBack: false,
       },
       citationVerification: null,
+      answerTruncated: false,
     };
 
     return buildQueryStreamResponse({
@@ -440,6 +442,7 @@ export async function POST(request: NextRequest) {
         fellBack: false,
       },
       citationVerification: null,
+      answerTruncated: false,
     };
 
     logAuditEvent({
@@ -585,6 +588,7 @@ export async function POST(request: NextRequest) {
           },
           citationVerification: null as
             AnswerResult["citationVerification"] | null,
+          answerTruncated: false,
         });
 
         const buildFullMeta = (
@@ -598,6 +602,7 @@ export async function POST(request: NextRequest) {
           outputFilter: answerResult.outputFilter,
           citationAttribution: answerResult.citationAttribution,
           citationVerification: answerResult.citationVerification,
+          answerTruncated: answerResult.answerTruncated,
         });
 
         const persistQueryHistory = async (

@@ -174,6 +174,13 @@ export type BenchmarkSummaryMetrics = {
   contextPrecision: number;
   contextRecall: number;
   abstentionRate: number;
+  /**
+   * Share of answers the generator cut off at RAG_LLM_MAX_OUTPUT_TOKENS.
+   * Report-only and deliberately ungated: a non-zero value means the run was
+   * misconfigured, so it invalidates the answer-quality metrics rather than
+   * being one of them.
+   */
+  truncationRate: number;
 };
 
 export type ThresholdResult = {
@@ -226,6 +233,8 @@ export type QueryBenchmarkResult = {
     text: string;
     citations: Citation[];
     insufficientEvidence: boolean;
+    /** Generator hit RAG_LLM_MAX_OUTPUT_TOKENS; a config bug, not a quality signal. */
+    truncated: boolean;
   };
   metrics: QueryRetrievalMetrics &
     QueryAnswerMetrics &

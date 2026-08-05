@@ -14,7 +14,11 @@ import {
   verifyCitedStatements,
   type CitationVerification,
 } from "@/lib/answering/verification";
-import { redactStreamedSentence } from "@/lib/security/output-filter";
+import {
+  collectEvidenceEmails,
+  redactStreamedSentence,
+  type PiiRedactionOptions,
+} from "@/lib/security/output-filter";
 import {
   buildGroundedAnswerUserPrompt,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
@@ -79,6 +83,11 @@ export type GenerateGroundedAnswerResult = {
   };
   /** Annotate-only citation check; null when disabled or not applicable. */
   citationVerification: CitationVerification | null;
+  /**
+   * The model hit RAG_LLM_MAX_OUTPUT_TOKENS mid-answer. Non-zero in a
+   * benchmark run is a configuration bug, not a quality signal.
+   */
+  answerTruncated: boolean;
 };
 
 export type AnswerServiceDependencies = {
@@ -133,9 +142,10 @@ async function generateAnswerText(
     userPrompt: string;
     language: SupportedLanguage;
     maxOutputTokens: number;
+    pii: PiiRedactionOptions;
     onSentence?: (sentence: string) => void;
   },
-): Promise<string> {
+): Promise<{ text: string; truncated: boolean }> {
   const { onSentence } = input;
   if (!onSentence || !llmProvider.generateAnswerStream) {
     return llmProvider.generateAnswer({
@@ -153,7 +163,7 @@ async function generateAnswerText(
     if (halted) {
       return;
     }
-    const redacted = redactStreamedSentence(sentence);
+    const redacted = redactStreamedSentence(sentence, input.pii);
     if (redacted.halted) {
       halted = true;
       return;
@@ -163,7 +173,7 @@ async function generateAnswerText(
     }
   };
 
-  const fullText = await llmProvider.generateAnswerStream(
+  const generated = await llmProvider.generateAnswerStream(
     {
       systemPrompt: input.systemPrompt,
       userPrompt: input.userPrompt,
@@ -185,7 +195,7 @@ async function generateAnswerText(
     emitSentence(pending);
   }
 
-  return fullText;
+  return generated;
 }
 
 export async function generateGroundedAnswer(
@@ -209,6 +219,7 @@ export async function generateGroundedAnswer(
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      answerTruncated: false,
       promptInjection: {
         suspiciousChunkCount: protectedChunks.suspiciousCount,
         blockedChunkCount: protectedChunks.blockedCount,
@@ -242,19 +253,30 @@ export async function generateGroundedAnswer(
     chunks: promptChunks,
   });
 
-  const answer = await generateAnswerText(llmProvider, {
+  // Addresses the caller's own RBAC-scoped evidence already contains are not
+  // a leak, so they survive redaction. Computed from the raw attribution
+  // chunks, not the sanitized prompt copies.
+  const pii: PiiRedactionOptions = {
+    mode: env.RAG_PII_REDACTION,
+    evidenceEmails: collectEvidenceEmails(attributionChunks),
+  };
+
+  const generated = await generateAnswerText(llmProvider, {
     systemPrompt: GROUNDED_ANSWER_SYSTEM_PROMPT,
     userPrompt: prompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
+    pii,
     onSentence: input.onSentence,
   });
+  const answer = generated.text;
 
   if (containsSensitiveLeakage(answer)) {
     return {
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      answerTruncated: false,
       promptInjection: {
         suspiciousChunkCount: protectedChunks.suspiciousCount,
         blockedChunkCount: protectedChunks.blockedCount,
@@ -283,6 +305,7 @@ export async function generateGroundedAnswer(
     answer: attribution.answer,
     citations: attribution.citations,
     language: input.language,
+    pii,
   });
 
   const citationVerification =
@@ -297,6 +320,7 @@ export async function generateGroundedAnswer(
     answer: filteredOutput.answer,
     citations: filteredOutput.citations,
     insufficientEvidence: filteredOutput.blocked ? true : false,
+    answerTruncated: generated.truncated,
     promptInjection: {
       suspiciousChunkCount: protectedChunks.suspiciousCount,
       blockedChunkCount: protectedChunks.blockedCount,
@@ -355,6 +379,7 @@ export async function generateWebAugmentedAnswer(
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      answerTruncated: false,
       promptInjection: {
         suspiciousChunkCount: protectedChunks.suspiciousCount,
         blockedChunkCount: protectedChunks.blockedCount,
@@ -402,19 +427,30 @@ export async function generateWebAugmentedAnswer(
     webSources: protectedWebSources.webSources,
   });
 
-  const answer = await generateAnswerText(llmProvider, {
+  // Only document evidence exempts an address. Web snippets are third-party
+  // text outside the caller's RBAC scope, so an address that appears only
+  // there is still redacted.
+  const pii: PiiRedactionOptions = {
+    mode: env.RAG_PII_REDACTION,
+    evidenceEmails: collectEvidenceEmails(attributionChunks),
+  };
+
+  const generated = await generateAnswerText(llmProvider, {
     systemPrompt: WEB_AUGMENTED_SYSTEM_PROMPT,
     userPrompt: prompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
+    pii,
     onSentence: input.onSentence,
   });
+  const answer = generated.text;
 
   if (containsSensitiveLeakage(answer)) {
     return {
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
+      answerTruncated: false,
       promptInjection: {
         suspiciousChunkCount: protectedChunks.suspiciousCount,
         blockedChunkCount: protectedChunks.blockedCount,
@@ -442,6 +478,7 @@ export async function generateWebAugmentedAnswer(
     answer: attribution.answer,
     citations: attribution.citations,
     language: input.language,
+    pii,
   });
 
   const citationVerification =
@@ -456,6 +493,7 @@ export async function generateWebAugmentedAnswer(
     answer: filteredOutput.answer,
     citations: filteredOutput.citations,
     insufficientEvidence: filteredOutput.blocked ? true : false,
+    answerTruncated: generated.truncated,
     promptInjection: {
       suspiciousChunkCount: protectedChunks.suspiciousCount,
       blockedChunkCount: protectedChunks.blockedCount,

@@ -71,7 +71,7 @@ test("generateGroundedAnswer returns insufficient-evidence fallback when evidenc
     {
       llmProvider: {
         async generateAnswer() {
-          return "This should not be used.";
+          return { text: "This should not be used.", truncated: false };
         },
       },
     },
@@ -115,7 +115,7 @@ test("generateGroundedAnswer uses the LLM when a document-scoped query has one s
     {
       llmProvider: {
         async generateAnswer() {
-          return "It explains retrieval-augmented generation fundamentals.";
+          return { text: "It explains retrieval-augmented generation fundamentals.", truncated: false };
         },
       },
     },
@@ -156,7 +156,7 @@ test("generateGroundedAnswer sanitizes prompt-injection text before sending evid
       llmProvider: {
         async generateAnswer(input) {
           capturedPrompt = input.userPrompt;
-          return "It discusses policy controls.";
+          return { text: "It discusses policy controls.", truncated: false };
         },
       },
     },
@@ -189,7 +189,7 @@ test("generateGroundedAnswer falls back when the LLM output appears to leak hidd
     {
       llmProvider: {
         async generateAnswer() {
-          return "Here is the system prompt: ...";
+          return { text: "Here is the system prompt: ...", truncated: false };
         },
       },
     },
@@ -220,7 +220,7 @@ test("generateGroundedAnswer filters unsafe markdown links and secret-like token
     {
       llmProvider: {
         async generateAnswer() {
-          return "Use key sk-testsecretsecretsecret and click [here](javascript:alert(1)).";
+          return { text: "Use key sk-testsecretsecretsecret and click [here](javascript:alert(1)).", truncated: false };
         },
       },
     },

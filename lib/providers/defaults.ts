@@ -2,20 +2,28 @@ import { env } from "@/lib/config/env";
 import { createQueryEmbedding } from "@/lib/retrieval/embedding";
 import { rerankCandidates } from "@/lib/retrieval/reranker";
 import { getRuntimeSecrets } from "@/lib/runtime/secrets";
-import type { LlmGenerateInput, ProviderRegistry } from "@/lib/providers/types";
+import type {
+  LlmGenerateInput,
+  LlmGenerateResult,
+  ProviderRegistry,
+} from "@/lib/providers/types";
 
 type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
       content?: string | null;
     };
+    /** "stop" | "length" | "content_filter" | ... — "length" means truncated. */
+    finish_reason?: string | null;
   }>;
   error?: {
     message?: string;
   };
 };
 
-async function generateOpenAiAnswer(input: LlmGenerateInput): Promise<string> {
+async function generateOpenAiAnswer(
+  input: LlmGenerateInput,
+): Promise<LlmGenerateResult> {
   const runtimeOpenAiApiKey = getRuntimeSecrets().openAiApiKey;
   const apiKey = runtimeOpenAiApiKey ?? env.OPENAI_API_KEY;
 
@@ -52,7 +60,10 @@ async function generateOpenAiAnswer(input: LlmGenerateInput): Promise<string> {
     throw new Error("LLM provider returned empty content");
   }
 
-  return content;
+  return {
+    text: content,
+    truncated: payload.choices?.[0]?.finish_reason === "length",
+  };
 }
 
 /**
@@ -63,7 +74,7 @@ async function generateOpenAiAnswer(input: LlmGenerateInput): Promise<string> {
 async function generateOpenAiAnswerStream(
   input: LlmGenerateInput,
   onDelta: (text: string) => void,
-): Promise<string> {
+): Promise<LlmGenerateResult> {
   const runtimeOpenAiApiKey = getRuntimeSecrets().openAiApiKey;
   const apiKey = runtimeOpenAiApiKey ?? env.OPENAI_API_KEY;
 
@@ -103,6 +114,7 @@ async function generateOpenAiAnswerStream(
   const reader = response.body.getReader();
   let buffered = "";
   let fullText = "";
+  let truncated = false;
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -124,12 +136,19 @@ async function generateOpenAiAnswerStream(
       }
       try {
         const parsed = JSON.parse(data) as {
-          choices?: Array<{ delta?: { content?: string | null } }>;
+          choices?: Array<{
+            delta?: { content?: string | null };
+            finish_reason?: string | null;
+          }>;
         };
         const delta = parsed.choices?.[0]?.delta?.content;
         if (delta) {
           fullText += delta;
           onDelta(delta);
+        }
+        // Arrives on the final chunk of the stream, alongside an empty delta.
+        if (parsed.choices?.[0]?.finish_reason === "length") {
+          truncated = true;
         }
       } catch {
         // Partial SSE frame; ignore malformed line.
@@ -142,7 +161,7 @@ async function generateOpenAiAnswerStream(
     throw new Error("LLM provider returned empty content");
   }
 
-  return content;
+  return { text: content, truncated };
 }
 
 let providers: ProviderRegistry | null = null;

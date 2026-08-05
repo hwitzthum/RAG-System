@@ -66,6 +66,13 @@ type RunCapture = {
     unsupportedCount: number;
     unverified: boolean;
   } | null;
+  /**
+   * The generator hit RAG_LLM_MAX_OUTPUT_TOKENS. A non-zero rate across a run
+   * is a configuration bug, not a quality signal: a severed final sentence
+   * with a dangling [n] marker scores as an unsupported statement and depresses
+   * faithfulness for a reason unrelated to grounding.
+   */
+  answerTruncated: boolean;
 };
 
 type QueryExecution = {
@@ -306,6 +313,7 @@ function executeDryRun(
         unsupportedCount: 0,
         unverified: false,
       },
+      answerTruncated: false,
     },
     cached: {
       chunks,
@@ -326,6 +334,7 @@ function executeDryRun(
         unsupportedCount: 0,
         unverified: false,
       },
+      answerTruncated: false,
     },
   };
 }
@@ -399,6 +408,7 @@ async function executeLive(
       insufficientEvidence: uncachedAnswer.insufficientEvidence,
       latencyMs: uncachedLatencyMs,
       citationVerification: uncachedAnswer.citationVerification,
+      answerTruncated: uncachedAnswer.answerTruncated,
     },
     cached: {
       chunks: cachedRetrieval.chunks,
@@ -409,6 +419,7 @@ async function executeLive(
       insufficientEvidence: cachedAnswer.insufficientEvidence,
       latencyMs: cachedLatencyMs,
       citationVerification: cachedAnswer.citationVerification,
+      answerTruncated: cachedAnswer.answerTruncated,
     },
   };
 }
@@ -688,6 +699,7 @@ ${configRows}
 | Citation evidence hit rate | ${formatMetric(overall.citationEvidenceHitRate)} |
 | Verified citation rate | ${overall.verifiedQueryCount > 0 ? formatMetric(overall.verifiedCitationRate) : "n/a"} (${overall.verifiedQueryCount} verified) |
 | Citation accuracy (strict, report-only) | ${formatMetric(overall.citationAccuracy)} |
+| Answer truncation rate${overall.truncationRate > 0 ? " **(CONFIG BUG - answer metrics below are not trustworthy)**" : ""} | ${formatMetric(overall.truncationRate)} |
 | Cache hit rate | ${formatMetric(overall.cacheHitRate)} |
 | Uncached p50 latency (ms) | ${formatMetric(overall.uncachedP50LatencyMs)} |
 | Uncached p95 latency (ms) | ${formatMetric(overall.uncachedP95LatencyMs)} |
@@ -808,6 +820,7 @@ async function evaluateQuery(
         text: execution.uncached.answer,
         citations: execution.uncached.citations,
         insufficientEvidence: execution.uncached.insufficientEvidence,
+        truncated: execution.uncached.answerTruncated,
       },
       metrics: {
         ...retrievalMetrics,
@@ -848,6 +861,7 @@ async function evaluateQuery(
         text: "",
         citations: [],
         insufficientEvidence: false,
+        truncated: false,
       },
       metrics: {
         recallAt5: 0,

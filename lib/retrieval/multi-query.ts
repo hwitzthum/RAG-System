@@ -29,7 +29,7 @@ export async function generateQueryVariations(
 
   let raw: string;
   try {
-    raw = await Promise.race([
+    ({ text: raw } = await Promise.race([
       getDefaultProviders().llm.generateAnswer({
         systemPrompt,
         userPrompt,
@@ -39,7 +39,7 @@ export async function generateQueryVariations(
         maxOutputTokens: 300,
       }),
       timeout,
-    ]);
+    ]));
   } catch {
     return [originalQuery];
   } finally {
