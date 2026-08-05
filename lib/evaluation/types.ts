@@ -8,15 +8,56 @@ export const EVALUATION_LANGUAGES = ["EN", "DE", "FR", "IT", "ES"] as const;
 
 export type EvaluationLanguage = (typeof EVALUATION_LANGUAGES)[number];
 
+export const EVALUATION_QUESTION_TYPES = [
+  "single_hop",
+  "multi_hop",
+  "unanswerable",
+  "adversarial",
+] as const;
+
+export type EvaluationQuestionType = (typeof EVALUATION_QUESTION_TYPES)[number];
+
 export type EvaluationQueryRecord = {
   id: string;
   language: EvaluationLanguage;
   question: string;
+  question_type: EvaluationQuestionType;
+  /**
+   * Exact ground truth: the chunk row(s) the question was generated from.
+   * When non-empty, retrieval relevance is an exact chunk-id hit, replacing
+   * the page-number proxy that scored the semantically correct passage one
+   * page over as zero. Empty only for unanswerable questions.
+   */
+  expected_chunk_ids: string[];
+  /** Empty string for unanswerable questions, which have no gold evidence. */
   expected_document: string;
   expected_section: string;
   expected_pages: number[];
+  /** Empty for unanswerable questions: the correct behaviour is abstention. */
   acceptable_answer_points: string[];
 };
+
+/**
+ * The dataset file wraps its records in an envelope binding them to the corpus
+ * state they were generated from. A re-chunk previously invalidated the golden
+ * set silently — benchmark-2026-08-04T11-28-14-544Z.json recorded recall 0.405
+ * against stale ground truth, indistinguishable from a retrieval collapse.
+ * The benchmark refuses to run when the live fingerprint no longer matches.
+ */
+export type EvaluationDatasetEnvelope = {
+  corpusFingerprint: string;
+  generatedAt: string;
+  generatorModel: string;
+  records: EvaluationQueryRecord[];
+};
+
+/**
+ * Measured judge noise floor: two live runs over byte-identical retrieved
+ * chunks differed by 0.0085 on contextPrecision (item 1.6 follow-up), so any
+ * judge-metric delta under ~0.01 is indistinguishable from variance. Carried
+ * into every report so deltas at the floor stop being read as signal.
+ */
+export const JUDGE_NOISE_FLOOR = 0.01;
 
 export type DatasetValidationOptions = {
   minTotalQueries: number;
@@ -24,8 +65,13 @@ export type DatasetValidationOptions = {
 };
 
 export type DatasetValidationResult = {
+  corpusFingerprint: string;
+  generatedAt: string;
+  generatorModel: string;
   records: EvaluationQueryRecord[];
   totalQueries: number;
+  answerableCount: number;
+  unanswerableCount: number;
   languageCounts: Record<SupportedLanguage, number>;
 };
 
@@ -99,6 +145,23 @@ export type BenchmarkThresholds = {
   faithfulnessMin: number;
   /** Report-only since the grounding metric was demoted. */
   hallucinationRateMax: number;
+  /**
+   * Max fraction of unanswerable questions the system answered instead of
+   * abstaining on. Only checked when the dataset carries an unanswerable
+   * slice; before item 3.1 abstention was structurally unmeasurable.
+   */
+  falseAnswerRateMax: number;
+  /** Max fraction of answerable questions the system abstained on. */
+  falseAbstentionRateMax: number;
+  /**
+   * Per-language floors for recall@5 / nDCG@10, applied to every language
+   * with at least `perLanguageMinQueries` answerable queries. EN recall was
+   * 0.667 while the 0.85 aggregate gate passed on DE's 1.000 — the aggregate
+   * alone lets one language hide behind another.
+   */
+  perLanguageRecallAt5: number;
+  perLanguageNdcgAt10: number;
+  perLanguageMinQueries: number;
   cacheHitRate: number;
   uncachedP50LatencyMs: number;
   uncachedP95LatencyMs: number;
@@ -137,6 +200,19 @@ export const DEFAULT_BENCHMARK_THRESHOLDS: BenchmarkThresholds = {
   // faithfulness level is discovered; fix the cause, do not lower this number.
   faithfulnessMin: 0.9,
   hallucinationRateMax: 0.05,
+  // Abstention gates, measurable for the first time since item 3.1 added an
+  // unanswerable slice. Set from the behaviour a correct system exhibits, not
+  // from what the current system measures: expect the first runs to fail while
+  // the true false-answer level is discovered. Fix the cause, do not lower
+  // these numbers.
+  falseAnswerRateMax: 0.1,
+  falseAbstentionRateMax: 0.05,
+  // Same floors as the aggregate gates: a per-language miss is a real miss.
+  // EN measured 0.667 recall while the aggregate passed on DE — these exist
+  // precisely so that keeps failing until EN itself is fixed.
+  perLanguageRecallAt5: 0.85,
+  perLanguageNdcgAt10: 0.8,
+  perLanguageMinQueries: 5,
   cacheHitRate: 0.3,
   uncachedP50LatencyMs: 8000,
   uncachedP95LatencyMs: 15000,
@@ -148,6 +224,21 @@ export type BenchmarkSummaryMetrics = {
   queryCount: number;
   evaluatedCount: number;
   systemErrorCount: number;
+  /**
+   * The answerable/unanswerable split. Retrieval, citation and judge averages
+   * run over the answerable slice only — an unanswerable question has no gold
+   * evidence to retrieve, so including it would zero-drag every average.
+   */
+  answerableCount: number;
+  unanswerableCount: number;
+  /**
+   * Fraction of evaluated unanswerable queries the system answered instead of
+   * abstaining on. 0 when the slice is empty. Computed from the production
+   * `insufficientEvidence` flag, so it works with the judge disabled.
+   */
+  falseAnswerRate: number;
+  /** Fraction of evaluated answerable queries the system abstained on. */
+  falseAbstentionRate: number;
   recallAt5: number;
   ndcgAt10: number;
   mrr: number;
@@ -196,7 +287,14 @@ export type ThresholdEvaluation = {
 };
 
 export type BenchmarkFailureType =
-  "retrieval" | "citation" | "grounding" | "latency" | "cache" | "system_error";
+  | "retrieval"
+  | "citation"
+  | "grounding"
+  | "latency"
+  | "cache"
+  | "system_error"
+  /** Answered an unanswerable question, or abstained on an answerable one. */
+  | "abstention";
 
 export type QueryFailure = {
   failureType: BenchmarkFailureType;
@@ -219,6 +317,7 @@ export type QueryBenchmarkResult = {
   id: string;
   language: SupportedLanguage;
   question: string;
+  questionType: EvaluationQuestionType;
   retrieval: {
     cacheHit: boolean;
     candidateCounts: {

@@ -2,7 +2,7 @@
 
 Version: 1.2
 Date: 2026-08-05
-Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). Wave 3 not started; item 3.1 is now the prerequisite for any further retrieval A/B, having been the binding constraint on measurement three separate times this wave.
+Status: Wave 0 complete (PR #57). Wave 1 complete (2026-08-05) — 1.1/1.3 (PR #60), 1.2 (PR #61), 1.6 (PR #62); 1.4 withdrawn, 1.5 deferred, both on measurement. **Wave 2 complete (2026-08-05)** — 2.1/2.2 shipped as written, 2.3 shipped for tables with the multi-column-reordering half withdrawn on measurement; duplicate document removed; corpus re-ingested and re-measured (EN nDCG@10 +0.068, contextRecall 1.0000, all gated metrics up — see the Wave 2 outcome section). **Wave 3 item 3.1 complete (2026-08-05)** — golden set rebuilt with chunk-id ground truth, corpus-fingerprint envelope, multi-hop + unanswerable slices, per-language gates, and the judge fixes; new zero recorded at `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json` (gate FAIL by design: falseAnswerRate 0.333, EN recall/nDCG below floor — see the 3.1 outcome section). Item 3.2's remaining bullets (Wave 1 A/B re-runs, embedding-drift baseline re-adoption) are open.
 
 ## Objective
 
@@ -581,23 +581,39 @@ The generator has `chunk.id` in hand and throws it away. The schema has no chunk
 
 **Change:**
 
-- [ ] Extend `EvaluationQueryRecord` with `expected_chunk_ids: string[]` and `question_type: single_hop | multi_hop | unanswerable | adversarial`.
-- [ ] Wrap the file in an envelope carrying `{corpusFingerprint, generatedAt, generatorModel, records}`, where the fingerprint hashes document ids + chunk counts + max chunk `updated_at`. Make `validateEvaluationDataset` and the benchmark refuse to run on a fingerprint mismatch.
-- [ ] Add ~15 unanswerable questions about topics provably absent from the corpus; report and gate `falseAnswerRate` on that slice alongside `falseAbstentionRate` on the answerable one.
-- [ ] Add a multi-hop slice by prompting the generator with two chunks from different documents.
-- [ ] Delete the synthetic fixture and the CI test at `tests/evaluation.metrics.test.ts` that keeps it alive.
-- [ ] Add **per-language threshold checks** so EN cannot hide behind DE.
+- [x] Extend `EvaluationQueryRecord` with `expected_chunk_ids: string[]` and `question_type: single_hop | multi_hop | unanswerable | adversarial`. Retrieval relevance and citation-evidence hits are chunk-id-exact when ids are present; the page proxy survives only as a fallback for id-less records.
+- [x] Wrap the file in an envelope carrying `{corpusFingerprint, generatedAt, generatorModel, records}`. The fingerprint hashes document ids + chunk counts + max chunk `created_at` — not the planned `updated_at`, which does not exist on `document_chunks`; chunk rows are immutable (a re-chunk deletes and re-inserts), so creation time is the freshness signal. `validateEvaluationDataset` rejects bare arrays and the live benchmark refuses a fingerprint mismatch with a regenerate instruction. The generator also re-fingerprints after generation and fails if the corpus moved mid-run.
+- [x] Add ~15 unanswerable questions about topics provably absent from the corpus; report and gate `falseAnswerRate` (≤0.1) on that slice alongside `falseAbstentionRate` (≤0.05) on the answerable one. Each question centres on an invented entity whose name is keyword-verified absent from every chunk before the record is accepted. Both rates read the production `insufficientEvidence` flag, so they hold under `--no-judge`. Two generator defects found live: a probe-term filter demanding ≥2 terms when one invented entity is the natural case, and a 1.5k-token cap truncating candidate JSON — both fixed.
+- [x] Add a multi-hop slice by prompting the generator with two chunks from different documents. Pairs are over-generated 3× because the LLM refuses unrelated pairs (`feasible: false`); 7 survived.
+- [x] Delete the synthetic fixture and the CI test that kept it alive. The fixture and its generator (`scripts/evaluation/generate-dataset.ts`, `eval:dataset:generate`) are gone; `tests/evaluation.metrics.test.ts` was rewritten on inline records rather than deleted — the threshold/fail-closed regression tests are worth keeping, and the point was killing the fixture dependency, which is dead.
+- [x] Add **per-language threshold checks** so EN cannot hide behind DE. Recall@5 and nDCG@10 are gated per language at the aggregate floors (0.85/0.8) for every language with ≥5 answerable queries.
 - [ ] ~~Add the scoped-query slice needed to verify item 1.5.~~ Item 1.5 was deferred on measurement; the slice is only needed if its trigger condition is ever met.
-- [ ] **Stop scoring negative-existential claims as unsupported.** Since item 1.6 shipped, every answer carries a `## Limitations` section asserting what the evidence does _not_ establish. The judge asks "is this statement supported by the retrieved evidence?", which such a claim can never satisfy, so `faithfulness` is now biased downward for all 44 answers — 6 of the 9 unsupported statements in the 1.6 treatment run were of exactly this kind. Either exclude Limitations sections from statement extraction, or score them against "does the evidence _contradict_ this?" instead. Fix the metric, not the prompt.
-- [ ] **Record the judge noise floor in the report.** Two runs over byte-identical retrieved chunks differed by 0.0085 on `contextPrecision` (see item 1.6), so any judge delta under ~0.01 is indistinguishable from variance. Every judge metric in the report should carry that caveat, or deltas at the floor will keep being read as signal.
+- [x] **Stop scoring negative-existential claims as unsupported.** Fixed by exclusion: `stripLimitationsSection` (in `lib/evaluation/metrics.ts`, so it stays importable without env side effects) deterministically removes the `## Limitations` section before the judge sees the answer. Headings are matched by localized stem (Limitations/Einschränkungen/Grenzen/…) because answer-contract rule 11 writes headings in the answer's language. Post-processing in code, not a judge-prompt plea.
+- [x] **Record the judge noise floor in the report.** `JUDGE_NOISE_FLOOR = 0.01` is stamped into every run artifact and printed as a caveat above the judge table in every report.
 
 **Measure:** self-measuring. Abstention becomes measurable for the first time — today a build that answers everything confidently, hallucinating on out-of-corpus questions, passes every gate. Chunk-id ground truth also upgrades recall@5 from a fuzzy page proxy to an exact-hit metric, removing label noise from the flagship number. Regenerating resets every historical metric; the unanswerable slice will look bad at first — **do not lower the threshold to fit**.
 
+### 3.1 outcome — measured (2026-08-05)
+
+Shipped as written (deviations noted in the checklist above). New dataset: 63 records against fingerprint `7125c124…` — 48 answerable (EN 18 / DE 30; 41 single-hop, 7 multi-hop) + 15 unanswerable (8 EN / 7 DE, every probe term keyword-verified absent). The new zero is `evaluation/runs/benchmark-2026-08-05T14-54-59-370Z.json`. **Gate status: FAIL — by design, and the failures are the findings:**
+
+- **`falseAnswerRate` 0.333 (5/15) vs gate ≤0.1.** The prediction was exact: the system confidently answers a third of questions whose subject matter provably does not exist in the corpus (e.g. the invented "Tech for Good Initiative", "Innovationsförderung 2024"). This was structurally invisible before this item — abstention was 0 on every prior run because nothing unanswerable was ever asked. This is now the top open quality defect; the deferred CRAG/Self-RAG item's trigger condition ("a false-answer number to optimize against") is met.
+- **`falseAbstentionRate` 0.0208 (1/48) passes** — the system rarely refuses answerable questions; its failure mode is the opposite.
+- **EN gates fail as intended: Recall@5 [EN] 0.778, nDCG@10 [EN] 0.563 vs DE 1.000/0.940.** The aggregate recall (0.917) still passes — exactly the hiding the per-language gates were built to expose. Three of four EN multi-hop questions retrieve only one of two golden chunks (nDCG 0.387–0.613); DE multi-hop is near-perfect.
+- **Aggregate nDCG@10 0.7985 vs 0.8** — a hair-fail driven entirely by the EN slice plus the stricter multi-hop ideal (a perfect score now requires _both_ golden chunks ranked).
+- **Faithfulness 0.9465 passes** with Limitations sections stripped — first live confirmation that the negative-existential bias, not grounding, was holding the number down.
+- Numbers on the chunk-id-exact basis are **not comparable to any earlier run**: the old page proxy sometimes credited a wrong-but-same-page chunk and sometimes zeroed a right-but-page-shifted one. This run is the zero; deltas start here.
+
+### 3.1 addendum — instrument defects found while shipping
+
+- `document_chunks` has no `updated_at`; the fingerprint hashes max `created_at` (chunks are immutable — re-chunks delete + re-insert). Recorded so nobody "fixes" it back.
+- The unanswerable generator initially produced 2/15 usable questions: a probe-term filter demanded ≥2 terms when a question built on one invented entity naturally has one, and a 1,500-token cap truncated candidate JSON mid-array (silently parsed as zero candidates). Both fixed; the final run kept 15/15 with zero discards.
+
 ### 3.2 Re-baseline
 
-- [ ] Re-run the Wave 1 A/Bs against the new corpus to confirm nothing regressed.
+- [ ] Re-run the Wave 1 A/Bs against the new corpus to confirm nothing regressed. Note: comparisons against pre-3.1 runs are meaningless (metric basis changed); re-run both arms fresh.
 - [ ] Re-adopt the embedding-drift baseline (`centroid_drift_within_limit` fails once by design after the re-embed).
-- [ ] Record the new zero in `evaluation/runs/`.
+- [x] Record the new zero in `evaluation/runs/` — `benchmark-2026-08-05T14-54-59-370Z.json` (2026-08-05, fingerprint `7125c124…`).
 
 ---
 
