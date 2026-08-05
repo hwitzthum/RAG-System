@@ -29,9 +29,17 @@ const CACHE_KEY_SCHEMA_VERSION = 2;
 export type RetrievalConfig = {
   crossEncoderEnabled: boolean;
   crossEncoderModel: string;
+  /** Changes the document text the cross-encoder scores. */
+  crossEncoderIncludeContext: boolean;
   rerankPoolSize: number;
   rrfK: number;
   contextualGroupingEnabled: boolean;
+  /** Changes the ordering the grouping stage produces. */
+  adjacencyBoost: number;
+  /** Changes final topK membership (soft per-document cap; 0 = off). */
+  maxChunksPerDocument: number;
+  /** Qualification floor for diversity promotion. */
+  diversityRelevanceFloor: number;
   multiQueryEnabled: boolean;
   /** Changes the merged vector candidate set within a single cache key. */
   multiQueryVariations: number;
@@ -52,9 +60,13 @@ export function computeRetrievalConfigFingerprint(
       [
         `ce:${config.crossEncoderEnabled}`,
         `cem:${config.crossEncoderModel}`,
+        `cectx:${config.crossEncoderIncludeContext}`,
         `pool:${config.rerankPoolSize}`,
         `rrfk:${config.rrfK}`,
         `group:${config.contextualGroupingEnabled}`,
+        `adjb:${config.adjacencyBoost}`,
+        `maxdoc:${config.maxChunksPerDocument}`,
+        `divfloor:${config.diversityRelevanceFloor}`,
         `mq:${config.multiQueryEnabled}`,
         `mqv:${config.multiQueryVariations}`,
         `emb:${config.queryEmbeddingModel}`,

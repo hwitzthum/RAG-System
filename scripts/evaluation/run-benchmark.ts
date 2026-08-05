@@ -477,8 +477,12 @@ type RunConfig = {
   crossEncoderEnabled: boolean;
   crossEncoderModel: string;
   crossEncoderTimeoutMs: number;
+  crossEncoderIncludeContext: boolean;
   hydeEnabled: boolean;
   contextualGroupingEnabled: boolean;
+  adjacencyBoost: number;
+  maxChunksPerDocument: number;
+  diversityRelevanceFloor: number;
   multiQueryEnabled: boolean;
   multiQueryVariations: number;
   evidencePlacement: string;
@@ -524,8 +528,12 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
     crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
     crossEncoderTimeoutMs: env.RAG_CROSS_ENCODER_TIMEOUT_MS,
+    crossEncoderIncludeContext: env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
     hydeEnabled: env.RAG_HYDE_ENABLED,
     contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
+    adjacencyBoost: env.RAG_ADJACENCY_BOOST,
+    maxChunksPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+    diversityRelevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
     multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
     multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
     evidencePlacement: env.RAG_EVIDENCE_PLACEMENT,

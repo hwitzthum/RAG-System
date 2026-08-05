@@ -26,6 +26,7 @@ import {
 } from "@/lib/retrieval/trace";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
 import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
+import { applyDocumentDiversity } from "@/lib/retrieval/diversity";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 import { isDocumentOverviewQuery } from "@/lib/retrieval/intent";
 
@@ -35,9 +36,13 @@ const MIN_CANDIDATE_LIMIT = 20;
 export const RETRIEVAL_CONFIG_FINGERPRINT = computeRetrievalConfigFingerprint({
   crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
   crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
+  crossEncoderIncludeContext: env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
   rerankPoolSize: env.RAG_RERANK_POOL_SIZE,
   rrfK: env.RAG_RRF_K,
   contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
+  adjacencyBoost: env.RAG_ADJACENCY_BOOST,
+  maxChunksPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+  diversityRelevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
   multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
   multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
   queryEmbeddingModel: env.RAG_QUERY_EMBEDDING_MODEL,
@@ -334,7 +339,18 @@ export async function retrieveRankedCandidates(
   }
 
   if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    orderedCandidates = applyContextualGrouping(orderedCandidates);
+    orderedCandidates = applyContextualGrouping(
+      orderedCandidates,
+      env.RAG_ADJACENCY_BOOST,
+    );
+  }
+
+  if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
+    orderedCandidates = applyDocumentDiversity(orderedCandidates, {
+      topK,
+      maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+      relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
+    });
   }
 
   const rerankedCandidates = orderedCandidates.slice(0, topK);

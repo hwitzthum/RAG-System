@@ -95,6 +95,15 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(3000),
+  // Include `chunk.context` in the document text the cross-encoder scores.
+  // Context is embedded, in the tsvector, and shown to the answerer and judge,
+  // but was historically absent from the rerank input — leaving the CE without
+  // the document-level disambiguation that separates near-duplicate siblings.
+  // Default off pending the Wave 4 A/B (arm 2).
+  RAG_CROSS_ENCODER_INCLUDE_CONTEXT: z.preprocess(
+    (val) => val === "true" || val === "1" || val === true,
+    z.boolean().default(false),
+  ),
   // HyDE runs only inside the user-requested "Broaden search" expansion path.
   RAG_HYDE_ENABLED: z.preprocess(
     (val) => !(val === "false" || val === "0" || val === false),
@@ -132,6 +141,20 @@ const envSchema = z.object({
     (val) => !(val === "false" || val === "0" || val === false),
     z.boolean().default(true),
   ),
+  // Per-adjacent-neighbour ordering boost applied by contextual grouping, on
+  // top of the cross-encoder score. 0.05 is the historical constant; at CE
+  // rank gaps of 0.01–0.05 it can leapfrog a genuine relevance preference, so
+  // Wave 4 sweeps it downward (arm 3). Do not re-tune without an nDCG@10 A/B.
+  RAG_ADJACENCY_BOOST: z.coerce.number().nonnegative().default(0.05),
+  // Soft cap on chunks per document in the final topK (0 = disabled). Reserved
+  // slots are filled only by cross-encoder-scored chunks from other documents
+  // at or above RAG_DIVERSITY_RELEVANCE_FLOOR; with no qualifier the cap
+  // backfills and degrades to a no-op for legitimately single-document
+  // queries. Targets cross-document multi-hop starvation (Wave 4 arm 4).
+  RAG_MAX_CHUNKS_PER_DOCUMENT: z.coerce.number().int().nonnegative().default(0),
+  // Aligned with RAG_MIN_RERANK_SCORE's cross-encoder default so a promoted
+  // chunk is never gate-failing evidence.
+  RAG_DIVERSITY_RELEVANCE_FLOOR: z.coerce.number().nonnegative().default(0.25),
   RAG_WEB_SEARCH_ENABLED: z.preprocess(
     (val) => val === "true" || val === "1" || val === true,
     z.boolean().default(false),
@@ -200,6 +223,8 @@ const parsed = envSchema.safeParse({
   RAG_CROSS_ENCODER_ENABLED: process.env.RAG_CROSS_ENCODER_ENABLED,
   RAG_CROSS_ENCODER_MODEL: process.env.RAG_CROSS_ENCODER_MODEL,
   RAG_CROSS_ENCODER_TIMEOUT_MS: process.env.RAG_CROSS_ENCODER_TIMEOUT_MS,
+  RAG_CROSS_ENCODER_INCLUDE_CONTEXT:
+    process.env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
   RAG_HYDE_ENABLED: process.env.RAG_HYDE_ENABLED,
   RAG_WEB_MIN_SOURCES: process.env.RAG_WEB_MIN_SOURCES,
   RAG_EVAL_JUDGE_MODEL: process.env.RAG_EVAL_JUDGE_MODEL,
@@ -209,6 +234,9 @@ const parsed = envSchema.safeParse({
   RAG_CITATION_VERIFICATION_ENABLED:
     process.env.RAG_CITATION_VERIFICATION_ENABLED,
   RAG_CONTEXTUAL_GROUPING_ENABLED: process.env.RAG_CONTEXTUAL_GROUPING_ENABLED,
+  RAG_ADJACENCY_BOOST: process.env.RAG_ADJACENCY_BOOST,
+  RAG_MAX_CHUNKS_PER_DOCUMENT: process.env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+  RAG_DIVERSITY_RELEVANCE_FLOOR: process.env.RAG_DIVERSITY_RELEVANCE_FLOOR,
   RAG_WEB_SEARCH_ENABLED: process.env.RAG_WEB_SEARCH_ENABLED,
   RAG_WEB_SEARCH_PROVIDER: process.env.RAG_WEB_SEARCH_PROVIDER,
   RAG_WEB_SEARCH_API_KEY: process.env.RAG_WEB_SEARCH_API_KEY || undefined,
