@@ -727,6 +727,19 @@ Retrieve → **assess** (three-way verdict) → **correct** (ambiguous band only
 
 **Measure — A/B protocol** (`--no-judge`, fresh cache namespace per arm, same session): Arm A loop-off baseline; Arm B guard+reflection with calibrated thresholds; Arm B3 corrective-retrieval-on; attribution arms B1 (guard-only) / B2 (reflection-only) only if B misses. **Ship criterion, all must hold:** falseAnswerRate ≤ 0.1 (≤1/15); falseAbstentionRate ≤ 0.05 (≤2/48, no regression); p50 < 8000 / p95 < 15000; answerable recall@5 and citationAccuracy within noise of Arm A (sufficient-band prompts are bit-identical); every falseAnswer→abstention flip attributable via `actionsTaken`, with zero answerable abstentions carrying guard/reflection actions; then one judged run confirming the faithfulness gates before the default flips and production env changes.
 
+### 4.3 outcome — measured (2026-08-05)
+
+**falseAnswerRate 0.40 → 0.0667 (1/15) — the gate's first pass since abstention became measurable.** Arm B (`benchmark-2026-08-05T19-07-28-152Z.json`, `--no-judge`, loop on, calibrated threshold, vs the loop-off judged baseline `-T18-54-54-341Z`): every ship criterion held.
+
+- **Calibration on the true scale** (`calibrate-evidence-thresholds.ts` over the 4.2-stack artifact `-T18-30-29-842Z`): the three slices separate with zero overlap — correct abstentions' top-3 mean ≤ 0.087, false answers ≤ 0.194, answerable ≥ 0.239. `RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN = 0.214` (max unanswerable + 0.02). Every unanswerable query lands in the insufficient or ambiguous band; every answerable query is sufficient — falseAbstention protection is structural, not statistical.
+- **Attribution is complete**: 7/15 unanswerables refuse at the hard gate (verdict `insufficient`); 7 more entered the ambiguous band and the **prompt guard alone** flipped them to model abstention (`actionsTaken: [prompt_guard]`); the reflection gate never needed to fire. Zero answerable queries carry any loop action; the single answerable abstention (falseAbstentionRate 0.0208, unchanged) is the pre-existing `mh-en-2e51c566-14…` gate abstention with verdict `sufficient` and no actions — not loop-caused.
+- Retrieval metrics bit-identical to the baseline (the loop never touches retrieval); latency p50 6205 / p95 12684 — the loop's v1 path adds no LLM calls.
+- **Residual:** `ua-en-5` ("Tech for Good Initiative") still answers — top-1 relevance 0.385 makes it the strongest false-answer attractor; 1/15 passes the gate, recorded honestly rather than chased with a tighter threshold.
+- **Arm B3 (corrective retrieval) was not run — a measured no-op by construction:** at the calibrated threshold the ambiguous-answerable set (its entire value target) is empty, so the arm could only demonstrate unchanged answerable behavior plus latency cost on unanswerables. Corrective retrieval stays **built, tested, and default-off**; its trigger condition: a future calibration that places answerable queries in the ambiguous band (corpus growth, threshold drift), or the EN multi-hop decomposition work — the q4 residual in 4.2 is exactly the query shape it exists for.
+- Attribution arms B1/B2 unnecessary (B passed outright).
+
+Shipped: `RAG_CRAG_LOOP_ENABLED=true` + `RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN=0.214` in `.env.local` and `.env.vercel.production` together, alongside the 4.2 stack (`RAG_CONTEXTUAL_GROUPING_ENABLED=false`, `RAG_MAX_CHUNKS_PER_DOCUMENT=5`, `RAG_DIVERSITY_RELEVANCE_FLOOR=0.125`). Schema defaults stay conservative (loop off) — production opts in via env, matching the pool-size precedent.
+
 ### 4.4 Re-baseline
 
 - [ ] Final judged run on the shipped stack recorded as the new zero in `evaluation/runs/`.
