@@ -1,8 +1,8 @@
 # RAG_QUALITY_IMPROVEMENT_PLAN.md
 
-Version: 1.0
-Date: 2026-08-04
-Status: Wave 0 complete (merged 2026-08-04, PR #57) — Waves 1-3 not started
+Version: 1.1
+Date: 2026-08-05
+Status: Wave 0 complete (merged 2026-08-04, PR #57). Wave 1 in progress — 1.1 and 1.3 shipped (PR #60), 1.4 withdrawn and 1.5 deferred on measurement, 1.2 under sweep, 1.6 not started. Waves 2-3 not started.
 
 ## Objective
 
@@ -119,9 +119,36 @@ Three compounding defects:
 
 ## Wave 1 — Answer Quality, No Re-ingest Required
 
-Highest quality per hour. Land 1.1 first: it is currently depressing the very baselines everything else is measured against.
+**Phase A — premises measured before implementing (2026-08-05).** Wave 0 closed with an instruction to verify each "verified" item against a run rather than a code read. Doing that first changed the wave: two items were withdrawn on measurement and one had stale arithmetic. The runs below are retrieval-only (`--no-judge`) at production config (`RAG_RERANK_POOL_SIZE=60`, `RAG_CROSS_ENCODER_TIMEOUT_MS=6000`).
+
+**A1 — the production-config baseline** (`evaluation/runs/benchmark-2026-08-05T04-37-06-711Z.json`). Carry-over 1 required this before anything could be A/B'd: the Wave 0 zero was measured at `rerankPoolSize: 20` from `.env.local`, not production's 60.
+
+|          |                  EN |              DE |         Overall |
+| -------- | ------------------: | --------------: | --------------: |
+| recall@5 | 0.6667 → **0.7222** |       1.0 → 1.0 | 0.8636 → 0.8864 |
+| nDCG@10  |     0.6195 → 0.6238 | 0.9534 → 0.9527 | 0.8168 → 0.8182 |
+| MRR      |     0.5926 → 0.5810 | 0.9519 → 0.9519 | 0.8049 → 0.8002 |
+
+Pool 20 → 60 buys exactly one EN query of recall (1/18 = 0.056) and nothing in ranking quality — nDCG flat, MRR slightly down. Item 1.2's headroom is therefore much smaller than the plan assumed; see 1.2 below.
+
+**A2 — item 1.4's premise, and its withdrawal** (`benchmark-2026-08-05T04-53-24-485Z.json`). See item 1.4.
+
+| Item                    | Outcome                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1.1 PII redaction       | **Shipped** (PR #60). Real defect, but the _email_ pattern, not the phone regex the plan predicted.  |
+| 1.3 Output ceiling      | **Shipped** (PR #60).                                                                                |
+| 1.2 Pool width          | **Resolved by sweep.** Pool raised 60 → 100; `RAG_CANDIDATE_LIMIT` not built (no depth left to add). |
+| 1.4 HyDE auto-fire      | **WITHDRAWN on measurement.** Net-negative on EN and ~2× latency.                                    |
+| 1.5 HNSW iterative scan | **DEFERRED on measurement.** Provably inert at current corpus size.                                  |
+| 1.6 Prompt contract     | Code written; **awaiting a judged benchmark** before it ships.                                       |
+
+**Net effect of Phase A on the wave: two items shipped, two withdrawn, one resolved to a one-line config change, one still to be measured.** Four of the six were labelled "Impact: high · Confidence: verified" on a code read. That label meant considerably less than it appeared to.
 
 ### 1.1 PII filter redacts correct figures out of finished answers
+
+**SHIPPED — PR #60 (2026-08-05).** Right defect, wrong pattern. The grouped-numeral phone regex is genuinely broken as described, but it does not fire on this corpus. What fires is the **email** pattern: 2 of the 44 baseline answers shipped `Richte das E-Mail an die Adresse [REDACTED]`, deleting the corpus's own contact address out of a procedural answer derived from that same corpus. Both are fixed behind `RAG_PII_REDACTION` (`off | numbers_safe | strict`, default `numbers_safe`).
+
+As Wave 0's carry-over 2 predicted, **no metric moved and none was expected to** — faithfulness was already 0.9910. This is a correctness fix for something no current metric captures. Verified live: the query that produced the redaction now renders `kogu@sa.zh.ch` with `redactionCount: 0`.
 
 **Impact:** high · **Effort:** 4h · **Confidence:** verified (regex executed)
 
@@ -147,6 +174,38 @@ This fires on exactly the content a RAG system exists to surface. Because it run
 
 ### 1.2 Split retrieval depth from rerank width
 
+**RESOLVED BY SWEEP (2026-08-05): pool raised to 100. `RAG_CANDIDATE_LIMIT` NOT built — see below.**
+
+**The premise arithmetic was stale.** The item computes `candidateLimit` as 32 and concludes only 20 candidates reach rerank. But `candidateLimit = max(topK * 4, env.RAG_RERANK_POOL_SIZE, MIN_CANDIDATE_LIMIT)` (`lib/retrieval/service.ts:234-238`), and Wave 0's item 0.1 had already set `RAG_RERANK_POOL_SIZE="60"` in production — so it was already 60. The "dropping up to 44 fused candidates" figure was true before Wave 0 and not after it.
+
+**The sweep therefore needed no code.** Because `candidateLimit` is derived from `RAG_RERANK_POOL_SIZE`, moving the env var moves depth and width together, so the curve could be measured before deciding whether to build anything. All four points at identical config (`--no-judge`, timeout 6000, `maxOutputTokens` 700):
+
+| EN (18 queries)  | pool 20 | pool 40 | pool 60 |   pool 100 |
+| ---------------- | ------: | ------: | ------: | ---------: |
+| recall@5         |  0.6667 |  0.7222 |  0.7222 |     0.7222 |
+| nDCG@10          |  0.6195 |  0.6033 |  0.6238 | **0.6443** |
+| MRR              |  0.5926 |  0.5532 |  0.5810 | **0.6088** |
+| overall nDCG@10  |  0.8168 |  0.8098 |  0.8182 | **0.8265** |
+| overall MRR      |  0.8049 |  0.7888 |  0.8002 | **0.8116** |
+| avg fused pool   |    48.5 |    59.6 |    86.6 |      133.4 |
+| p50 latency (ms) |    6142 |    6354 |    5885 |       6247 |
+
+Artifacts: `benchmark-2026-08-04T21-15-47-237Z` (20), `-2026-08-05T05-02-35-712Z` (40), `-T04-37-06-711Z` (60), `-T05-11-11-365Z` (100).
+
+**Reading it honestly.** recall@5 **saturates at pool 40** — widening finds no additional documents. What keeps improving is ordering: nDCG@10 and MRR rise monotonically 40 → 60 → 100 on both the EN slice and the aggregate, which is what a cross-encoder given more candidates should do. Latency is flat throughout, so nothing is traded.
+
+The effect is nonetheless small relative to the noise floor. EN is 18 queries, so 0.02 of nDCG@10 is roughly one query moving one rank, and the pool-40 point sitting _below_ pool 20 shows that scale of movement occurs without a real cause. What makes pool 100 the right pick is not any single pair but that the rise is monotone across three consecutive points on two correlated metrics at no latency cost — **not** that a 0.02 gain has been demonstrated significant on n=18. Treat this as a low-risk configuration choice, not a validated improvement.
+
+**`RAG_CANDIDATE_LIMIT` is not being built.** The knob's purpose is to retrieve deeper than you rerank (or the reverse). At pool 100 the system already fuses an average of 133 distinct candidates out of a 255-chunk corpus — **52% of everything indexed** — before cutting to topK 8. There is no meaningful depth left to add, and no way to measure which half of the coupled change produced the +0.02 when the whole corpus is nearly in the pool already. Building it now would be unmeasurable machinery, the same failure mode as item 1.5.
+
+**Trigger for revisiting:** once the corpus is large enough that a pool of 100 is a small fraction of it (order 10,000+ chunks), depth and width stop being interchangeable and the knob becomes both meaningful and measurable. Note also that `CROSS_ENCODER_POOL_CAP = 100` (`lib/retrieval/cross-encoder.ts:16`) is now **exactly binding** — the pool cannot be raised further without raising it too, or the excess silently keeps heuristic order.
+
+**Not adopted from the original item:** raising `RAG_CROSS_ENCODER_TIMEOUT_MS` was already done in Wave 0 (production is 6000). No Cohere fallback warnings were observed at any sweep point.
+
+---
+
+**Original item, for reference:**
+
 **Impact:** high · **Effort:** 3h · **Confidence:** verified
 
 `RAG_RERANK_POOL_SIZE` defaults to 40 (`lib/config/env.ts:46`) but production sets it to 20 (`.env.vercel.production:25`). `candidateLimit = Math.max(topK * 4, env.RAG_RERANK_POOL_SIZE, MIN_CANDIDATE_LIMIT)` = 32 (`lib/retrieval/service.ts:215`), so vector and keyword each return up to 32 and RRF can fuse up to 64 distinct chunks. That pool is handed to `rerankCandidates`, whose first act is `const pool = input.candidates.slice(0, poolSize)` (`lib/retrieval/reranker.ts:120`) — dropping up to 44 fused candidates. Only 20 reach `crossEncoderRerank`, whose own `CROSS_ENCODER_POOL_CAP = 100` is therefore never binding. A 20→8 narrowing gives rerank-v3.5 almost nothing to rescue, and the decision about which candidates the expensive relevance model may consider is made by the cheapest signal in the pipeline.
@@ -156,6 +215,15 @@ This fires on exactly the content a RAG system exists to surface. Because it run
 **Measure:** nDCG@10 and MRR. Also log the Cohere fallback-warning rate — a rise means the timeout is now binding and the win is illusory. Must land after item 0.2 or the 24h cache serves pre-change rankings and the A/B reads as a no-op.
 
 ### 1.3 Raise the output ceiling and detect truncation
+
+**SHIPPED — PR #60 (2026-08-05).** Default 700 → 2000, matched across `.env.example`, `.env.staging.example`, `.env.vercel.production` and CI. `LlmProvider` now resolves `{ text, truncated }` from `finish_reason === "length"`; `answerTruncated` reaches `retrievalMeta` and renders as a badge; the benchmark records a per-answer `truncated` flag and a run-level `truncationRate`, reported as a **config bug** rather than a quality metric.
+
+Verified live: starving `maxOutputTokens` to 80 sets `answerTruncated: true` on an answer that stops mid-token; the shipped ceiling reports `false`.
+
+Two things the item did not anticipate:
+
+- `trimForSafety`'s 6,000-char cut pushed **no** reason string, so a safety truncation was silently indistinguishable from a finished answer. Raised to 24,000 and given one.
+- `hasExcessiveRepetition` returns a **hard refusal** and measured repetition by unique-_line_ ratio. Eight `##` headings plus eight `Limitations` labels across eight substantive sections score 0.42 on that ratio — a refusal for a good answer, and precisely the shape item 1.6's output contract will produce. It now measures by character mass: 0.80 for that answer, 0.14 for a line repeated seven times.
 
 **Impact:** high · **Effort:** 3h · **Confidence:** verified
 
@@ -167,6 +235,28 @@ This fires on exactly the content a RAG system exists to surface. Because it run
 
 ### 1.4 Make HyDE and the fusion branches actually fire
 
+**WITHDRAWN — measured, net-negative, not implemented. Do not re-propose without a mechanism fix (see below).**
+
+**Measured outcome (2026-08-05).** The plan correctly said the branch is measurable before any code change, so it was. Run with `--expansion` at production config (`benchmark-2026-08-05T04-53-24-485Z.json`) against the identical run without it (`-T04-37-06-711Z.json`):
+
+|                  | no expansion |                                   expansion |
+| ---------------- | -----------: | ------------------------------------------: |
+| EN recall@5      |       0.7222 |                                  **0.6667** |
+| EN nDCG@10       |       0.6238 |                                      0.6077 |
+| DE (all metrics) |            — |                                   unchanged |
+| p50 latency      |     5,885 ms |                               **11,226 ms** |
+| EN p95 latency   |    11,257 ms | **15,776 ms** (breaches the 15,000 ms gate) |
+
+Expansion did fire — average vector candidates rose 60 → 318 across ~5 branches. It cost 91% p50 latency, lost the single EN query that widening the pool had just gained (`en-2e51c566-11`, recall 1 → 0), and moved DE not at all.
+
+**Mechanism, which is the part worth keeping.** `fuseBranchCandidates` (`lib/retrieval/router.ts:94-126`) fuses each branch's _already-truncated_ output, not each branch's pool: `branchTopK` is `max(topK, min(RAG_RERANK_POOL_SIZE, max(topK*2, 8)))` = 16, so five branches contribute at most 5 × 16 candidates before dedup. Measured average fused pool size **fell from 86.6 to 25.4**. Expansion pays for five retrievals and then hands the cross-encoder a third as many candidates to rank. That is a plausible sufficient cause for the loss, and it means the branch as currently built cannot be net-positive regardless of when it fires — an auto-fire heuristic would only have applied the loss more often.
+
+**If revisited:** fix the fusion first (fuse the branches' full pools, or raise `branchTopK` to the pool size), re-measure, and only then consider a firing heuristic. The latency cost is separate and likely disqualifying on its own against the current gates.
+
+---
+
+**Original item, for reference:**
+
 **Impact:** high · **Effort:** 4h · **Confidence:** verified
 
 The router's only branch is `const shouldExpand = Boolean(input.enableQueryExpansion)` (`lib/retrieval/router.ts:160`). That flag is a per-request user checkbox initialised to `useState(false)` (`components/rag-workbench.tsx:161`), and the dashboard path at `app/api/run/route.ts:76` posts only `{query, topK, enableWebResearch}` — it never sets it at all. HyDE runs exclusively inside that branch (`env.RAG_HYDE_ENABLED ? deps.generateHyde(...) : Promise.resolve(null)`, `router.ts:194`), so despite `RAG_HYDE_ENABLED` defaulting to true and being unset in production (i.e. on), HyDE is dead code in every default flow. The benchmark also defaults `expansion: false` (`scripts/evaluation/run-benchmark.ts:119`), so the harness has never measured it either.
@@ -176,6 +266,29 @@ The router's only branch is `const shouldExpand = Boolean(input.enableQueryExpan
 **Measure:** the harness supports `--expansion` today, so the value of the branch is measurable _before_ any code change. Run the 44-query set with and without it, compare recall@5 and nDCG@10 split by language (EN is the weak half at 0.667), and only ship the heuristic if the branch is net-positive.
 
 ### 1.5 Enable HNSW iterative scan for filtered queries
+
+**DEFERRED — the premise is false at current corpus size. Do not implement until the trigger condition below is met.**
+
+**Measured (2026-08-05).** The item predicts a scoped question "can receive two or three chunks instead of the requested 32". Calling `public.match_document_chunks` directly against the live database with a document filter:
+
+| Scope                      | Requested | Returned |
+| -------------------------- | --------: | -------: |
+| single document, 9 chunks  |        32 |        9 |
+| single document, 11 chunks |        32 |       11 |
+| single document, 12 chunks |        32 |       12 |
+| single document, 67 chunks |        32 |   **32** |
+| single document, 62 chunks |        60 |   **60** |
+| unscoped                   |       200 |  **200** |
+
+Every scoped query returns either the full document or the full requested count. Nothing is being lost. The corpus is 255 chunks across 8 ready documents, so `ef_search = 120` already covers roughly half the table and the planner is very unlikely to be choosing the HNSW index at all — the filter has nothing to subtract from.
+
+Shipping the migration now would mean a schema change on a database **shared with another project** (see `docs/DATABASE_RUNBOOK.md`) in exchange for a provably zero effect, and it would be indistinguishable from a no-op when measured.
+
+**Trigger condition for revisiting:** any single document exceeds ~`ef_search` chunks, or the corpus passes a few thousand chunks _and_ `EXPLAIN ANALYZE` confirms an `Index Scan using idx_document_chunks_embedding_hnsw`. pgvector on the project is **0.8.0**, so `hnsw.iterative_scan` is available whenever it becomes real; the change described below remains correct, it is simply premature.
+
+---
+
+**Original item, for reference:**
 
 **Impact:** high · **Effort:** 3h · **Confidence:** verified
 
