@@ -1,20 +1,84 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import dataset from "../evaluation/evaluation_queries.json";
 import type { RetrievedChunk } from "../lib/contracts/retrieval";
 import { validateEvaluationDataset } from "../lib/evaluation/dataset";
 import {
   computeRetrievalMetrics,
   evaluateThresholds,
+  stripLimitationsSection,
   summarizeBenchmark,
 } from "../lib/evaluation/metrics";
 import type {
   BenchmarkSummaryMetrics,
+  EvaluationDatasetEnvelope,
   EvaluationQueryRecord,
   QueryBenchmarkResult,
 } from "../lib/evaluation/types";
 
-const records = dataset as EvaluationQueryRecord[];
+/**
+ * Inline golden records. The 200-record synthetic fixture these tests used to
+ * import named documents that existed nowhere in the corpus, and keeping it
+ * alive meant the benchmark could still be pointed at ground truth that
+ * measured nothing (item 3.1).
+ */
+function buildRecord(
+  overrides: Partial<EvaluationQueryRecord> = {},
+): EvaluationQueryRecord {
+  return {
+    id: "en-doc-profile-01",
+    language: "EN",
+    question: "How is the company ownership model documented?",
+    question_type: "single_hop",
+    expected_chunk_ids: ["chunk-golden-1"],
+    expected_document: "doc_company_profile",
+    expected_section: "Company Overview",
+    expected_pages: [1],
+    acceptable_answer_points: [
+      "Ownership model is documented.",
+      "Leadership team responsibilities are listed.",
+      "Reporting lines are defined.",
+    ],
+    ...overrides,
+  };
+}
+
+function buildUnanswerableRecord(
+  overrides: Partial<EvaluationQueryRecord> = {},
+): EvaluationQueryRecord {
+  return buildRecord({
+    id: "ua-en-1",
+    question: "What was the acquisition price of the Mars subsidiary?",
+    question_type: "unanswerable",
+    expected_chunk_ids: [],
+    expected_document: "",
+    expected_section: "",
+    expected_pages: [],
+    acceptable_answer_points: [],
+    ...overrides,
+  });
+}
+
+function buildEnvelope(
+  records: EvaluationQueryRecord[],
+): EvaluationDatasetEnvelope {
+  return {
+    corpusFingerprint: "fp-test",
+    generatedAt: "2026-08-05T00:00:00.000Z",
+    generatorModel: "test-model",
+    records,
+  };
+}
+
+/** A spread of answerable records satisfying the 5-per-language floor. */
+function answerableSpread(language: "EN" | "DE", count: number) {
+  return Array.from({ length: count }, (_, index) =>
+    buildRecord({
+      id: `${language.toLowerCase()}-rec-${index}`,
+      language,
+      expected_chunk_ids: [`chunk-${language}-${index}`],
+    }),
+  );
+}
 
 function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
   return {
@@ -33,21 +97,100 @@ function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
   };
 }
 
-test("evaluation dataset satisfies multilingual minimum requirements", () => {
-  const result = validateEvaluationDataset(records);
-  assert.equal(result.totalQueries >= 200, true);
-  assert.equal(result.languageCounts.EN >= 40, true);
-  assert.equal(result.languageCounts.DE >= 40, true);
-  assert.equal(result.languageCounts.FR >= 40, true);
-  assert.equal(result.languageCounts.IT >= 40, true);
-  assert.equal(result.languageCounts.ES >= 40, true);
+// ---- Dataset validation -----------------------------------------------------
+
+test("dataset validation accepts an envelope and reports slice counts", () => {
+  const envelope = buildEnvelope([
+    ...answerableSpread("EN", 15),
+    ...answerableSpread("DE", 15),
+    buildUnanswerableRecord(),
+  ]);
+
+  const result = validateEvaluationDataset(envelope);
+  assert.equal(result.corpusFingerprint, "fp-test");
+  assert.equal(result.totalQueries, 31);
+  assert.equal(result.answerableCount, 30);
+  assert.equal(result.unanswerableCount, 1);
+  // Unanswerable records do not pad language counts.
+  assert.equal(result.languageCounts.EN, 15);
 });
 
-test("computeRetrievalMetrics returns positive recall/ndcg/mrr when expected evidence appears", () => {
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
+test("dataset validation refuses a bare record array (no corpus binding)", () => {
+  const records = [
+    ...answerableSpread("EN", 15),
+    ...answerableSpread("DE", 15),
+  ];
+  assert.throws(() => validateEvaluationDataset(records), /envelope/);
+});
+
+test("dataset validation enforces per-type record constraints", () => {
+  // Answerable without chunk ids: rejected.
+  assert.throws(() =>
+    validateEvaluationDataset(
+      buildEnvelope([
+        ...answerableSpread("EN", 14),
+        ...answerableSpread("DE", 15),
+        buildRecord({ id: "broken", expected_chunk_ids: [] }),
+      ]),
+    ),
   );
-  assert.ok(record);
+
+  // Unanswerable carrying chunk ids: rejected.
+  assert.throws(() =>
+    validateEvaluationDataset(
+      buildEnvelope([
+        ...answerableSpread("EN", 15),
+        ...answerableSpread("DE", 15),
+        buildUnanswerableRecord({ expected_chunk_ids: ["chunk-x"] }),
+      ]),
+    ),
+  );
+});
+
+test("per-language floor applies to the answerable slice only", () => {
+  // 15 EN answerable + 4 DE answerable: DE misses the floor of 5 even though
+  // DE unanswerable records would push it over if they counted.
+  assert.throws(
+    () =>
+      validateEvaluationDataset(
+        buildEnvelope([
+          ...answerableSpread("EN", 25),
+          ...answerableSpread("DE", 4),
+          buildUnanswerableRecord({ id: "ua-de-1", language: "DE" }),
+        ]),
+      ),
+    /language DE/,
+  );
+});
+
+// ---- Retrieval relevance ----------------------------------------------------
+
+test("chunk-id ground truth judges relevance by exact chunk hit", () => {
+  const record = buildRecord({ expected_chunk_ids: ["chunk-golden-1"] });
+
+  // Right document and page but the WRONG chunk: not relevant.
+  const wrongChunk = [
+    buildChunk({
+      chunkId: "chunk-other",
+      pageNumber: record.expected_pages[0],
+    }),
+  ];
+  assert.equal(computeRetrievalMetrics(record, wrongChunk).recallAt5, 0);
+
+  // The golden chunk id is relevant even when its page/section labels moved
+  // (a re-chunk shifts pages; section labels are extraction artifacts).
+  const goldenChunk = [
+    buildChunk({
+      chunkId: "chunk-golden-1",
+      pageNumber: 999,
+      sectionTitle: "A different heading after re-chunking",
+    }),
+  ];
+  assert.equal(computeRetrievalMetrics(record, goldenChunk).recallAt5, 1);
+});
+
+test("legacy records without chunk ids fall back to the page proxy", () => {
+  const record = buildRecord({ expected_chunk_ids: [] });
 
   const chunks = [
     buildChunk({
@@ -70,39 +213,45 @@ test("computeRetrievalMetrics returns positive recall/ndcg/mrr when expected evi
   assert.equal(retrieval.ndcgAt10 > 0, true);
 });
 
-test("benchmark thresholds detect pass/fail conditions from summary", () => {
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
+test("multi-hop nDCG requires both golden chunks for a perfect score", () => {
+  const record = buildRecord({
+    question_type: "multi_hop",
+    expected_chunk_ids: ["chunk-a", "chunk-b"],
+  });
 
-  const retrieval = {
-    recallAt5: 1,
-    ndcgAt10: 1,
-    mrr: 1,
-    firstRelevantRank: 1,
-    relevantRanks: [1],
-  };
-  const answer = {
-    citationAccuracy: 1,
-    citationEvidenceHit: 1,
-    verifiedCitationRate: 1,
-    groundingScore: 1,
-    hallucinationRate: 0,
-  };
+  const oneOfTwo = computeRetrievalMetrics(record, [
+    buildChunk({ chunkId: "chunk-a" }),
+    buildChunk({ chunkId: "noise-1", documentId: "noise" }),
+  ]);
+  assert.equal(oneOfTwo.recallAt5, 1);
+  assert.equal(oneOfTwo.ndcgAt10 < 1, true);
 
-  const baseResult: QueryBenchmarkResult = {
+  const bothChunks = computeRetrievalMetrics(record, [
+    buildChunk({ chunkId: "chunk-a" }),
+    buildChunk({ chunkId: "chunk-b" }),
+  ]);
+  assert.equal(bothChunks.ndcgAt10, 1);
+});
+
+// ---- Summary + thresholds ---------------------------------------------------
+
+function buildResult(
+  overrides: Partial<QueryBenchmarkResult> = {},
+): QueryBenchmarkResult {
+  const record = buildRecord();
+  return {
     id: record.id,
     language: record.language,
     question: record.question,
+    questionType: "single_hop",
     retrieval: {
       cacheHit: false,
       candidateCounts: { vector: 3, keyword: 3, fused: 3, reranked: 1 },
       chunks: [
         {
-          chunkId: "chunk-1",
+          chunkId: "chunk-golden-1",
           documentId: record.expected_document,
-          pageNumber: record.expected_pages[0],
+          pageNumber: record.expected_pages[0]!,
           sectionTitle: record.expected_section,
           source: "hybrid",
           retrievalScore: 0.9,
@@ -115,16 +264,24 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
       citations: [
         {
           documentId: record.expected_document,
-          pageNumber: record.expected_pages[0],
-          chunkId: "chunk-1",
+          pageNumber: record.expected_pages[0]!,
+          chunkId: "chunk-golden-1",
         },
       ],
       insufficientEvidence: false,
       truncated: false,
     },
     metrics: {
-      ...retrieval,
-      ...answer,
+      recallAt5: 1,
+      ndcgAt10: 1,
+      mrr: 1,
+      firstRelevantRank: 1,
+      relevantRanks: [1],
+      citationAccuracy: 1,
+      citationEvidenceHit: 1,
+      verifiedCitationRate: 1,
+      groundingScore: 1,
+      hallucinationRate: 0,
       uncachedLatencyMs: 1500,
       cachedLatencyMs: 400,
       cacheHitOnRepeat: true,
@@ -141,16 +298,19 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
     failures: [],
     error: null,
   };
+}
 
-  const passingSummary = summarizeBenchmark([baseResult]).overall;
+test("benchmark thresholds detect pass/fail conditions from summary", () => {
+  const passingSummary = summarizeBenchmark([buildResult()]).overall;
   const passing = evaluateThresholds(passingSummary);
   assert.equal(passing.passed, true);
 
+  const base = buildResult();
   const failingSummary = summarizeBenchmark([
     {
-      ...baseResult,
+      ...base,
       metrics: {
-        ...baseResult.metrics,
+        ...base.metrics,
         recallAt5: 0,
         ndcgAt10: 0,
         citationAccuracy: 0,
@@ -164,6 +324,123 @@ test("benchmark thresholds detect pass/fail conditions from summary", () => {
   ]).overall;
   const failing = evaluateThresholds(failingSummary);
   assert.equal(failing.passed, false);
+});
+
+test("unanswerable queries feed falseAnswerRate, not the retrieval averages", () => {
+  const answered = buildResult();
+  const falseAnswer: QueryBenchmarkResult = {
+    ...buildResult(),
+    id: "ua-answered",
+    questionType: "unanswerable",
+    answer: {
+      text: "A confident hallucination.",
+      citations: [],
+      insufficientEvidence: false,
+      truncated: false,
+    },
+    metrics: {
+      ...buildResult().metrics,
+      // Zero retrieval scores: there is no gold evidence to retrieve.
+      recallAt5: 0,
+      ndcgAt10: 0,
+      mrr: 0,
+      citationAccuracy: 0,
+      citationEvidenceHit: 0,
+      verifiedCitationRate: null,
+    },
+    judge: null,
+  };
+  const correctAbstention: QueryBenchmarkResult = {
+    ...falseAnswer,
+    id: "ua-abstained",
+    answer: { ...falseAnswer.answer, insufficientEvidence: true },
+  };
+
+  const summary = summarizeBenchmark([
+    answered,
+    falseAnswer,
+    correctAbstention,
+  ]).overall;
+
+  assert.equal(summary.answerableCount, 1);
+  assert.equal(summary.unanswerableCount, 2);
+  // One of two unanswerable queries was answered.
+  assert.equal(summary.falseAnswerRate, 0.5);
+  assert.equal(summary.falseAbstentionRate, 0);
+  // The unanswerable zeros must NOT drag the retrieval averages.
+  assert.equal(summary.recallAt5, 1);
+  assert.equal(summary.ndcgAt10, 1);
+  assert.equal(summary.citationEvidenceHitRate, 1);
+
+  // And the gate fails on a 0.5 false-answer rate.
+  const evaluation = evaluateThresholds(summary);
+  const gate = evaluation.checks.find((check) =>
+    check.metric.startsWith("False answer rate"),
+  );
+  assert.ok(gate);
+  assert.equal(gate.passed, false);
+});
+
+test("abstaining on an answerable query raises falseAbstentionRate and fails its gate", () => {
+  const base = buildResult();
+  const abstained: QueryBenchmarkResult = {
+    ...base,
+    id: "answerable-abstained",
+    answer: { ...base.answer, insufficientEvidence: true },
+  };
+
+  const summary = summarizeBenchmark([abstained]).overall;
+  assert.equal(summary.falseAbstentionRate, 1);
+
+  const evaluation = evaluateThresholds(summary);
+  const gate = evaluation.checks.find((check) =>
+    check.metric.startsWith("False abstention rate"),
+  );
+  assert.ok(gate);
+  assert.equal(gate.passed, false);
+});
+
+test("per-language gates stop one language hiding behind another", () => {
+  // 5 perfect DE queries, 5 failing EN queries: the aggregate recall (0.5)
+  // already fails, but the point is the EN-specific check failing while DE
+  // passes — assert both are reported independently.
+  const deResults = Array.from({ length: 5 }, (_, index) => ({
+    ...buildResult(),
+    id: `de-${index}`,
+    language: "DE" as const,
+  }));
+  const enResults = Array.from({ length: 5 }, (_, index) => {
+    const base = buildResult();
+    return {
+      ...base,
+      id: `en-${index}`,
+      metrics: { ...base.metrics, recallAt5: 0, ndcgAt10: 0 },
+    };
+  });
+
+  const summary = summarizeBenchmark([...deResults, ...enResults]);
+  const evaluation = evaluateThresholds(
+    summary.overall,
+    undefined,
+    summary.byLanguage,
+  );
+
+  const enGate = evaluation.checks.find(
+    (check) => check.metric === "Recall@5 [EN]",
+  );
+  const deGate = evaluation.checks.find(
+    (check) => check.metric === "Recall@5 [DE]",
+  );
+  assert.ok(enGate);
+  assert.ok(deGate);
+  assert.equal(enGate.passed, false);
+  assert.equal(deGate.passed, true);
+
+  // Languages with no queries get no per-language check.
+  assert.equal(
+    evaluation.checks.some((check) => check.metric === "Recall@5 [FR]"),
+    false,
+  );
 });
 
 test("faithfulness gates the build and fails closed when nothing was judged", () => {
@@ -213,31 +490,25 @@ test("the token-overlap grounding metric no longer gates the build", () => {
 
 test("an abstention scores null grounding instead of a perfect score", async () => {
   const { computeAnswerMetrics } = await import("../lib/evaluation/metrics");
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
+  const record = buildRecord();
 
   const metrics = computeAnswerMetrics(record, "", [], [], true, null);
   assert.equal(metrics.groundingScore, null);
   assert.equal(metrics.hallucinationRate, null);
 });
 
-test("citationEvidenceHit does not penalise extra citations from multi-chunk synthesis", async () => {
+test("citationEvidenceHit matches on golden chunk id, not only document/page", async () => {
   const { computeCitationEvidenceHit, computeCitationAccuracy } =
     await import("../lib/evaluation/metrics");
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
+  const record = buildRecord({ expected_chunk_ids: ["chunk-golden-1"] });
 
-  // One citation hits the golden evidence; two more cite other (legitimate)
-  // supporting pages. The strict metric scores 1/3; the hit metric scores 1.
+  // One citation names the golden chunk; two more cite other (legitimate)
+  // supporting evidence. The strict metric scores 1/3; the hit metric 1.
   const citations = [
     {
       documentId: record.expected_document,
       pageNumber: record.expected_pages[0]!,
-      chunkId: "golden",
+      chunkId: "chunk-golden-1",
     },
     {
       documentId: record.expected_document,
@@ -249,16 +520,14 @@ test("citationEvidenceHit does not penalise extra citations from multi-chunk syn
 
   assert.equal(computeCitationEvidenceHit(record, citations), 1);
   assert.ok(computeCitationAccuracy(record, citations) < 0.5);
+  // A citation to the right page but the wrong chunk is not a golden hit.
   assert.equal(computeCitationEvidenceHit(record, [citations[1]!]), 0);
 });
 
 test("verified citation rate excludes unverified queries and fails the gate with zero verified", async () => {
   const { computeAnswerMetrics, evaluateThresholds, summarizeBenchmark } =
     await import("../lib/evaluation/metrics");
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
+  const record = buildRecord();
 
   // Verifier ran: rate = supported/checked.
   const verified = computeAnswerMetrics(
@@ -293,46 +562,7 @@ test("verified citation rate excludes unverified queries and fails the gate with
 });
 
 test("summarizeBenchmark averages judge metrics over judged queries only", () => {
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
-
-  const base: QueryBenchmarkResult = {
-    id: record.id,
-    language: record.language,
-    question: record.question,
-    retrieval: {
-      cacheHit: false,
-      candidateCounts: { vector: 1, keyword: 1, fused: 1, reranked: 1 },
-      chunks: [],
-    },
-    answer: {
-      text: "answer",
-      citations: [],
-      insufficientEvidence: false,
-      truncated: false,
-    },
-    metrics: {
-      recallAt5: 1,
-      ndcgAt10: 1,
-      mrr: 1,
-      firstRelevantRank: 1,
-      relevantRanks: [1],
-      citationAccuracy: 1,
-      citationEvidenceHit: 1,
-      verifiedCitationRate: null,
-      groundingScore: 1,
-      hallucinationRate: 0,
-      uncachedLatencyMs: 1000,
-      cachedLatencyMs: 300,
-      cacheHitOnRepeat: true,
-    },
-    judge: null,
-    failures: [],
-    error: null,
-  };
-
+  const base = buildResult();
   const summary = summarizeBenchmark([
     {
       ...base,
@@ -373,10 +603,62 @@ test("summarizeBenchmark averages judge metrics over judged queries only", () =>
   assert.equal(summary.abstentionRate, 0.5);
 });
 
+// ---- Limitations stripping --------------------------------------------------
+
+test("stripLimitationsSection removes the section in English and German", () => {
+  const english = [
+    "The ownership model is documented [1].",
+    "",
+    "## Ownership Structure",
+    "Detail sentence [2].",
+    "",
+    "## Limitations",
+    "The evidence does not establish the founding year.",
+    "It is unclear whether the model changed after 2020.",
+  ].join("\n");
+  const strippedEnglish = stripLimitationsSection(english);
+  assert.equal(strippedEnglish.includes("Limitations"), false);
+  assert.equal(strippedEnglish.includes("founding year"), false);
+  assert.equal(strippedEnglish.includes("Ownership Structure"), true);
+  assert.equal(strippedEnglish.includes("Detail sentence [2]."), true);
+
+  const german = [
+    "Das Modell ist dokumentiert [1].",
+    "",
+    "## Einschränkungen",
+    "Die Belege klären nicht, wann das Modell eingeführt wurde.",
+  ].join("\n");
+  const strippedGerman = stripLimitationsSection(german);
+  assert.equal(strippedGerman.includes("Einschränkungen"), false);
+  assert.equal(strippedGerman.includes("dokumentiert"), true);
+});
+
+test("stripLimitationsSection keeps content after the section and is a no-op without one", () => {
+  const withTrailingSection = [
+    "Answer sentence [1].",
+    "",
+    "## Limitations",
+    "Negative-existential claim.",
+    "",
+    "## Sources",
+    "Source list.",
+  ].join("\n");
+  const stripped = stripLimitationsSection(withTrailingSection);
+  assert.equal(stripped.includes("Negative-existential"), false);
+  assert.equal(stripped.includes("## Sources"), true);
+
+  const noSection = "A plain answer with no headings [1].";
+  assert.equal(stripLimitationsSection(noSection), noSection);
+});
+
 const PASSING_SUMMARY: BenchmarkSummaryMetrics = {
   queryCount: 1,
   evaluatedCount: 1,
   systemErrorCount: 0,
+  answerableCount: 1,
+  unanswerableCount: 0,
+  falseAnswerRate: 0,
+  falseAbstentionRate: 0,
   recallAt5: 1,
   ndcgAt10: 1,
   mrr: 1,
@@ -401,58 +683,3 @@ const PASSING_SUMMARY: BenchmarkSummaryMetrics = {
   abstentionRate: 0,
   truncationRate: 0,
 };
-
-test("ignoreExpectedSection rescues a correct chunk whose section label moved", () => {
-  // Item 2.1 stops the destructive recasing of section titles, so a record
-  // storing today's mangled label ("Pacity Building") stops matching a chunk
-  // that is otherwise exactly the expected evidence. Strict judging reads that
-  // as a retrieval collapse; the page-only mode is how a re-chunk is A/B'd.
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
-
-  const chunks = [
-    buildChunk({
-      chunkId: "expected",
-      documentId: record.expected_document,
-      pageNumber: record.expected_pages[0],
-      sectionTitle: "A completely different heading after re-chunking",
-    }),
-  ];
-
-  assert.equal(computeRetrievalMetrics(record, chunks).recallAt5, 0);
-  assert.equal(
-    computeRetrievalMetrics(record, chunks, { ignoreExpectedSection: true })
-      .recallAt5,
-    1,
-  );
-});
-
-test("ignoreExpectedSection still requires the expected document and page", () => {
-  const record = records.find(
-    (item) => item.id === "en-doc_company_profile-01",
-  );
-  assert.ok(record);
-
-  const wrongDocument = [
-    buildChunk({
-      chunkId: "wrong-doc",
-      documentId: "some_other_document",
-      pageNumber: record.expected_pages[0],
-      sectionTitle: record.expected_section,
-    }),
-  ];
-  const wrongPage = [
-    buildChunk({
-      chunkId: "wrong-page",
-      documentId: record.expected_document,
-      pageNumber: 9999,
-      sectionTitle: record.expected_section,
-    }),
-  ];
-
-  const options = { ignoreExpectedSection: true };
-  assert.equal(computeRetrievalMetrics(record, wrongDocument, options).recallAt5, 0);
-  assert.equal(computeRetrievalMetrics(record, wrongPage, options).recallAt5, 0);
-});

@@ -19,22 +19,30 @@ The framework validates:
 
 ## Dataset Requirements
 
-File: `evaluation/evaluation_queries.json`
+File: `evaluation/evaluation_queries.generated.json` — generated from the real
+corpus by `npm run eval:dataset:corpus`. The file is an envelope
+`{corpusFingerprint, generatedAt, generatorModel, records}`; the benchmark
+refuses to run when the live corpus no longer matches the fingerprint, so a
+re-ingest requires regenerating the dataset.
 
-Minimum dataset size:
+Minimum dataset size (sized to the real corpus and its languages):
 
-- 200 labeled queries total
-- 40 queries per language: `EN`, `DE`, `FR`, `IT`, `ES`
+- 25 labeled queries total
+- 5 answerable queries per language actually present in the corpus
+- an unanswerable slice (~15 questions whose probe terms are verified absent
+  from every chunk) — without it, abstention is unmeasurable
 
 Required fields per record:
 
 - `id`
 - `language`
 - `question`
-- `expected_document`
+- `question_type` (`single_hop` | `multi_hop` | `unanswerable` | `adversarial`)
+- `expected_chunk_ids` (array — exact ground truth; empty only for unanswerable)
+- `expected_document` (empty for unanswerable)
 - `expected_section`
 - `expected_pages` (array)
-- `acceptable_answer_points` (array)
+- `acceptable_answer_points` (array; empty for unanswerable)
 
 ## Core Metrics
 
@@ -74,7 +82,7 @@ Run the full suite separately for each supported language and then aggregate.
 Use the Phase 11 scripts:
 
 ```bash
-npm run eval:dataset:generate
+npm run eval:dataset:corpus
 npm run eval:dataset:validate
 npm run eval:benchmark:dry
 npm run eval:benchmark

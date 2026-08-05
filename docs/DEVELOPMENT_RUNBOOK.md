@@ -67,7 +67,7 @@ supabase db push --local
 ## Evaluation Validation (Phase 11)
 
 ```bash
-npm run eval:dataset:generate
+npm run eval:dataset:corpus
 npm run eval:dataset:validate
 npm run eval:benchmark:dry
 ```
@@ -220,8 +220,8 @@ Note:
 
 ## Phase 11 Definition of Done Checklist
 
-- evaluation dataset exists at `evaluation/evaluation_queries.json`
-- dataset contains `>=200` labeled queries with `>=40` per language (`EN|DE|FR|IT|ES`)
+- evaluation dataset exists at `evaluation/evaluation_queries.generated.json` (corpus-derived envelope with fingerprint)
+- dataset contains `>=25` labeled queries with `>=5` answerable per corpus language, plus an unanswerable slice
 - dataset schema validation script exists and passes
 - benchmark runner executes uncached + cached query cycle per record
 - benchmark artifacts capture retrieval traces, answer/citation data, latency, and failure analysis fields

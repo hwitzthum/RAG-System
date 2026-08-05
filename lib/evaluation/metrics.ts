@@ -75,9 +75,20 @@ export type RelevanceOptions = {
 
 export function isChunkRelevant(
   record: EvaluationQueryRecord,
-  chunk: Pick<RetrievedChunk, "documentId" | "pageNumber" | "sectionTitle">,
+  chunk: Pick<
+    RetrievedChunk,
+    "chunkId" | "documentId" | "pageNumber" | "sectionTitle"
+  >,
   options: RelevanceOptions = {},
 ): boolean {
+  // Chunk-id ground truth is exact: the golden set records the chunk rows the
+  // question was generated from, so relevance is a set-membership test rather
+  // than the page-number proxy (which scored the semantically correct passage
+  // one page over as zero, and broke entirely when section labels moved).
+  if (record.expected_chunk_ids.length > 0) {
+    return record.expected_chunk_ids.includes(chunk.chunkId);
+  }
+
   if (chunk.documentId !== record.expected_document) {
     return false;
   }
@@ -142,7 +153,7 @@ export function computeRetrievalMetrics(
   // nDCG values above 1.
   const expectedRelevantCount = Math.max(
     1,
-    record.expected_pages.length,
+    record.expected_chunk_ids.length || record.expected_pages.length,
     relevantRanks.length,
   );
   let idcg = 0;
@@ -159,6 +170,24 @@ export function computeRetrievalMetrics(
   };
 }
 
+/**
+ * A citation hits the golden evidence when it names an expected chunk id
+ * (exact ground truth) or, for records without chunk ids, the expected
+ * document + page (the legacy proxy).
+ */
+function citationHitsGoldenEvidence(
+  record: EvaluationQueryRecord,
+  citation: Citation,
+): boolean {
+  if (record.expected_chunk_ids.length > 0) {
+    return record.expected_chunk_ids.includes(citation.chunkId);
+  }
+  return (
+    citation.documentId === record.expected_document &&
+    record.expected_pages.includes(citation.pageNumber)
+  );
+}
+
 export function computeCitationAccuracy(
   record: EvaluationQueryRecord,
   citations: Citation[],
@@ -167,10 +196,8 @@ export function computeCitationAccuracy(
     return 0;
   }
 
-  const matches = citations.filter(
-    (citation) =>
-      citation.documentId === record.expected_document &&
-      record.expected_pages.includes(citation.pageNumber),
+  const matches = citations.filter((citation) =>
+    citationHitsGoldenEvidence(record, citation),
   ).length;
 
   return matches / citations.length;
@@ -186,13 +213,48 @@ export function computeCitationEvidenceHit(
   record: EvaluationQueryRecord,
   citations: Citation[],
 ): number {
-  return citations.some(
-    (citation) =>
-      citation.documentId === record.expected_document &&
-      record.expected_pages.includes(citation.pageNumber),
+  return citations.some((citation) =>
+    citationHitsGoldenEvidence(record, citation),
   )
     ? 1
     : 0;
+}
+
+/**
+ * Removes the `## Limitations` section (and everything under it up to the
+ * next same-or-higher heading) before the answer reaches the LLM judge.
+ *
+ * Since item 1.6, every answer ends with a Limitations section asserting what
+ * the evidence does NOT establish. The judge scores each statement on "is
+ * this supported by the retrieved evidence?" — a question a negative-
+ * existential claim can never satisfy — so faithfulness was biased downward
+ * for every answer (6 of the 9 unsupported statements in the 1.6 treatment
+ * run were of exactly this kind). Stripping in code is deterministic; asking
+ * the judge to special-case the section in its prompt is not. The heading is
+ * matched by stem because rule 11 of the answer contract localises headings
+ * into the answer's language.
+ */
+const LIMITATIONS_HEADING_PATTERN =
+  /^##\s+.*(limitation|limitación|limitacion|limitazion|limites|einschränkung|beschränkung|grenzen)/i;
+
+export function stripLimitationsSection(answer: string): string {
+  const lines = answer.split("\n");
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    if (/^#{1,2}\s/.test(line)) {
+      skipping = LIMITATIONS_HEADING_PATTERN.test(line);
+      if (skipping) {
+        continue;
+      }
+    }
+    if (!skipping) {
+      kept.push(line);
+    }
+  }
+
+  return kept.join("\n").trimEnd();
 }
 
 function splitStatements(answer: string): string[] {
@@ -370,17 +432,40 @@ function summarizeBucket(
   const evaluated = results.filter((result) => !result.error);
   const systemErrorCount = results.length - evaluated.length;
 
-  const recallValues = evaluated.map((result) => result.metrics.recallAt5);
-  const ndcgValues = evaluated.map((result) => result.metrics.ndcgAt10);
-  const mrrValues = evaluated.map((result) => result.metrics.mrr);
-  const citationValues = evaluated.map(
+  // Retrieval, citation and judge averages run over the answerable slice
+  // only: an unanswerable question has no gold evidence to retrieve, so
+  // including it would zero-drag every average. Its sole contribution is
+  // falseAnswerRate. Latency and cache behaviour are real for every query
+  // and stay whole-run.
+  const answerable = evaluated.filter(
+    (result) => result.questionType !== "unanswerable",
+  );
+  const unanswerable = evaluated.filter(
+    (result) => result.questionType === "unanswerable",
+  );
+
+  const falseAnswerRate =
+    unanswerable.length > 0
+      ? unanswerable.filter((result) => !result.answer.insufficientEvidence)
+          .length / unanswerable.length
+      : 0;
+  const falseAbstentionRate =
+    answerable.length > 0
+      ? answerable.filter((result) => result.answer.insufficientEvidence)
+          .length / answerable.length
+      : 0;
+
+  const recallValues = answerable.map((result) => result.metrics.recallAt5);
+  const ndcgValues = answerable.map((result) => result.metrics.ndcgAt10);
+  const mrrValues = answerable.map((result) => result.metrics.mrr);
+  const citationValues = answerable.map(
     (result) => result.metrics.citationAccuracy,
   );
   // Abstentions carry null and are excluded rather than averaged as perfect.
-  const groundingValues = evaluated
+  const groundingValues = answerable
     .map((result) => result.metrics.groundingScore)
     .filter((value): value is number => value !== null);
-  const hallucinationValues = evaluated
+  const hallucinationValues = answerable
     .map((result) => result.metrics.hallucinationRate)
     .filter((value): value is number => value !== null);
   const cacheHitValues = evaluated.map((result) =>
@@ -392,19 +477,19 @@ function summarizeBucket(
   const cachedLatencies = evaluated.map(
     (result) => result.metrics.cachedLatencyMs,
   );
-  const evidenceHitValues = evaluated.map(
+  const evidenceHitValues = answerable.map(
     (result) => result.metrics.citationEvidenceHit,
   );
   // Verified-citation averages run over queries where the verifier produced
   // verdicts; failed/absent verification excludes the query rather than
   // silently scoring it perfect.
-  const verifiedRates = evaluated
+  const verifiedRates = answerable
     .map((result) => result.metrics.verifiedCitationRate)
     .filter((value): value is number => value !== null);
 
   // Judge averages run over successfully judged queries only; a failed judge
   // call excludes the query from the average instead of scoring it perfect.
-  const judged = evaluated.filter((result) => result.judge?.judged);
+  const judged = answerable.filter((result) => result.judge?.judged);
   const judgeAverage = (
     pick: (judge: NonNullable<QueryBenchmarkResult["judge"]>) => number | null,
   ): number =>
@@ -418,6 +503,10 @@ function summarizeBucket(
     queryCount: results.length,
     evaluatedCount: evaluated.length,
     systemErrorCount,
+    answerableCount: answerable.length,
+    unanswerableCount: unanswerable.length,
+    falseAnswerRate,
+    falseAbstentionRate,
     recallAt5: average(recallValues),
     ndcgAt10: average(ndcgValues),
     mrr: average(mrrValues),
@@ -500,6 +589,28 @@ function thresholdChecks(
         summary.judgedCount > 0 &&
         summary.faithfulness >= thresholds.faithfulnessMin,
     },
+    // Abstention gates, live since item 3.1 added the unanswerable slice.
+    // Both come from the production insufficientEvidence flag, not the judge,
+    // so they hold even under --no-judge. The false-answer gate only applies
+    // when the dataset carries unanswerable questions — but a dataset without
+    // them cannot measure abstention at all, so the slice is required by the
+    // generator rather than silently waived here.
+    ...(summary.unanswerableCount > 0
+      ? [
+          {
+            metric: "False answer rate (unanswerable slice)",
+            actual: summary.falseAnswerRate,
+            target: `<= ${thresholds.falseAnswerRateMax}`,
+            passed: summary.falseAnswerRate <= thresholds.falseAnswerRateMax,
+          },
+        ]
+      : []),
+    {
+      metric: "False abstention rate (answerable slice)",
+      actual: summary.falseAbstentionRate,
+      target: `<= ${thresholds.falseAbstentionRateMax}`,
+      passed: summary.falseAbstentionRate <= thresholds.falseAbstentionRateMax,
+    },
     {
       metric: "Cache hit rate",
       actual: summary.cacheHitRate,
@@ -533,11 +644,49 @@ function thresholdChecks(
   ];
 }
 
+/**
+ * Per-language floors for the two retrieval gates, applied to every language
+ * with enough answerable queries to make the number meaningful. EN recall
+ * measured 0.667 while the aggregate gate passed on DE's 1.000 — without
+ * these, one language hides behind another.
+ */
+function perLanguageChecks(
+  byLanguage: Record<SupportedLanguage, BenchmarkSummaryMetrics>,
+  thresholds: BenchmarkThresholds,
+): ThresholdResult[] {
+  const checks: ThresholdResult[] = [];
+  for (const language of EVALUATION_LANGUAGES) {
+    const summary = byLanguage[language];
+    if (summary.answerableCount < thresholds.perLanguageMinQueries) {
+      continue;
+    }
+    checks.push(
+      {
+        metric: `Recall@5 [${language}]`,
+        actual: summary.recallAt5,
+        target: `>= ${thresholds.perLanguageRecallAt5}`,
+        passed: summary.recallAt5 >= thresholds.perLanguageRecallAt5,
+      },
+      {
+        metric: `nDCG@10 [${language}]`,
+        actual: summary.ndcgAt10,
+        target: `>= ${thresholds.perLanguageNdcgAt10}`,
+        passed: summary.ndcgAt10 >= thresholds.perLanguageNdcgAt10,
+      },
+    );
+  }
+  return checks;
+}
+
 export function evaluateThresholds(
   summary: BenchmarkSummaryMetrics,
   thresholds: BenchmarkThresholds = DEFAULT_BENCHMARK_THRESHOLDS,
+  byLanguage?: Record<SupportedLanguage, BenchmarkSummaryMetrics>,
 ): ThresholdEvaluation {
-  const checks = thresholdChecks(summary, thresholds);
+  const checks = [
+    ...thresholdChecks(summary, thresholds),
+    ...(byLanguage ? perLanguageChecks(byLanguage, thresholds) : []),
+  ];
   return {
     passed: checks.every((check) => check.passed),
     checks,

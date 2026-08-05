@@ -28,7 +28,6 @@
     "infra:vercel:sync-ids": "node scripts/infrastructure/sync-vercel-project-ids.mjs --env-file .env.staging --project-file .vercel/project.json",
     "db:validate:migrations": "node scripts/database/validate-migrations.mjs",
     "test:security": "tsx --test tests/*.test.ts",
-    "eval:dataset:generate": "tsx scripts/evaluation/generate-dataset.ts",
     "eval:dataset:validate": "tsx scripts/evaluation/validate-dataset.ts",
     "eval:dataset:corpus": "node -r dotenv/config --import tsx scripts/evaluation/generate-dataset-from-corpus.ts dotenv_config_path=.env.local",
     "eval:benchmark": "node -r dotenv/config --import tsx scripts/evaluation/run-benchmark.ts --mode live dotenv_config_path=.env.local",

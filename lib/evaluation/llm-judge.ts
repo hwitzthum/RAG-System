@@ -4,6 +4,7 @@ import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 import { formatEvidenceChunk } from "@/lib/answering/prompts";
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
+import { stripLimitationsSection } from "@/lib/evaluation/metrics";
 import type { QueryJudgeMetrics } from "@/lib/evaluation/types";
 
 export type JudgeQueryInput = {
@@ -129,7 +130,7 @@ function buildJudgeUserPrompt(input: JudgeQueryInput): string {
 
   return [
     `Question:\n${input.question}`,
-    `System answer:\n${input.answer}`,
+    `System answer:\n${stripLimitationsSection(input.answer)}`,
     `Evidence chunks (${input.chunks.length}):\n${buildEvidenceBlocks(input.chunks) || "(none)"}`,
     `Expected answer points (${input.acceptableAnswerPoints.length}):\n${pointLines}`,
   ].join("\n\n");

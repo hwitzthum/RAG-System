@@ -4,10 +4,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
 
-function parseArgs(argv: string[]): { datasetPath: string; minTotal: number; minPerLanguage: number } {
-  let datasetPath = "evaluation/evaluation_queries.json";
-  let minTotal = 200;
-  let minPerLanguage = 40;
+function parseArgs(argv: string[]): {
+  datasetPath: string;
+  minTotal: number;
+  minPerLanguage: number;
+} {
+  let datasetPath = "evaluation/evaluation_queries.generated.json";
+  let minTotal = 25;
+  let minPerLanguage = 5;
 
   for (let index = 2; index < argv.length; index += 1) {
     const token = argv[index];
@@ -18,7 +22,10 @@ function parseArgs(argv: string[]): { datasetPath: string; minTotal: number; min
       minTotal = Number.parseInt(argv[index + 1] ?? `${minTotal}`, 10);
       index += 1;
     } else if (token === "--min-per-language") {
-      minPerLanguage = Number.parseInt(argv[index + 1] ?? `${minPerLanguage}`, 10);
+      minPerLanguage = Number.parseInt(
+        argv[index + 1] ?? `${minPerLanguage}`,
+        10,
+      );
       index += 1;
     }
   }
@@ -34,18 +41,22 @@ function run(): void {
     throw new Error(`Dataset file not found: ${resolvedPath}`);
   }
 
-  const parsedJson = JSON.parse(fs.readFileSync(resolvedPath, "utf8")) as unknown;
+  const parsedJson = JSON.parse(
+    fs.readFileSync(resolvedPath, "utf8"),
+  ) as unknown;
   const result = validateEvaluationDataset(parsedJson, {
     minTotalQueries: args.minTotal,
     minPerLanguage: args.minPerLanguage,
   });
 
   console.log(`Evaluation dataset validation passed: ${resolvedPath}`);
-  console.log(`Total queries: ${result.totalQueries}`);
+  console.log(`Corpus fingerprint: ${result.corpusFingerprint}`);
   console.log(
-    `Language counts: EN=${result.languageCounts.EN}, DE=${result.languageCounts.DE}, FR=${result.languageCounts.FR}, IT=${result.languageCounts.IT}, ES=${result.languageCounts.ES}`,
+    `Total queries: ${result.totalQueries} (answerable ${result.answerableCount}, unanswerable ${result.unanswerableCount})`,
+  );
+  console.log(
+    `Answerable language counts: EN=${result.languageCounts.EN}, DE=${result.languageCounts.DE}, FR=${result.languageCounts.FR}, IT=${result.languageCounts.IT}, ES=${result.languageCounts.ES}`,
   );
 }
 
 run();
-

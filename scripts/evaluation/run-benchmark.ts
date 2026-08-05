@@ -18,6 +18,7 @@ import {
 } from "../../lib/evaluation/metrics";
 import {
   DEFAULT_BENCHMARK_THRESHOLDS,
+  JUDGE_NOISE_FLOOR,
   type EvaluationQueryRecord,
   type QueryBenchmarkResult,
   type QueryFailure,
@@ -134,10 +135,10 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
 
 function parseArgs(argv: string[]): RunnerArgs {
   const args: RunnerArgs = {
-    // The corpus-derived golden set. The 200-record synthetic fixture
-    // (evaluation/evaluation_queries.json) names documents such as
-    // `doc_company_profile` that exist nowhere in the corpus, so benchmarking
-    // against it measured nothing.
+    // The corpus-derived golden set: an envelope binding records to the
+    // corpus fingerprint they were generated from. (The old 200-record
+    // synthetic fixture named documents that existed nowhere in the corpus,
+    // so benchmarking against it measured nothing; it was deleted in 3.1.)
     datasetPath: "evaluation/evaluation_queries.generated.json",
     reportsDir: "evaluation/reports",
     runsDir: "evaluation/runs",
@@ -246,8 +247,12 @@ function buildMockChunk(
   language: SupportedLanguage,
   relevantPage?: number,
 ): RetrievedChunk {
+  // Relevance is now an exact chunk-id hit, so a relevant mock chunk must
+  // carry one of the golden ids rather than a fabricated one.
   const chunkId = isRelevant
-    ? `${query.id}-rel-${rank}`
+    ? (query.expected_chunk_ids[rank] ??
+      query.expected_chunk_ids[0] ??
+      `${query.id}-rel-${rank}`)
     : `${query.id}-noise-${rank}`;
   return {
     chunkId,
@@ -297,14 +302,20 @@ function executeDryRun(
     rank += 1;
   }
 
-  const answerText = `${query.acceptable_answer_points[0]}. ${query.acceptable_answer_points[1]}. ${query.acceptable_answer_points[2]}.`;
-  const citations: Citation[] = [
-    {
-      documentId: query.expected_document,
-      pageNumber: query.expected_pages[0] ?? 1,
-      chunkId: chunks[0]?.chunkId ?? `${query.id}-citation`,
-    },
-  ];
+  // The mock system behaves correctly: it abstains on unanswerable questions.
+  const unanswerable = query.question_type === "unanswerable";
+  const answerText = unanswerable
+    ? "Insufficient evidence."
+    : `${query.acceptable_answer_points[0]}. ${query.acceptable_answer_points[1]}. ${query.acceptable_answer_points[2]}.`;
+  const citations: Citation[] = unanswerable
+    ? []
+    : [
+        {
+          documentId: query.expected_document,
+          pageNumber: query.expected_pages[0] ?? 1,
+          chunkId: chunks[0]?.chunkId ?? `${query.id}-citation`,
+        },
+      ];
 
   return {
     uncached: {
@@ -318,14 +329,16 @@ function executeDryRun(
       cacheHit: false,
       answer: answerText,
       citations,
-      insufficientEvidence: false,
+      insufficientEvidence: unanswerable,
       latencyMs: uncachedLatencyMs,
-      citationVerification: {
-        checkedCount: 3,
-        supportedCount: 3,
-        unsupportedCount: 0,
-        unverified: false,
-      },
+      citationVerification: unanswerable
+        ? null
+        : {
+            checkedCount: 3,
+            supportedCount: 3,
+            unsupportedCount: 0,
+            unverified: false,
+          },
       answerTruncated: false,
     },
     cached: {
@@ -339,14 +352,16 @@ function executeDryRun(
       cacheHit: true,
       answer: answerText,
       citations,
-      insufficientEvidence: false,
+      insufficientEvidence: unanswerable,
       latencyMs: cachedLatencyMs,
-      citationVerification: {
-        checkedCount: 3,
-        supportedCount: 3,
-        unsupportedCount: 0,
-        unverified: false,
-      },
+      citationVerification: unanswerable
+        ? null
+        : {
+            checkedCount: 3,
+            supportedCount: 3,
+            unsupportedCount: 0,
+            unverified: false,
+          },
       answerTruncated: false,
     },
   };
@@ -532,15 +547,50 @@ function toFailure(
 }
 
 function deriveFailures(
-  queryId: string,
+  query: EvaluationQueryRecord,
   retrievalMetrics: ReturnType<typeof computeRetrievalMetrics>,
   answerMetrics: ReturnType<typeof computeAnswerMetrics>,
   judge: QueryBenchmarkResult["judge"],
+  insufficientEvidence: boolean,
   uncachedLatencyMs: number,
   cachedLatencyMs: number,
   cacheHitOnRepeat: boolean,
 ): QueryFailure[] {
+  const queryId = query.id;
   const failures: QueryFailure[] = [];
+
+  // An unanswerable question has no gold evidence: its only quality signal
+  // is whether the system abstained. Latency/cache checks below still apply.
+  if (query.question_type === "unanswerable") {
+    if (!insufficientEvidence) {
+      failures.push(
+        toFailure(
+          "abstention",
+          "System answered a question whose evidence is provably absent from the corpus (false answer).",
+          queryId,
+        ),
+      );
+    }
+    return [
+      ...failures,
+      ...deriveOperationalFailures(
+        queryId,
+        uncachedLatencyMs,
+        cachedLatencyMs,
+        cacheHitOnRepeat,
+      ),
+    ];
+  }
+
+  if (insufficientEvidence) {
+    failures.push(
+      toFailure(
+        "abstention",
+        "System abstained on a question the golden set considers answerable (false abstention).",
+        queryId,
+      ),
+    );
+  }
 
   if (retrievalMetrics.recallAt5 < 1) {
     failures.push(
@@ -592,6 +642,26 @@ function deriveFailures(
     );
   }
 
+  return [
+    ...failures,
+    ...deriveOperationalFailures(
+      queryId,
+      uncachedLatencyMs,
+      cachedLatencyMs,
+      cacheHitOnRepeat,
+    ),
+  ];
+}
+
+/** Latency and cache checks apply to every query, answerable or not. */
+function deriveOperationalFailures(
+  queryId: string,
+  uncachedLatencyMs: number,
+  cachedLatencyMs: number,
+  cacheHitOnRepeat: boolean,
+): QueryFailure[] {
+  const failures: QueryFailure[] = [];
+
   if (
     uncachedLatencyMs >= DEFAULT_BENCHMARK_THRESHOLDS.uncachedP95LatencyMs ||
     cachedLatencyMs >= DEFAULT_BENCHMARK_THRESHOLDS.cachedP95LatencyMs
@@ -624,6 +694,7 @@ function buildMarkdownReport(input: {
   runPath: string;
   generatedAt: string;
   queryCount: number;
+  corpusFingerprint: string;
   config: RunConfig | null;
   summary: ReturnType<typeof summarizeBenchmark>;
   thresholdEvaluation: ReturnType<typeof evaluateThresholds>;
@@ -691,6 +762,7 @@ function buildMarkdownReport(input: {
 Generated: ${input.generatedAt}
 Mode: ${input.mode}
 Dataset: ${path.resolve(input.datasetPath)}
+Corpus fingerprint: \`${input.corpusFingerprint}\`
 Run artifact: ${path.resolve(input.runPath)}
 Evaluated queries: ${input.queryCount}
 Generator model: ${input.config?.generatorModel ?? "n/a"}
@@ -709,6 +781,9 @@ ${configRows}
 | Query count | ${overall.queryCount} |
 | Evaluated queries | ${overall.evaluatedCount} |
 | System error count | ${overall.systemErrorCount} |
+| Answerable / unanswerable | ${overall.answerableCount} / ${overall.unanswerableCount} |
+| False answer rate (unanswerable slice) | ${overall.unanswerableCount > 0 ? formatMetric(overall.falseAnswerRate) : "n/a — dataset has no unanswerable slice"} |
+| False abstention rate (answerable slice) | ${formatMetric(overall.falseAbstentionRate)} |
 | Recall@5 | ${formatMetric(overall.recallAt5)} |
 | nDCG@10 | ${formatMetric(overall.ndcgAt10)} |
 | MRR | ${formatMetric(overall.mrr)} |
@@ -736,6 +811,14 @@ Abstentions are excluded rather than scored as perfectly grounded.
 | Hallucination rate | ${overall.groundedQueryCount > 0 ? formatMetric(overall.hallucinationRate) : "n/a"} |
 
 ## LLM-Judge Metrics (faithfulness is gated; the rest are report-only)
+
+Judge noise floor: ±${JUDGE_NOISE_FLOOR} (measured across two runs over
+byte-identical retrieved chunks). Any judge-metric delta below this is
+indistinguishable from run-to-run variance — do not read it as signal.
+Limitations sections are stripped from answers before statement extraction:
+their negative-existential claims ("the evidence does not establish X") can
+never be "supported by the evidence" and previously biased faithfulness
+downward for every answer.
 
 | Metric | Value |
 | --- | ---: |
@@ -805,7 +888,14 @@ async function evaluateQuery(
     const cacheHitOnRepeat = execution.cached.cacheHit;
 
     let judgeMetrics: QueryBenchmarkResult["judge"] = null;
-    if (args.judge && args.mode === "live") {
+    // Unanswerable queries are never judged: their only quality signal is the
+    // production insufficientEvidence flag, and no judge dimension
+    // (faithfulness, relevance, precision, recall) is consumed for them.
+    if (
+      args.judge &&
+      args.mode === "live" &&
+      query.question_type !== "unanswerable"
+    ) {
       const deps = await loadLiveDependencies();
       judgeMetrics = await deps.judgeQueryResult({
         question: query.question,
@@ -820,6 +910,7 @@ async function evaluateQuery(
       id: query.id,
       language: query.language,
       question: query.question,
+      questionType: query.question_type,
       retrieval: {
         cacheHit: execution.uncached.cacheHit,
         candidateCounts: execution.uncached.candidateCounts,
@@ -848,10 +939,11 @@ async function evaluateQuery(
       },
       judge: judgeMetrics,
       failures: deriveFailures(
-        query.id,
+        query,
         retrievalMetrics,
         answerMetrics,
         judgeMetrics,
+        execution.uncached.insufficientEvidence,
         execution.uncached.latencyMs,
         execution.cached.latencyMs,
         cacheHitOnRepeat,
@@ -864,6 +956,7 @@ async function evaluateQuery(
       id: query.id,
       language: query.language,
       question: query.question,
+      questionType: query.question_type,
       retrieval: {
         cacheHit: false,
         candidateCounts: {
@@ -946,9 +1039,8 @@ async function run(): Promise<void> {
   const rawDataset = JSON.parse(
     fs.readFileSync(resolvedDatasetPath, "utf8"),
   ) as unknown;
-  // Relaxed floors: the benchmark accepts a corpus-derived golden set (sized
-  // to the real corpus and its languages), not only the 200-record synthetic
-  // fixture. eval:dataset:validate keeps the stricter fixture defaults.
+  // Floors sized to a corpus-derived golden set (the corpus's real languages),
+  // not the old 200-record synthetic fixture, which is gone.
   const validated = validateEvaluationDataset(rawDataset, {
     minTotalQueries: 25,
     minPerLanguage: 5,
@@ -966,6 +1058,27 @@ async function run(): Promise<void> {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
         `Live benchmark preflight failed. Ensure staging env vars are configured (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY). ${message}`,
+      );
+    }
+
+    // Refuse to measure against a corpus the golden set no longer describes.
+    // A silent mismatch previously read as a retrieval collapse (recall 0.405
+    // on the 2026-08-04 run) that never happened.
+    const [{ getSupabaseAdminClient }, { computeCorpusFingerprint }] =
+      await Promise.all([
+        import("../../lib/supabase/admin"),
+        import("../../lib/evaluation/corpus-fingerprint"),
+      ]);
+    const liveFingerprint = await computeCorpusFingerprint(
+      getSupabaseAdminClient(),
+    );
+    if (liveFingerprint !== validated.corpusFingerprint) {
+      throw new Error(
+        `Corpus fingerprint mismatch: dataset was generated against ` +
+          `${validated.corpusFingerprint} but the live corpus is ${liveFingerprint}. ` +
+          `The corpus has been re-ingested or edited since the golden set was ` +
+          `built — regenerate it with \`npm run eval:dataset:corpus\` before ` +
+          `benchmarking.`,
       );
     }
 
@@ -996,6 +1109,7 @@ async function run(): Promise<void> {
   const thresholdEvaluation = evaluateThresholds(
     summary.overall,
     DEFAULT_BENCHMARK_THRESHOLDS,
+    summary.byLanguage,
   );
 
   const generatedAt = new Date().toISOString();
@@ -1010,7 +1124,16 @@ async function run(): Promise<void> {
     generatedAt,
     mode: args.mode,
     datasetPath: resolvedDatasetPath,
+    dataset: {
+      corpusFingerprint: validated.corpusFingerprint,
+      generatedAt: validated.generatedAt,
+      generatorModel: validated.generatorModel,
+      answerableCount: validated.answerableCount,
+      unanswerableCount: validated.unanswerableCount,
+    },
     queryCount: selectedRecords.length,
+    // Judge deltas below this are indistinguishable from run-to-run variance.
+    judgeNoiseFloor: JUDGE_NOISE_FLOOR,
     config: await buildRunConfig(args),
     thresholds: DEFAULT_BENCHMARK_THRESHOLDS,
     summary,
@@ -1044,6 +1167,7 @@ async function run(): Promise<void> {
     runPath,
     generatedAt,
     queryCount: selectedRecords.length,
+    corpusFingerprint: validated.corpusFingerprint,
     config: runArtifact.config,
     summary,
     thresholdEvaluation,
