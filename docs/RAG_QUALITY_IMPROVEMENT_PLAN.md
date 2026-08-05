@@ -397,6 +397,16 @@ Tables are real and damaged; two-column prose is present but already extracts co
 
 Scheduled for deletion as part of the re-ingest, measured on its own first so its effect stays separable from Wave 2's.
 
+### Two defects the re-ingest exposed, neither in the plan
+
+**1. Sections merged across page boundaries, destroying page provenance.** `mergeAdjacentSections` gives a merged section the _first_ section's `pageNumber`, and page number is what citations, the Evidence Navigator and `expected_pages` all key on. Latent until item 2.1 stopped deleting heading lines and left sparse documents with sections small enough to merge end to end: after the first re-ingest, all 5 chunks of `Rollen-Basierte-Arbeit-Redesign.pdf` claimed page 1, so content from page 14 would have been cited as page 1. Both DE recall@5 losses in that run were this one document. Fixed — merging now requires the same page — and pinned by two tests.
+
+**2. pdfjs falls back to byte-scrape silently, and the fallback loses every page number.** Two of seven documents came out of one worker run as `byte_scrape`, which collapses a document to a single page. The job completed, no error was raised, and nothing downstream could tell. It is intermittent: the same two documents parse as `pdfjs` on every attempt from a fresh process, including sequentially alongside the other five, so the cause is unidentified — most likely resource state inside pdfjs in a long-lived worker. `extractPages` now retries once and logs the degradation at error level naming its consequence.
+
+**This one nearly produced a false finding.** The byte-scraped `Rollen-Basierte-Arbeit-Redesign.pdf` reported 756 → 3,219 tokens, which was initially read as item 2.1 restoring deleted headings — a headline result. It was the raw byte-scraper picking up more text. Once extraction was correct the true figure was **756 → 809 tokens (+7%)**. Item 2.1's real effect across the corpus is a 0.3–7% token gain per document. A number that large should have been traced before it was believed.
+
+**Also worth noting:** `run-worker` treats a single failed RPC as fatal — one transient `TypeError: fetch failed` killed the worker mid-session twice. Not fixed here; recorded as a robustness gap.
+
 ### Measurement instrument for this wave
 
 - **Judge `contextPrecision` / `contextRecall` are primary.** They are computed from question + retrieved chunks + answer and never touch the dataset labels, so they survive a re-chunk intact.
