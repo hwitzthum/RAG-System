@@ -34,6 +34,24 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 
 ---
 
+## Who This Is For
+
+**Legal teams** reviewing contracts, liability caps, and regulatory obligations across dozens of documents without reading each one cover-to-cover.
+
+**Technical documentation owners** who need to answer "where is the API rate limit documented?" or "which config file sets the timeout?" across wikis, specs, and API docs.
+
+**Compliance officers** verifying that policies align across organisational documents, or tracing a decision through board minutes and policy archives.
+
+**Support teams** that answer customer questions by finding the exact policy section or specification passage rather than relying on memory.
+
+**Researchers** synthesising evidence across a corpus of papers or reports, with citations you can verify by page number.
+
+**Solo developers** indexing their own notes and project documentation so they can ask "what did I decide about password reset flow?" and get the exact decision and rationale with links to the page.
+
+**What these people have in common:** They have a large corpus of text (100 MB to 1 GB is typical), don't have the time or memory to read it all, need to find specific facts with proof they came from the right place, and can't trust a system that guesses. Speed is secondary — correctness is everything.
+
+---
+
 ## How It Works (Plain English)
 
 Think of RAG System as a **smart document assistant** that helps you find answers buried inside your files.
@@ -58,6 +76,16 @@ Think of RAG System as a **smart document assistant** that helps you find answer
 6. **Download** — Export the answer as a formatted Word document or PDF, ready to share with colleagues.
 
 **Why this matters:** Most systems search for keywords or use only semantic matching — but your documents have both structured data (contract terms, numbers) and conceptual content (obligations, risks). RAG System uses both, fuses them intelligently, and lets you choose precision or speed depending on your question.
+
+### The Problem RAG Solves
+
+**Naive keyword search is brittle.** If a contract says "the liable party shall pay damages" but you ask "who is responsible for payment?", keyword search fails because the words don't overlap. You'd have to rephrase your question multiple ways and read results manually.
+
+**Pure semantic search misses numbers and codes.** An embedding model understands that "API rate limit is 1000 requests/minute" and "calls per 60 seconds: 1000" mean the same thing. But if you search for "what's the exact rate limit?", semantic search alone is terrible at returning passages containing the precise number "1000" — embeddings blur specificity.
+
+**LLMs hallucinate.** Given a question and a corpus, modern LLMs will confidently invent facts that sound plausible but aren't in your documents. RAG anchors the LLM in your actual evidence, and the system refuses to answer if the evidence is thin — better to say "I don't know" than to guess wrong on a legal or technical question.
+
+**Standard retrieval doesn't scale with complexity.** When you ask "how do the onboarding process and the data retention policy relate?", a single pass through the documents often misses one of the two topics because it optimized for the other. RAG System detects this multi-topic pattern and retrieves for each topic independently, so both pieces of evidence make it into the answer.
 
 ---
 
@@ -627,29 +655,43 @@ Browser / API Client
 
 Each stage is designed with a specific failure mode in mind.
 
+**Why the pipeline is necessary:** A raw PDF is not searchable. It is binary data representing pixels and layout instructions, not text. Before the corpus can answer questions, every PDF must become structured text that embeddings can process, the database can index, and the LLM can reason over. Each stage removes a hidden failure mode — wrong file validation, lost page numbers, fragmented sentences, missing context, or corrupted chunks in the database. Most naive systems skip these; the cost is silent retrieval failures months later.
+
 **1. PDF Validation**
 
 Incoming files are checked for the `%PDF-` magic byte signature before any parsing occurs, and a SHA-256 hash of the raw bytes is compared against stored hashes. This prevents disguised file uploads (e.g., an executable renamed `.pdf`) and avoids re-processing identical documents, which would waste embedding API budget and produce duplicate chunks.
+
+**Why this matters:** Without this gate, an attacker could upload a malicious executable, or a user could accidentally upload the same document twice, creating duplicate embeddings that bloat the database and pollute search results. The hash check is deterministic and fast — a cheap guard at the boundary.
 
 **2. Text Extraction**
 
 Text is extracted page-by-page using `pdfjs-dist`, with page numbers recorded alongside each text segment. Preserving page numbers at this stage is essential: they propagate through chunking and embedding to surface as citation metadata in the final answer, allowing users to locate source passages in the original document.
 
+**Why this matters:** PDFs are visual, not textual — they are rendered for human eyes, not for machines to read. Page-by-page extraction preserves the document's structure. And page numbers are the only way a user can verify an answer by going back to the source. Without them, the system becomes unverifiable — the LLM can cite a fact, but the user has no way to check it.
+
 **3. Chunking with Overlap**
 
 Extracted text is split into approximately 700-token chunks with roughly 120 tokens of overlap, respecting sentence boundaries. The overlap prevents answer truncation at chunk boundaries — a hard cut would render the chunk's final thought unreadable in isolation. Sentence-boundary awareness avoids mid-sentence cuts that confuse both the embedding model and the reader.
+
+**Why this matters:** An embedding model is trained on complete sentences and paragraphs. If you cut a sentence in half, the embedding becomes noise. And if a retrieval system returns only chunk 1 when the actual answer spans chunks 1–2, the user gets an incomplete answer. Overlap bridges this: a key fact at the end of chunk 1 is repeated at the start of chunk 2, so if either chunk is retrieved, the full context comes with it.
 
 **4. Context Generation**
 
 Each chunk is prepended with a short contextual header, either generated by an LLM or produced via the heuristic `"{section} | page N: {first 280 chars}"`. Short chunks lose their surrounding context when retrieved out of order. The prepended header bridges this gap, giving the embedding model and the LLM enough signal to understand what the chunk is about without fetching adjacent chunks.
 
+**Why this matters:** Imagine retrieving a chunk that reads: "The limit is 10 requests per minute." In isolation, the reader doesn't know what is being limited. Is it API calls? User logins? Without context, the answer is useless. The prepended header solves this: "Rate Limiting | page 3: The API enforces strict rate limits. The limit is 10 requests per minute…" Now the LLM and the reader both understand what the limit applies to.
+
 **5. Embedding & Storage**
 
 Each contextualised chunk is embedded with OpenAI `text-embedding-3-large` and stored in pgvector alongside a PostgreSQL `tsvector` column. The dual representation is intentional: vector embeddings capture semantic similarity while `tsvector` enables exact-term retrieval — the two modalities have complementary failure modes.
 
+**Why this matters:** Embeddings are great at finding paraphrases ("maximum concurrent requests" finds "request concurrency limit"), but terrible at finding numbers and codes ("rate limit: 1000" and "limit: 1000" look unrelated to an embedding model). Keyword search is the opposite — excellent with exact terms, useless with synonyms. Using both means you don't miss either the paraphrase or the exact number.
+
 **6. Background Worker**
 
 Ingestion runs in a background worker that polls for pending jobs at 5-second intervals using a distributed database lock, with exponential backoff on retries. This decouples upload request latency from ingestion work — a user uploading a 200-page PDF does not wait for all embeddings to be generated before receiving an HTTP response.
+
+**Why this matters:** Embedding a 200-page PDF takes 30+ seconds. If the user had to wait for the entire process before getting an HTTP 200 response, they would see a blank page for half a minute. A background worker makes the upload feel instant — the user gets feedback immediately, and embeddings happen silently in the background.
 
 ---
 
@@ -698,41 +740,77 @@ Query
 
 **Cache Lookup** — A SHA-256 digest over the normalised query, language code, retrieval version, `topK`, and document scope. The scope key embeds the user id, so cache entries are per-user: repeated queries by the same user are free, and entries can never leak across access boundaries.
 
+**Why this matters:** Retrieving 10k chunks, re-ranking them with a neural model, and generating embeddings takes 3–5 seconds. Users often re-ask the same question, and expensive corporate systems can afford to memoize. The cache is deterministic (same query always returns the same result), per-user (no cross-contamination), and versioned (an algorithm change flushes it automatically).
+
 **Language Detection** — Keyword-frequency heuristics identify the query language before any database call. Detected language selects the answer's output language, is passed to the query-transform prompts, and acts as a small (+0.04) rerank nudge. It deliberately does not filter search: keyword search queries all language dictionaries at once so cross-language evidence stays reachable.
+
+**Why this matters:** A multi-language corpus can answer cross-language queries — "What is Datenschutz?" (German) has good evidence in English documents about data protection. But the output language should match the query language so the user doesn't have to translate the answer. Detecting language upfront solves this without adding latency.
 
 **Query Expansion ("Broaden search", per-request opt-in)** — The base query, up to three LLM-generated variations (written in the query's language, 4-second timeout), and a HyDE passage each retrieve independently as weighted branches (base 1.0, variations 0.9, HyDE 0.75) that are fused with weighted RRF. Works with any scope — single document, multiple documents, or the whole corpus.
 
+**Why this matters:** A user might ask "What's the policy?" but the actual document says "This regulation applies to…" Because the words don't match, embedding search fails. Query expansion asks the LLM to rephrase the question — "What regulation governs this?" — so the second phrasing hits the document. Multiple paraphrases cover more search angles than a single query can reach alone.
+
 **HyDE (part of expansion, `RAG_HYDE_ENABLED`)** — The LLM writes a short hypothetical answer passage that is embedded as an additional retrieval branch. The embedding of a verbose answer sits geometrically closer to relevant document chunks than the embedding of a short question, improving cosine matching for under-specified queries.
+
+**Why this matters:** A query like "What is this?" is too vague for embeddings to distinguish. But if you ask an LLM "Write a sentence answering 'What is this?'" the LLM writes something specific, like "This is a protocol for…" When you embed that specific answer, embedding search finds chunks about protocols because the hypothetical answer is semantically specific, even though the original question is not.
 
 **Query Decomposition (`RAG_QUERY_DECOMPOSITION_ENABLED`)** — In the standard (non-expansion) path, a query that blends two or more distinct topics — the shape of cross-document multi-hop questions, where a single cross-encoder pass against the blended text compresses scores and the second topic's evidence never reaches the window — is split by the LLM into 2–3 self-contained per-topic sub-queries (`RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES`). Each sub-query runs the full pipeline and is cross-encoder-reranked against its own text; the resulting windows are merged with the base query's window by weighted Reciprocal Rank Fusion over per-pool ranks (base 1.0, sub-queries 0.9 — absolute cross-encoder scores are not comparable across query texts), and the per-document cap is re-applied to the merged pool. Single-topic queries are returned unsplit and behave exactly as if the feature were off. Queries under 12 words skip the LLM call, decomposition results are memoized per query, and any LLM failure degrades silently to normal retrieval.
 
+**Why this matters:** A cross-document question like "How does the onboarding process relate to the data retention policy?" has two topics in different documents. A single reranking pass against the blended question compresses the cross-encoder scores — it has to choose between ranking for "onboarding" or "retention", so the second topic's evidence gets pushed to rank 15 and never reaches the top-8 window. Query decomposition splits it: "What is the onboarding process?" retrieves and reranks against onboarding-specific text (higher scores), and "What is the data retention policy?" retrieves against retention-specific text (also higher scores). Merging by rank (not by absolute score) keeps both topics' strongest evidence in the top-8 window.
+
 **Parallel Hybrid Search** — Vector search (pgvector cosine) and keyword search (tsvector) execute concurrently. Vector search captures paraphrases and synonyms; keyword search captures exact terms, product codes, and identifiers that vector similarity dilutes.
+
+**Why this matters:** You cannot choose between keyword search and semantic search — each fails where the other excels. A query for "REST API" should find chunks with "REST" and "API" (keywords), but also chunks that say "HTTP-based architectural style" (synonyms). Running both in parallel and fusing the results captures both.
 
 **Reciprocal Rank Fusion** — `score = 1/(K + vector_rank) + 1/(K + keyword_rank)` with K=60. Penalises rank inflation from a single list and rewards documents that rank highly in both — a more robust fusion strategy than averaging raw similarity scores on incomparable scales.
 
+**Why this matters:** Vector and keyword search return scores on incomparable scales — cosine similarity is 0–1, BM25 scores can be 0–1000. Averaging them is meaningless. RRF instead combines ranks, which are comparable: if a chunk ranks 2nd in both lists, it is evidence the chunk is genuinely relevant, not just lucky on one scale. The `K` parameter penalises rank inflation — a chunk ranked 1st and 1000th scores lower than a chunk ranked 50th and 50th, because consensus (both lists agree) is evidence.
+
 **Heuristic Reranking** — A fast weighted blend over the full candidate pool (`RAG_RERANK_POOL_SIZE`, default 100): pool-normalised retrieval score (0.55) + lexical overlap (0.30) + absolute cosine similarity (0.10) + exact phrase bonus (0.05) + same-language nudge (0.04). Also emits a pool-independent `relevanceScore` that the evidence gate reads.
+
+**Why this matters:** RRF gives a good initial ranking, but it misses human judgment: "This chunk has the exact phrase the user asked for" or "This is in the user's language". Heuristic reranking is a fast, deterministic second pass that captures these signals without calling an external API. It is a fallback for when the neural reranker is unavailable, and it provides a fast proxy of relevance for the evidence gate to read.
 
 **Cross-Encoder Reranking (`RAG_CROSS_ENCODER_ENABLED`, default on)** — Cohere `rerank-v3.5` reads the query and every pool candidate together, re-ordering the entire pool — not just the final top-K — so a relevant chunk ranked anywhere in the pool can still reach the final set. `RAG_CROSS_ENCODER_TIMEOUT_MS` (default 3000) bounds latency; on timeout, error, or a missing Cohere key the heuristic order stands.
 
+**Why this matters:** A cross-encoder is a neural model trained to directly score "how relevant is this chunk to this query?" without converting either to embeddings. It can consider the full text of both query and chunk, catching nuances that embeddings miss. But it is expensive — it scores every candidate in the pool, not just the top-K. That is why it runs last: by then the pool has been filtered to ~100 candidates, not 10,000. For expensive queries, the cross-encoder often moves the 8th-ranked chunk to rank 3 because it actually matches the question better than the top-K candidates that won the initial ranking race.
+
 **Contextual Grouping (`RAG_CONTEXTUAL_GROUPING_ENABLED`)** — Chunks page-adjacent to another retrieved chunk from the same document receive a `RAG_ADJACENCY_BOOST` (default +0.05) ordering boost per neighbour. Runs before the top-K slice so adjacency can pull a borderline chunk into the final set; it never touches the gate's `relevanceScore`. The tuned production configuration disables it: the boost was measured net-negative for ranking quality in both languages because it concentrates the final window into one document — the opposite of what cross-document questions need.
+
+**Why this matters:** If the retriever found chunk 3 of a document, chunk 2 and chunk 4 are spatially close and likely related — fetching them together saves the LLM from reconstructing context. But in practice, this boost concentrates the window into one document, which hurts cross-document questions that need evidence from multiple sources. Production disabled this and saw gains; it is left as a tuning knob for single-document workflows.
 
 **Per-Document Diversity Cap (`RAG_MAX_CHUNKS_PER_DOCUMENT`, 0 = off)** — A soft cap on how many chunks a single document may occupy in the final top-K. Reserved slots are filled only by cross-encoder-scored chunks from other documents at or above `RAG_DIVERSITY_RELEVANCE_FLOOR`; when no other document qualifies, the cap backfills and degrades to a no-op, so legitimately single-document queries are unaffected. The tuned production configuration sets the cap to 5, which measurably improved cross-document multi-hop retrieval.
 
+**Why this matters:** A single document can have many relevant chunks, but a question like "How do X and Y relate?" needs chunks from both documents. Without a cap, the top-8 window might be 7 chunks from the highest-ranked document and 1 from the other, destroying the second perspective. A soft cap (5 max per document) reserves slots for cross-document evidence. If no other document qualifies (a genuinely single-document question), the cap relaxes and all top-8 can be from one document.
+
 **Cache Write** — Awaited before the response is returned (a failed write logs and degrades gracefully); entries expire after `RAG_CACHE_TTL_SECONDS` and are flushed globally when ingestion completes.
+
+**Why this matters:** Caching the result of an expensive retrieval means the next identical query completes in milliseconds. But the cache must be invalidated when documents change (ingestion completes), otherwise an answer about an old version of the policy would be returned. A cache flush on ingestion keeps the two in sync.
 
 ---
 
 ### Answer Generation
 
+**Why structured answer generation is necessary:** An LLM given retrieval results will hallucinate details that sound plausible but aren't in the evidence. A company asking "What is our data retention policy?" cannot afford a plausible-sounding guess. The answer generation stage enforces three things: (1) an answer is only given if the evidence is strong enough, (2) the LLM is constrained by the specific chunks it was given, and (3) every claim can be traced to a source document and page, so a human can verify it.
+
 **1. Evidence Sufficiency Gate** — Before any LLM call, checks minimum chunk count (relaxed to 1 only when the user explicitly scoped documents), at least one chunk above the scale-appropriate relevance threshold (`RAG_MIN_RERANK_SCORE` for cross-encoder scores, `RAG_MIN_HEURISTIC_RELEVANCE` for heuristic scores), and a minimum average over the top chunks. Failing the gate returns a calibrated "insufficient evidence" response rather than a hallucination.
+
+**Why this matters:** If retrieval returns weak evidence (all chunks score 0.3 relevance), the LLM should not guess — it should say "I don't have enough information." A gate calibrated to the evidence quality (not just minimum count) ensures this. An over-cautious gate protects against hallucination but may refuse answerable questions; a loose gate enables partial answers but risks wrong answers. The production gate is tuned to maximize answers while keeping hallucination under 10%.
 
 **2. Prompt Construction** — Each chunk is rendered as an `<evidence_chunk index="n">` block with page and section metadata, wrapped in untrusted-data guards. Evidence is placed **ends-first** (`RAG_EVIDENCE_PLACEMENT`): the strongest document group opens the context and the second-strongest closes it, countering the lost-in-the-middle attention bias. The model cites with inline `[n]` markers, which are parsed post-generation to resolve `documentId` and `pageNumber` — exact document-and-page references without requiring structured JSON from the model.
 
+**Why this matters:** LLMs have a "lost in the middle" problem — evidence in the middle of a long context is ignored, while evidence at the start or end is weighted higher. The ends-first strategy exploits this by placing the strongest evidence at both ends (opening and closing) so the LLM attends to it. Untrusted-data guards (XML-style markers) make the boundary between evidence and instruction explicit, so the LLM doesn't accidentally treat a user prompt hidden in a document as a system instruction. Citations as `[n]` markers (rather than structured JSON) are parsed post-generation, so the LLM can focus on answering rather than formatting — a single `[3]` is easier to produce than `{"citation": 3}`.
+
 **3. LLM Inference (streamed)** — Default model `gpt-4o-mini` at temperature 0, streamed sentence-by-sentence: each completed sentence passes per-sentence redaction (secrets, PII, HTML, unsafe links; prompt-leak signatures halt the stream) before it is emitted as an SSE token event. The `final` event carries the fully-filtered authoritative answer and the client replaces streamed text with it. Model is configurable per-deployment or per-user BYOK.
+
+**Why this matters:** Streaming the answer sentence-by-sentence keeps the user from waiting 20 seconds for a response they could see typing out in real time. But a typed-out stream includes tokens the model might later regret — like accidental secrets. Per-sentence redaction catches these before they reach the user's screen, and the `final` event carries the authoritative version so the client UI shows the safe text (not the streamed version). Temperature 0 ensures reproducible, deterministic answers — critical for a system where consistency matters (users can re-ask and get the same result).
 
 **3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_CITATION_VERIFIER_MODEL`) checks that every `[n]`-cited sentence is entailed by the chunk(s) it cites. The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
 
+**Why this matters:** An LLM can cite the right chunk but phrase the answer in a way that extrapolates beyond what the chunk says. Citation verification doesn't edit the answer (the system stays transparent), but surfaces a warning badge so the user knows to double-check. A legal team reading the answer sees the badge and knows "this claim is inferred, not directly stated".
+
 **4. Web Augmentation (opt-in)** — Tavily results with relevance ≥ 0.5 are appended as `[WEB-N]` sources after the document evidence. The model is instructed to prefer document sources; web sources are surfaced separately in the response. When local evidence fails the gate, the answer proceeds only with at least `RAG_WEB_MIN_SOURCES` (default 2) web sources, and sub-threshold document chunks are dropped from the prompt.
+
+**Why this matters:** A question about current events ("What is the latest interest rate?") cannot be answered from a static corpus — the corpus is outdated by the time you ask. Web augmentation lets the system fill these gaps by searching the live web and appending results. But web results are ranked by traffic, not accuracy, so the system keeps document evidence primary (higher precedence in the prompt) and web secondary. When no good document evidence exists, the system can still answer with web sources, degrading gracefully rather than refusing.
 
 ---
 
