@@ -202,6 +202,28 @@ The effect is nonetheless small relative to the noise floor. EN is 18 queries, s
 
 **Not adopted from the original item:** raising `RAG_CROSS_ENCODER_TIMEOUT_MS` was already done in Wave 0 (production is 6000). No Cohere fallback warnings were observed at any sweep point.
 
+#### Follow-up: the contextPrecision drop does not replicate (2026-08-05)
+
+Wave 1 closed with one open question — the `−0.0398` `contextPrecision` drop attributed to pool 100, roughly 4× the noise floor, flagged as "the one merged change I'd want a second judged run to confirm". It was re-run as a clean pair before the Wave 2 re-ingest, since re-ingesting invalidates any A/B against this corpus.
+
+Two judged runs, **same session**, identical config apart from `RAG_RERANK_POOL_SIZE` (judge `claude-opus-5`, generator `gpt-4o-mini`, `maxOutputTokens` 2000, timeout 6000). Artifacts: `benchmark-2026-08-05T06-33-17-912Z.json` (60) and `-T06-50-12-778Z.json` (100).
+
+|                                | pool 60 | pool 100 |   delta |
+| ------------------------------ | ------: | -------: | ------: |
+| contextPrecision               |  0.6818 |   0.6733 | −0.0085 |
+| contextRecall                  |  0.9727 |   0.9727 |       — |
+| faithfulness                   |  0.9857 |   0.9836 | −0.0021 |
+| answerRelevance                |  0.9455 |   0.9423 | −0.0032 |
+| verifiedCitationRate _(gated)_ |  0.9639 |   0.9451 | −0.0187 |
+| nDCG@10                        |  0.8182 |   0.8265 | +0.0084 |
+| MRR                            |  0.8002 |   0.8116 | +0.0114 |
+
+**The pre-registered criterion was "revert to 60 if pool 100's contextPrecision is more than 0.01 lower". It did not trip: −0.0085.** That is not merely inside the floor — it is _exactly_ the magnitude item 1.6 measured between two runs over byte-identical retrieved chunks. **Pool 100 stays; `.env.vercel.production` is unchanged.**
+
+**Why the original −0.0398 was never a clean pair.** It compared the Wave 0 zero (pool 20) against the item 1.6 treatment run (pool 100) — different sessions, different answer prompts, and a different `maxOutputTokens`. Attributing the whole gap to pool width was not supportable. Measured properly, 60 → 100 costs nothing readable on `contextPrecision` and keeps the nDCG@10 / MRR rise the original sweep found.
+
+**One genuine residual:** `verifiedCitationRate` is 0.0187 lower at pool 100 — about 2× the floor, and a _gated_ metric (both arms pass the 0.9 threshold). One observation, not a trend; worth watching after the Wave 2 re-baseline rather than acting on now.
+
 ---
 
 **Original item, for reference:**
@@ -304,16 +326,16 @@ Shipping the migration now would mean a schema change on a database **shared wit
 
 Two judged runs at identical config (pool 100, `maxOutputTokens` 2000, judge `claude-opus-5`, generator `gpt-4o-mini`), differing only in the prompt: control `benchmark-2026-08-05T05-31-30-986Z.json`, treatment `-T05-47-47-452Z.json`.
 
-|                                     |   control |  contract |
-| ----------------------------------- | --------: | --------: |
-| citationEvidenceHitRate _(gated)_   |    0.8636 | **0.8864** |
-| verifiedCitationRate _(gated)_      |    0.9383 | **0.9623** |
-| contextRecall                       |    0.9682 |    0.9682 |
-| faithfulness                        |    0.9858 |    0.9771 |
-| answerRelevance                     |    0.9639 |    0.9455 |
-| contextPrecision                    |    0.6761 |    0.6676 |
-| markerCount / unsupportedStatements |   371 / 4 | 450 / **9** |
-| answers with `##` headings / Limitations | 0 / 0 | 44 / 44 |
+|                                          | control |    contract |
+| ---------------------------------------- | ------: | ----------: |
+| citationEvidenceHitRate _(gated)_        |  0.8636 |  **0.8864** |
+| verifiedCitationRate _(gated)_           |  0.9383 |  **0.9623** |
+| contextRecall                            |  0.9682 |      0.9682 |
+| faithfulness                             |  0.9858 |      0.9771 |
+| answerRelevance                          |  0.9639 |      0.9455 |
+| contextPrecision                         |  0.6761 |      0.6676 |
+| markerCount / unsupportedStatements      | 371 / 4 | 450 / **9** |
+| answers with `##` headings / Limitations |   0 / 0 |     44 / 44 |
 
 Retrieval metrics are identical to four decimals, as they must be — the prompt cannot move retrieval. Both runs pass 10/10 gates.
 
@@ -325,7 +347,7 @@ The unsupported statements are substantially a **measurement artifact of the con
 
 **Judge noise floor, measured for the first time.** `contextPrecision` moved −0.0085 between two runs whose retrieved chunks are byte-identical. That movement is therefore pure judge run-to-run variance, and it establishes a floor of roughly **±0.01** on these metrics. `faithfulness` (−0.0087) sits at that floor and should not be read as a regression. This also retro-informs item 1.2: the −0.0398 `contextPrecision` drop from pool 20 → 100 is ~4× the floor and is probably real.
 
-**What is not explained away.** `answerRelevance` fell 0.0184 — roughly 2× the noise floor — across 26 of 44 queries, with the worst-hit queries being the same ones that gained Limitations sections. Appending a paragraph about what the evidence does *not* address plausibly dilutes judged directness. This is a genuine cost of the mandatory section, accepted in exchange for the two gated citation metrics and for answers that disclose their own gaps.
+**What is not explained away.** `answerRelevance` fell 0.0184 — roughly 2× the noise floor — across 26 of 44 queries, with the worst-hit queries being the same ones that gained Limitations sections. Appending a paragraph about what the evidence does _not_ address plausibly dilutes judged directness. This is a genuine cost of the mandatory section, accepted in exchange for the two gated citation metrics and for answers that disclose their own gaps.
 
 **Harness defect this exposes — for Wave 3.** `computeAnswerMetrics`/the LLM judge now sees a sentence type that did not exist in the corpus of answers it was calibrated on. Negative-existential claims should be excluded from faithfulness scoring, or scored against a different question ("does the evidence contradict this?" rather than "does the evidence support this?"). Until then, `faithfulness` is biased slightly downward for every answer with a Limitations section, which is now all of them. Do **not** respond by removing the Limitations requirement to make the metric look better.
 
@@ -353,9 +375,51 @@ All three items require re-ingestion and item 2.1 additionally requires a full r
 
 Order within the wave matters: PDF extraction changes page text → which changes chunk boundaries → which changes what the context generator sees → which changes the embedded string. Implement in that order, then re-ingest once.
 
-**Before starting:** audit a sample of the live corpus for tables and two-column layouts. If it has neither, drop item 2.3 and save 14 hours.
+**Status (2026-08-05): code for 2.1, 2.2 and 2.3 is implemented and committed; the re-ingest has not run.** Retrieval and judge outcomes are therefore still open. What is settled is recorded per item below.
+
+### Corpus audit — the precondition for 2.3
+
+All 8 ready documents were pulled from storage and re-parsed through pdfjs, reading the `x` and `width` fields `assemblePageText` discards:
+
+| Document                          | gapped lines | pages w/ gutter | verdict                                  |
+| --------------------------------- | -----------: | --------------: | ---------------------------------------- |
+| `20240819_Projektbeschreibungen…` |        31.6% |             2/5 | 2-col key-value form                     |
+| `Checkliste_Handbuch_DZ.pdf`      |        34.5% |            8/50 | checkbox glyphs, **not** tables          |
+| `AI_Change_Management.pdf`        |         6.6% |           41/62 | real 3-col tables, destroyed             |
+| `4_ProDoc Samica II`              |         1.5% |            4/43 | label/body pairs                         |
+| `Employee_Wellbeing_AI.pdf`       |         0.7% |             2/8 | true 2-col paper, already reads in order |
+
+Tables are real and damaged; two-column prose is present but already extracts correctly. 2.3 was kept.
+
+### The corpus contains one document twice
+
+`Soak Metric Refresh` (`06da7a75`) is a re-save of `Employee_Wellbeing_AI.pdf` (`32fb0a96`) — different `sha256`, identical extracted text, 22 byte-identical chunks each (verified by `md5(content)`). That is **44 of 255 chunks**, and **8 of the 18 EN golden queries** point at the pair. `isChunkRelevant` requires an exact `documentId` match, so retrieving the twin's identical chunk scores **zero** — a plausible share of the EN recall gap (0.72 against DE 1.00) that has nothing to do with retrieval quality.
+
+Scheduled for deletion as part of the re-ingest, measured on its own first so its effect stays separable from Wave 2's.
+
+### Measurement instrument for this wave
+
+- **Judge `contextPrecision` / `contextRecall` are primary.** They are computed from question + retrieved chunks + answer and never touch the dataset labels, so they survive a re-chunk intact.
+- **Page-keyed retrieval metrics are secondary.** `expected_pages` does not move.
+- **`expected_section` does not survive.** 26 of 44 records carry a real heading, and they carry today's _mangled_ one (`Prozess UnterstüTzungsantrag`, `Mandat ZüRich`, `Pacity Building` — a truncated "Capacity Building"). Item 2.1 stops the recasing that produced those strings, so strict judging fails on 26/44 records for reasons unrelated to retrieval and reads as a collapse that did not happen.
+
+`scripts/evaluation/run-benchmark.ts` therefore gains `--ignore-expected-section`, threaded into `isChunkRelevant`, **defaulting off** so release gates stay strict. It must be applied to both arms of any comparison. Judge noise floor is ±0.01; nothing below that is reported as an effect.
 
 ### 2.1 Put headings, titles and sections into the embedded vector
+
+**IMPLEMENTED. Retrieval effect pending the re-ingest.**
+
+All three changes shipped as written: the heading is kept verbatim and pushed as the first element of its section's body, the lowercase/title-case round-trip is gone, sectioning is hoisted to a document-level pass (`splitPagesIntoSections`) that carries the heading path across page boundaries as a `" / "` breadcrumb, and the embedded string is now `title / sectionTitle / context / content`.
+
+**The destructive recasing is worse than the item suggests, and the evaluation set is itself a victim of it.** `expected_section` values in `evaluation/evaluation_queries.generated.json` include `Prozess UnterstüTzungsantrag`, `Mandat ZüRich` and `Pacity Building` — that last one a truncated "Capacity Building". Those labels were generated from the corpus, so the mangling has been propagating into the ground truth. This is why the wave needs `--ignore-expected-section` to be measurable at all, and why item 3.1's regeneration matters more than it looked.
+
+Heading depth comes from an explicit numbering prefix where one exists (`5.4 Mutationen` → depth 2), falling back to all-caps = level 1 and title-case = level 2.
+
+**Measure:** recall@5 and nDCG@10 on the page-only slice, plus judge `contextPrecision`. As the item warns, `centroid_drift_within_limit` fails once by design after the re-embed.
+
+---
+
+**Original item, for reference:**
 
 **Impact:** high · **Effort:** 5h · **Confidence:** verified
 
@@ -373,6 +437,37 @@ Sectioning is also strictly per page (`pipeline.ts:351`), so a heading on page 3
 
 ### 2.2 Feed contextual retrieval the whole document, and fix the dead cache breakpoint
 
+**IMPLEMENTED, and the cache is proven live. Retrieval effect pending the re-ingest.**
+
+The item's premise is confirmed: the minimum cacheable prefix for `claude-haiku-4-5` is **4,096 tokens**, so `cache_control` on the ~45-token `CONTEXT_SYSTEM_PROMPT` never created an entry. Two mechanics the item did not anticipate decide whether the fix saves money or costs a great deal of it:
+
+- **`enrich` runs five chunks concurrently** (`Promise.all` over batches of 5), and a cache entry only becomes readable once the first response begins streaming. Naively, the first batch of every document pays **five** full-document writes. A single `max_tokens: 0` pre-warm request now runs first: it performs prefill, writes the entry, returns an empty content array immediately, and bills no output tokens.
+- **`chunksPerRun` is 5**, so a 67-chunk document spans 14 worker runs and the default 5-minute TTL lapses between them. The breakpoint uses `ttl: "1h"`.
+
+**Measured live on `Checkliste_Handbuch_DZ.pdf` (50 pages, 67k chars), enriching 8 chunks:**
+
+```
+context_cache_prewarmed  read=     0  write= 25941
+context_cache            read= 25941  write=     0   (× 8)
+```
+
+One write, eight reads, zero repeat writes — against 9 full-price sends before.
+
+**Two decisions that differ from the item as written:**
+
+- **No new column, and no checkpointing of the document text.** Persisting 50 pages into the `chunk_candidates` JSONB blob bloats every job row, and a new column is a migration on a database **shared with another project**. A resumed run re-downloads and re-extracts instead: seconds, no LLM spend, no schema change.
+- **A size window, not an unconditional switch.** Below ~16,000 characters the document cannot cache at all, so sending it per chunk would be pure loss — those documents keep the summary path. Above ~400,000 characters the request is kept clear of the model's context window.
+
+`summarizeDocument`'s excerpt is now head + section outline + tail rather than a flat 6,000-character head slice, so a summary of a fifty-page handbook is no longer a summary of its cover.
+
+**One thing the item did not anticipate:** the model prefixed `**Retrieval Context Summary:**` to every context string, which is concatenated into the embedded text and the tsvector — an identical heading prepended to all 255 vectors. The system prompt now forbids a preamble.
+
+**Cost risk, as flagged:** the acceptance test is `cache_read_input_tokens`. It is logged per chunk as a `context_cache` event. Reads staying at zero means the document is being re-billed per chunk, and the change should be reverted rather than shipped.
+
+---
+
+**Original item, for reference:**
+
 **Impact:** high · **Effort:** 6h · **Confidence:** verified
 
 `summarizeDocument` does `input.text.replace(/\s+/g, " ").trim().slice(0, 6_000)` (`lib/ingestion/runtime/context-generator.ts:255`) — roughly the first page or two — with `max_tokens: 220`, and that single ≤4-sentence summary is the _only_ whole-document signal every chunk's context prompt ever sees. Anthropic's contextual retrieval recipe puts the whole document behind a cache breakpoint. Situating a page-40 contract clause against a summary of page 1 gives the model no way to know which clause, party, or annex it belongs to, so the generated context degenerates toward restating the chunk — the exact failure mode the technique exists to prevent.
@@ -386,6 +481,37 @@ Separately, `claudeContext` sets `cache_control: { type: "ephemeral" }` on a ~45
 **Cost risk:** if `cache_read_input_tokens` stays 0 (e.g. a document's chunks span worker runs more than 5 minutes apart), the whole document is re-billed per chunk. Fall back to the summary path above a size threshold.
 
 ### 2.3 Layout-aware PDF text assembly
+
+**IMPLEMENTED for tables. The multi-column reordering half is WITHDRAWN on measurement — it regressed two real documents and the corpus contains no page that needs it. Do not re-attempt without a page that demonstrates the defect.**
+
+**What the item missed, and it is the main finding.** pdfjs emits table content **cell-major**, not row-major. On `AI_Change_Management.pdf` p14 the y sequence runs 288.3 → 271.7 → 288.3 → 271.7 → 288.3 as the generator finishes each wrapped cell before starting the next column. So the damage was worse than "cells joined by a space": breaking on y _in emission order_ shattered every row into one fragment per cell line, and no amount of within-line gap analysis could have repaired it. Rows are recovered by regrouping items by **baseline**.
+
+**Why reordering was withdrawn.** Baseline regrouping is exactly what breaks side-by-side content: the blocks share baselines, so grouping by y interleaves them. Two real regressions were produced and measured before the scope was narrowed:
+
+- `Employee_Wellbeing_AI.pdf` p5 — a genuine two-column paper, which **already extracts in correct reading order** because the generator emits it column-major. Regrouping interleaved the columns.
+- `Rollen-Basierte-Arbeit-Redesign.pdf` p6 — three side-by-side text boxes, merged into `Unklare Verantwortlichkeiten: Bottlenecks durch Personen- Wissen geht verloren (Ferien,`.
+
+A page-level "is this two-column?" detector was tried (band widths, fill ratios, largest backward y-jump) and was not reliable enough to gate on: a footer emitted first produces the same signature as a column break. The shipped scope is therefore deliberately narrow:
+
+> **A page is emitted exactly as the previous assembler emitted it, except that a run of lines proven to be a table is replaced by a Markdown pipe table. Nothing is reordered.**
+
+**Measured across the whole 197-page corpus: 191 pages byte-identical, 6 changed, and all 6 are table substitutions.** Zero regressions.
+
+**Three thresholds that had to be derived from the data, not guessed:**
+
+- **Gap scale is local, not page-level.** A page median glyph advance is dragged up by heading text — a 34-character slide title at ~18pt/glyph against ~6pt body text — and the inflated threshold then swallows a genuine 15pt column gutter as a word space. Both `p14` and `p16` failed to detect until the threshold keyed on the neighbouring glyphs.
+- **Column clustering must compare against the cluster centroid.** Chaining against the predecessor let a column drift indefinitely and produced 22 spurious columns for one row of a four-column table.
+- **Wrapped rows fold by line spacing.** Cell count cannot distinguish a wrapped row from a new record when every column wraps (`p22`); within-record gaps are ~17pt against ~37pt between records.
+
+Plus a marker guard — a leading `☐`, `•` or `-` is absorbed rather than counted as a column — without which `Checkliste_Handbuch_DZ.pdf` reads as 34.5% tables across 50 pages, and a one-baseline header lookback so a comparison table's blank top-left corner does not strand its column labels and promote the first data row to header.
+
+Downstream, `chunking.ts` now keeps a pipe-row run as a single paragraph, refuses to read a pipe row as a heading, splits an oversized table on row boundaries with the header repeated, and preserves newlines in the relaxed-fallback path.
+
+**Measure:** pending the re-ingest. Only 6 pages change, all in one document, so any corpus-level effect will be small; `contextPrecision` on queries touching that document is where to look.
+
+---
+
+**Original item, for reference:**
 
 **Impact:** medium · **Effort:** 14h · **Confidence:** verified · **Conditional on corpus audit**
 
