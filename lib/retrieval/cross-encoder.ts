@@ -10,9 +10,13 @@ export type CrossEncoderInput = {
 };
 
 // Cohere accepts up to 1,000 documents per rerank call; capping well below
-// that bounds cost and latency. The heuristic pool (RAG_RERANK_POOL_SIZE,
-// default 40) fits entirely under this cap, so overflow only occurs with
-// unusual configuration.
+// that bounds cost and latency.
+//
+// RAG_RERANK_POOL_SIZE now defaults to 100, so this cap is exactly binding
+// rather than the comfortable headroom it used to be: raise the pool above 100
+// and the excess silently keeps its heuristic order behind the cross-encoded
+// candidates (see the overflow handling below) instead of being reranked.
+// Raise this constant in step if the pool is ever taken higher.
 const CROSS_ENCODER_POOL_CAP = 100;
 
 /**

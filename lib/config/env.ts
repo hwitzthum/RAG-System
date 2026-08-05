@@ -43,7 +43,12 @@ const envSchema = z.object({
     .default("text-embedding-3-large"),
   RAG_RETRIEVAL_VERSION: z.coerce.number().int().positive().default(1),
   RAG_RRF_K: z.coerce.number().int().positive().default(60),
-  RAG_RERANK_POOL_SIZE: z.coerce.number().int().positive().default(40),
+  // Also sets retrieval depth: candidateLimit at lib/retrieval/service.ts is
+  // max(topK * 4, this, MIN_CANDIDATE_LIMIT), so raising it widens both the
+  // vector/keyword fetch and the pool the cross-encoder may reorder. Chosen by
+  // a 20/40/60/100 sweep on 2026-08-05 (see RAG_QUALITY_IMPROVEMENT_PLAN 1.2);
+  // 100 is also CROSS_ENCODER_POOL_CAP, so going higher needs that raised too.
+  RAG_RERANK_POOL_SIZE: z.coerce.number().int().positive().default(100),
   RAG_LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
   RAG_LLM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(2_000),
   // Output PII redaction mode.
