@@ -17,6 +17,20 @@ const HEADING_TITLECASE =
   /^(?:\d+(?:\.\d+)*\s+)?[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+(?:\s+(?:[A-Z\u00C0-\u00DC][a-z\u00E0-\u00FF]+|and|or|of|the|for|in|on|to|with|&|\/|-)){1,10}$/;
 const RELAXED_MIN_CHARS = 20;
 
+// A Markdown pipe row emitted by the layout-aware page assembler. Tables have
+// to survive sectioning, paragraph splitting and chunk packing intact — the
+// point of reconstructing them is that a number stays attached to its row and
+// column label, and every one of those stages would otherwise flatten them.
+const TABLE_ROW_PATTERN = /^\|.*\|$/;
+
+export function isTableRow(line: string): boolean {
+  return TABLE_ROW_PATTERN.test(line.trim());
+}
+
+function isTableSeparatorRow(line: string): boolean {
+  return /^\|(?:\s*-{3,}\s*\|)+$/.test(line.trim());
+}
+
 function isHeading(line: string): boolean {
   const candidate = line.trim();
   if (!candidate) {
@@ -25,69 +39,120 @@ function isHeading(line: string): boolean {
   if (candidate.length > 120) {
     return false;
   }
+  // A table row is content, never a section title.
+  if (isTableRow(candidate)) {
+    return false;
+  }
   return HEADING_UPPERCASE.test(candidate) || HEADING_TITLECASE.test(candidate);
 }
 
-export function splitIntoSections(page: ExtractedPage): Section[] {
-  const lines = page.text.split(/\r?\n/).map((line) => line.trim());
+/**
+ * Depth of a heading in the document outline.
+ *
+ * An explicit numbering prefix is authoritative — `5.4 Mutationen` is depth 2.
+ * Without one, an all-caps line is treated as a top-level heading and a
+ * title-case line as its child, which is how these documents are typeset.
+ */
+function headingDepth(line: string): number {
+  const numbered = /^(\d+(?:\.\d+)*)\s+/.exec(line);
+  if (numbered) {
+    return numbered[1]!.split(".").length;
+  }
+  return HEADING_UPPERCASE.test(line) ? 1 : 2;
+}
+
+/**
+ * Splits a whole document into sections, carrying the heading path across page
+ * boundaries.
+ *
+ * Sectioning used to run strictly per page, so a heading on page 3 did not
+ * reach its continuation on page 4 — which fell back to the title `Page 4`.
+ * The breadcrumb (`5. Meldung veränderter Verhältnisse / 5.4 Mutationen`) gives
+ * every chunk its ancestry, and item 2.1 puts that string into the embedded
+ * vector, where the heading has never appeared.
+ */
+export function splitPagesIntoSections(pages: ExtractedPage[]): Section[] {
   const sections: Section[] = [];
+  // Heading path by depth, persisting across pages.
+  let stack: string[] = [];
 
-  let currentTitle = `Page ${page.pageNumber}`;
-  let currentContent: string[] = [];
-  let previousLineWasBlank = false;
-
-  for (const line of lines) {
-    if (!line) {
-      if (currentContent.length > 0 && !previousLineWasBlank) {
-        currentContent.push("");
-      }
-      previousLineWasBlank = true;
+  for (const page of pages) {
+    if (!page.text.trim()) {
       continue;
     }
 
-    if (isHeading(line)) {
-      if (currentContent.length > 0) {
-        sections.push({
-          pageNumber: page.pageNumber,
-          sectionTitle: currentTitle,
-          text: currentContent
-            .join("\n")
-            .replace(/\n{3,}/g, "\n\n")
-            .trim(),
-        });
-        currentContent = [];
+    const lines = page.text.split(/\r?\n/).map((line) => line.trim());
+    const breadcrumb = () =>
+      stack.length > 0 ? stack.join(" / ") : `Page ${page.pageNumber}`;
+
+    let currentTitle = breadcrumb();
+    let currentContent: string[] = [];
+    let previousLineWasBlank = false;
+    let emitted = false;
+
+    const flush = () => {
+      if (currentContent.length === 0) {
+        return;
       }
-      currentTitle = line
-        .toLowerCase()
-        .replace(/\b\w/g, (character) => character.toUpperCase());
+      sections.push({
+        pageNumber: page.pageNumber,
+        sectionTitle: currentTitle,
+        text: currentContent
+          .join("\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim(),
+      });
+      currentContent = [];
+      emitted = true;
+    };
+
+    for (const line of lines) {
+      if (!line) {
+        if (currentContent.length > 0 && !previousLineWasBlank) {
+          currentContent.push("");
+        }
+        previousLineWasBlank = true;
+        continue;
+      }
+
+      if (isHeading(line)) {
+        flush();
+        const depth = headingDepth(line);
+        // The heading itself is kept verbatim — no lowercase/title-case
+        // round-trip, which mangled acronyms and German compounds into
+        // `Mandat ZüRich` and truncated `Capacity Building` to `Pacity
+        // Building` in the evaluation set's own labels.
+        stack = [...stack.slice(0, depth - 1), line];
+        currentTitle = breadcrumb();
+        // The heading also leads the section body, so the words a user is
+        // most likely to search with reach the embedded text and the tsvector
+        // rather than only `section_title`.
+        currentContent.push(line);
+        previousLineWasBlank = false;
+        continue;
+      }
+
+      currentContent.push(line);
       previousLineWasBlank = false;
-      continue;
     }
 
-    currentContent.push(line);
-    previousLineWasBlank = false;
-  }
+    flush();
 
-  if (currentContent.length > 0) {
-    sections.push({
-      pageNumber: page.pageNumber,
-      sectionTitle: currentTitle,
-      text: currentContent
-        .join("\n")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim(),
-    });
-  }
-
-  if (sections.length === 0 && page.text.trim()) {
-    sections.push({
-      pageNumber: page.pageNumber,
-      sectionTitle: `Page ${page.pageNumber}`,
-      text: page.text.trim(),
-    });
+    if (!emitted) {
+      sections.push({
+        pageNumber: page.pageNumber,
+        sectionTitle: breadcrumb(),
+        text: page.text.trim(),
+      });
+    }
   }
 
   return sections;
+}
+
+/** Single-page form, for callers and fixtures that have one page in hand. */
+export function splitIntoSections(page: ExtractedPage): Section[] {
+  return splitPagesIntoSections([page]);
 }
 
 function tokenize(text: string): string[] {
@@ -179,7 +244,25 @@ function splitIntoParagraphs(text: string): string[] {
     current = [];
   };
 
+  // A run of pipe rows is one paragraph, kept verbatim: collapsing its
+  // newlines would destroy exactly the row structure the assembler recovered.
+  let tableRows: string[] = [];
+  const flushTable = () => {
+    if (tableRows.length === 0) {
+      return;
+    }
+    paragraphs.push(tableRows.join("\n"));
+    tableRows = [];
+  };
+
   for (const line of lines) {
+    if (isTableRow(line)) {
+      flush();
+      tableRows.push(line);
+      continue;
+    }
+    flushTable();
+
     if (!line) {
       flush();
       continue;
@@ -195,6 +278,7 @@ function splitIntoParagraphs(text: string): string[] {
   }
 
   flush();
+  flushTable();
   return paragraphs.filter((paragraph) => paragraph.length > 0);
 }
 
@@ -275,6 +359,52 @@ function buildParagraphOverlap(
   return overlap;
 }
 
+/**
+ * Splits a table too large for one chunk on row boundaries, repeating the
+ * header on every piece. Word-slicing it (the prose path) would cut mid-row and
+ * strand cells from their column labels — the failure the table reconstruction
+ * exists to prevent.
+ */
+function chunkOversizedTable(table: string, targetTokens: number): string[] {
+  const rows = table.split("\n");
+  const header: string[] = [];
+  if (rows[0] && isTableRow(rows[0])) {
+    header.push(rows[0]);
+    if (rows[1] && isTableSeparatorRow(rows[1])) {
+      header.push(rows[1]);
+    }
+  }
+
+  const body = rows.slice(header.length);
+  const headerText = header.join("\n");
+  const headerTokens = header.length > 0 ? countTokens(headerText) : 0;
+
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let currentTokens = headerTokens;
+
+  const flush = () => {
+    if (current.length === 0) {
+      return;
+    }
+    chunks.push([...header, ...current].join("\n"));
+    current = [];
+    currentTokens = headerTokens;
+  };
+
+  for (const row of body) {
+    const rowTokens = countTokens(row);
+    if (current.length > 0 && currentTokens + rowTokens > targetTokens) {
+      flush();
+    }
+    current.push(row);
+    currentTokens += rowTokens;
+  }
+  flush();
+
+  return chunks.length > 0 ? chunks : [table];
+}
+
 function chunkOversizedParagraph(
   paragraph: string,
   targetTokens: number,
@@ -350,6 +480,13 @@ export function chunkSections(input: {
       continue;
     }
 
+    // The whitespace-collapsed form is only an emptiness probe. A section
+    // holding a table has to keep its newlines in the fallback chunk below, or
+    // the relaxed path silently undoes the reconstruction.
+    const fallbackContent = section.text.split("\n").some(isTableRow)
+      ? section.text.trim()
+      : normalizedSectionText;
+
     const paragraphs = splitIntoParagraphs(section.text);
     let paragraphIndex = 0;
     let overlapParagraphs: string[] = [];
@@ -372,11 +509,11 @@ export function chunkSections(input: {
             break;
           }
 
-          const oversizedParagraphChunks = chunkOversizedParagraph(
-            paragraph,
-            targetTokens,
-            overlapTokens,
-          );
+          const oversizedParagraphChunks = isTableRow(
+            paragraph.split("\n")[0] ?? "",
+          )
+            ? chunkOversizedTable(paragraph, targetTokens)
+            : chunkOversizedParagraph(paragraph, targetTokens, overlapTokens);
           for (const oversizedContent of oversizedParagraphChunks) {
             if (
               oversizedContent.length < minChars &&
@@ -446,7 +583,7 @@ export function chunkSections(input: {
         chunkIndex,
         pageNumber: section.pageNumber,
         sectionTitle: section.sectionTitle,
-        content: normalizedSectionText,
+        content: fallbackContent,
         language,
       });
       chunkIndex += 1;

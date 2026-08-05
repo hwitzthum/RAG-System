@@ -56,9 +56,27 @@ function average(values: number[]): number {
   return values.reduce((acc, value) => acc + value, 0) / values.length;
 }
 
+/**
+ * Options for relevance judging.
+ *
+ * `ignoreExpectedSection` exists for one narrow purpose: A/B-ing a change that
+ * alters `section_title`. The golden set stores today's section labels, several
+ * of them mangled by the extraction bug item 2.1 fixes (`Mandat ZüRich`,
+ * `Pacity Building`), so any run after that fix fails the substring match on 26
+ * of 44 records and reads as a retrieval collapse that did not happen. Page
+ * numbers survive a re-chunk; section titles do not.
+ *
+ * It must be applied to *both* arms of a comparison, and it must default off —
+ * release gates are judged on the strict definition.
+ */
+export type RelevanceOptions = {
+  ignoreExpectedSection?: boolean;
+};
+
 export function isChunkRelevant(
   record: EvaluationQueryRecord,
   chunk: Pick<RetrievedChunk, "documentId" | "pageNumber" | "sectionTitle">,
+  options: RelevanceOptions = {},
 ): boolean {
   if (chunk.documentId !== record.expected_document) {
     return false;
@@ -66,6 +84,10 @@ export function isChunkRelevant(
 
   if (!record.expected_pages.includes(chunk.pageNumber)) {
     return false;
+  }
+
+  if (options.ignoreExpectedSection) {
+    return true;
   }
 
   const expectedSection = normalizeText(record.expected_section);
@@ -83,6 +105,7 @@ export function isChunkRelevant(
 export function computeRetrievalMetrics(
   record: EvaluationQueryRecord,
   chunks: RetrievedChunk[],
+  options: RelevanceOptions = {},
 ): QueryRetrievalMetrics {
   const top10 = chunks.slice(0, 10);
   const relevantRanks: number[] = [];
@@ -92,7 +115,7 @@ export function computeRetrievalMetrics(
     if (!chunk) {
       continue;
     }
-    if (isChunkRelevant(record, chunk)) {
+    if (isChunkRelevant(record, chunk, options)) {
       relevantRanks.push(index + 1);
     }
   }
@@ -107,7 +130,7 @@ export function computeRetrievalMetrics(
     if (!chunk) {
       continue;
     }
-    const relevance = isChunkRelevant(record, chunk) ? 1 : 0;
+    const relevance = isChunkRelevant(record, chunk, options) ? 1 : 0;
     if (relevance > 0) {
       dcg += (2 ** relevance - 1) / Math.log2(index + 2);
     }

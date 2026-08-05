@@ -1,3 +1,8 @@
+import {
+  assemblePage,
+  type AssembledPage,
+  type PageTextItem,
+} from "@/lib/ingestion/runtime/page-layout";
 import type {
   ExtractedPage,
   RuntimeLogger,
@@ -21,6 +26,12 @@ const MAX_INFLATED_STREAM_BYTES = 25 * 1024 * 1024;
 type PdfJsTextItem = {
   str?: string;
   transform?: number[];
+  /**
+   * Horizontal extent of the item. Read alongside `transform[4]` so the
+   * assembler can tell a column gutter from a word space — the previous
+   * assembler read neither and joined a whole baseline with single spaces.
+   */
+  width?: number;
 };
 
 type PdfJsPage = {
@@ -421,53 +432,25 @@ function extractTextFromPdfOperators(
   return sanitizeExtractedText(extracted.join("\n"));
 }
 
-function assemblePageText(items: PdfJsTextItem[]): string {
-  const lines: string[] = [];
-  let current: string[] = [];
-  let lastY: number | null = null;
+function assemblePageText(items: PdfJsTextItem[]): AssembledPage {
+  const textItems: PageTextItem[] = [];
 
   for (const item of items) {
-    const raw = item.str ?? "";
-    const text = raw.replace(/\s+/g, " ").trim();
+    const text = (item.str ?? "").replace(/\s+/g, " ").trim();
     if (!text) {
       continue;
     }
 
-    const y =
-      Array.isArray(item.transform) && item.transform.length > 5
-        ? item.transform[5]
-        : null;
-    if (
-      lastY !== null &&
-      y !== null &&
-      Math.abs(y - lastY) > 2 &&
-      current.length > 0
-    ) {
-      lines.push(
-        current
-          .join(" ")
-          .replace(/[ \t]+/g, " ")
-          .trim(),
-      );
-      current = [];
-    }
-
-    current.push(text);
-    if (y !== null) {
-      lastY = y;
-    }
+    const transform = Array.isArray(item.transform) ? item.transform : null;
+    textItems.push({
+      text,
+      x: transform && transform.length > 4 ? (transform[4] ?? 0) : 0,
+      y: transform && transform.length > 5 ? (transform[5] ?? 0) : 0,
+      width: typeof item.width === "number" ? item.width : 0,
+    });
   }
 
-  if (current.length > 0) {
-    lines.push(
-      current
-        .join(" ")
-        .replace(/[ \t]+/g, " ")
-        .trim(),
-    );
-  }
-
-  return lines.join("\n").trim();
+  return assemblePage(textItems);
 }
 
 async function extractPagesWithPdfJs(
@@ -495,9 +478,11 @@ async function extractPagesWithPdfJs(
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
+      const assembled = assemblePageText(content.items ?? []);
       pages.push({
         pageNumber,
-        text: assemblePageText(content.items ?? []),
+        text: assembled.text,
+        hasTables: assembled.hasTables,
       });
     }
 

@@ -1,7 +1,7 @@
 import {
   chunkSections,
   countTokens,
-  splitIntoSections,
+  splitPagesIntoSections,
 } from "@/lib/ingestion/runtime/chunking";
 import { ContextGenerator } from "@/lib/ingestion/runtime/context-generator";
 import { EmbeddingProvider } from "@/lib/ingestion/runtime/embedding-provider";
@@ -286,6 +286,15 @@ export class IngestionPipeline {
     // Load incremental state
     let progress: JobProgress = await this.repository.loadJobProgress(job.id);
 
+    /*
+     * Full document text, fed to the context generator so each chunk is
+     * situated against the whole document rather than a summary of its first
+     * page. Populated during extraction on the first run; a resumed run
+     * re-derives it below rather than checkpointing it, which would put fifty
+     * pages of text into the `chunk_candidates` JSONB blob on every job.
+     */
+    let documentText: string | null = null;
+
     // Phase 1: Extract (first invocation only — no candidates saved yet)
     if (!progress.candidates) {
       await setStage("extracting");
@@ -320,14 +329,16 @@ export class IngestionPipeline {
         extractionMethod: extractionMethod ?? null,
       });
 
-      // One document-level summary, generated once and persisted: it feeds
-      // every chunk's context prompt (full contextual retrieval) on this run
-      // and on any resumed run. Failure to summarise must not fail ingestion.
+      documentText = pages.map((page) => page.text).join("\n\n");
+
+      // One document-level summary, generated once and persisted: it is the
+      // fallback whenever the document is outside the cacheable size window.
+      // Failure to summarise must not fail ingestion.
       if (!document.summary && contextGenerator.summarizeDocument) {
         try {
           const summary = await contextGenerator.summarizeDocument({
             title: document.title,
-            text: pages.map((page) => page.text).join("\n\n"),
+            text: documentText,
           });
           if (summary) {
             await this.repository.setDocumentSummary(document.id, summary);
@@ -347,12 +358,9 @@ export class IngestionPipeline {
       }
 
       await setStage("chunking");
-      const sections = [];
-      for (const page of pages) {
-        if (page.text.trim()) {
-          sections.push(...splitIntoSections(page));
-        }
-      }
+      // Document-level so a heading carries to its continuation on the next
+      // page instead of restarting at `Page N`.
+      const sections = splitPagesIntoSections(pages);
 
       if (sections.length === 0) {
         throw new Error("No extractable text found in document");
@@ -466,9 +474,36 @@ export class IngestionPipeline {
 
     // Enrich batch with context, situating each chunk within the document.
     await setStage("contextualizing");
+
+    if (documentText === null) {
+      /*
+       * A resumed run: extraction happened on an earlier invocation. Re-deriving
+       * the text costs a download and a parse — seconds, no LLM spend — and
+       * keeps the whole-document context available across the runs a large
+       * document spans. Failure falls back to the summary path.
+       */
+      try {
+        const pdfBytes = await this.repository.downloadDocument(
+          document.storagePath,
+        );
+        const pages = await this.extractPagesFn(
+          pdfBytes,
+          this.settings.ocrFallbackEnabled,
+          this.logger,
+        );
+        documentText = pages.map((page) => page.text).join("\n\n");
+      } catch (error) {
+        this.logger.warn("document_text_reextraction_failed", {
+          documentId: document.id,
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
+
     const batchWithContext = await contextGenerator.enrich(batch, {
       title: document.title,
       summary: document.summary,
+      text: documentText,
     });
     this.logger.info("pipeline_step", {
       step: "batch_context_enriched",
@@ -478,8 +513,23 @@ export class IngestionPipeline {
 
     // Generate embeddings for batch
     await setStage("embedding");
-    const embeddingInputs = batchWithContext.map(
-      (item) => `${item.context}\n\n${item.content}`,
+    /*
+     * Document title and section breadcrumb lead the embedded string.
+     *
+     * They previously reached only `section_title`, which feeds the keyword
+     * tsvector but not the dense branch — so a query phrased in a heading's own
+     * words had to hope the generated context happened to echo it. The order is
+     * fixed rather than conditional so the same chunk always embeds to the same
+     * string.
+     */
+    const embeddingInputs = batchWithContext.map((item) =>
+      [
+        document.title ?? "",
+        item.sectionTitle,
+        item.context,
+        "",
+        item.content,
+      ].join("\n"),
     );
     const embeddings = await embeddingProvider.embedTexts(embeddingInputs);
     this.logger.info("pipeline_step", {
