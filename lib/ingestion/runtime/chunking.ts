@@ -314,19 +314,28 @@ function mergeAdjacentSections(
     const currentTooSmall = current.text.trim().length < minSectionChars;
     const nextTooSmall = next.text.trim().length < minSectionChars;
     /*
-     * Never merge across a page boundary. A merged section keeps the *first*
-     * section's `pageNumber`, so absorbing a later page silently relabels its
-     * content — and the page number is what citations, the Evidence Navigator
-     * and `expected_pages` all key on.
+     * Merge at most one page forward.
      *
-     * This became load-bearing once item 2.1 stopped deleting heading lines:
-     * `Rollen-Basierte-Arbeit-Redesign.pdf` is a sparse 15-page deck whose
-     * sections are all small enough to merge, and every one of its chunks
-     * ended up claiming page 1 — content from page 14 cited as page 1.
+     * A merged section keeps the *first* section's `pageNumber`, and that
+     * number is what citations, the Evidence Navigator and `expected_pages`
+     * all key on. Unbounded merging destroys it: on
+     * `Rollen-Basierte-Arbeit-Redesign.pdf`, a sparse 15-page deck whose
+     * sections are all small enough to merge, every chunk ended up claiming
+     * page 1 — content from page 14 cited as page 1.
+     *
+     * Forbidding cross-page merges outright fixed provenance and cost
+     * retrieval: the same deck became 15 chunks of ~54 tokens, and its three
+     * evaluation queries lost 0.25 MRR — more than the whole corpus's decline.
+     * Chunks that small carry too little context to rank.
+     *
+     * Bounding the span to adjacent pages keeps sparse documents chunkable
+     * while capping the provenance error at one page. The bound does not
+     * chain: `current.pageNumber` stays at the first page, so a third page is
+     * already two away and stops the run.
      */
-    const samePage = current.pageNumber === next.pageNumber;
+    const withinOnePage = Math.abs(next.pageNumber - current.pageNumber) <= 1;
     const shouldMerge =
-      samePage &&
+      withinOnePage &&
       combinedTokens <= Math.floor(targetTokens * 1.15) &&
       (currentTooSmall || nextTooSmall);
 

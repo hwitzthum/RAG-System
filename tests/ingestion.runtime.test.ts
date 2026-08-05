@@ -735,16 +735,18 @@ test("runIngestionBatch passes completed document language to markJobCompleted",
   ]);
 });
 
-test("chunkSections never merges sections across a page boundary", () => {
-  // A merged section inherits the first section's pageNumber, so absorbing a
-  // later page relabels its content. Rollen-Basierte-Arbeit-Redesign.pdf is a
-  // sparse deck whose sections all merged: every chunk claimed page 1, so
-  // content from page 14 was cited as page 1.
+test("chunkSections bounds a merged section to adjacent pages", () => {
+  // A merged section inherits the first section's pageNumber, so unbounded
+  // merging relabels content: Rollen-Basierte-Arbeit-Redesign.pdf collapsed to
+  // 5 chunks all claiming page 1. Forbidding cross-page merges outright then
+  // cost retrieval — 15 chunks of ~54 tokens, -0.25 MRR. One page of span is
+  // the compromise, and it must not chain across three pages.
   const chunks = chunkSections({
     sections: [
       { pageNumber: 1, sectionTitle: "Intro", text: "Short text on page one." },
       { pageNumber: 2, sectionTitle: "Next", text: "Short text on page two." },
       { pageNumber: 3, sectionTitle: "Last", text: "Short text on page three." },
+      { pageNumber: 4, sectionTitle: "More", text: "Short text on page four." },
     ],
     language: "EN",
     targetTokens: 700,
@@ -752,11 +754,15 @@ test("chunkSections never merges sections across a page boundary", () => {
     minChars: 200,
   });
 
-  assert.equal(chunks.length, 3);
+  // Pages 1+2 merge, then 3+4 — never 1..3, which would put page-3 content
+  // under page 1.
+  assert.equal(chunks.length, 2);
   assert.deepEqual(
     chunks.map((chunk) => chunk.pageNumber),
-    [1, 2, 3],
+    [1, 3],
   );
+  assert.equal(chunks[0]?.content.includes("page two"), true);
+  assert.equal(chunks[1]?.content.includes("page four"), true);
 });
 
 test("chunkSections still merges short sections within one page", () => {
