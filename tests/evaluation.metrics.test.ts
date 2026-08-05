@@ -261,6 +261,7 @@ function buildResult(
         },
       ],
       scoreScaleComposition: "cross_encoder",
+      queryDecomposition: null,
     },
     answer: {
       text: "Ownership model is documented.",

@@ -21,6 +21,7 @@ import {
   JUDGE_NOISE_FLOOR,
   type EvaluationQueryRecord,
   type EvidenceAssessmentTrace,
+  type QueryDecompositionTrace,
   type QueryBenchmarkResult,
   type QueryFailure,
   type ScoreScaleComposition,
@@ -88,6 +89,8 @@ type RunCapture = {
   answerTruncated: boolean;
   /** The CRAG loop's evidence read for this answer; null on the error path. */
   evidenceAssessment: EvidenceAssessmentTrace | null;
+  /** The router's decomposition trace (Wave 5); null in dry-run mode. */
+  queryDecomposition: QueryDecompositionTrace | null;
 };
 
 type QueryExecution = {
@@ -359,6 +362,7 @@ function executeDryRun(
           },
       answerTruncated: false,
       evidenceAssessment,
+      queryDecomposition: null,
     },
     cached: {
       chunks,
@@ -383,6 +387,7 @@ function executeDryRun(
           },
       answerTruncated: false,
       evidenceAssessment,
+      queryDecomposition: null,
     },
   };
 }
@@ -470,6 +475,7 @@ async function executeLive(
       citationVerification: uncachedAnswer.citationVerification,
       answerTruncated: uncachedAnswer.answerTruncated,
       evidenceAssessment: uncachedAnswer.evidenceAssessment,
+      queryDecomposition: uncachedRetrieval.queryDecomposition,
     },
     cached: {
       chunks: cachedRetrieval.chunks,
@@ -482,6 +488,7 @@ async function executeLive(
       citationVerification: cachedAnswer.citationVerification,
       answerTruncated: cachedAnswer.answerTruncated,
       evidenceAssessment: cachedAnswer.evidenceAssessment,
+      queryDecomposition: cachedRetrieval.queryDecomposition,
     },
   };
 }
@@ -518,6 +525,8 @@ type RunConfig = {
   diversityRelevanceFloor: number;
   multiQueryEnabled: boolean;
   multiQueryVariations: number;
+  queryDecompositionEnabled: boolean;
+  queryDecompositionMaxSubQueries: number;
   evidencePlacement: string;
   citationVerificationEnabled: boolean;
   cragLoopEnabled: boolean;
@@ -577,6 +586,8 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     diversityRelevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
     multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
     multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
+    queryDecompositionEnabled: env.RAG_QUERY_DECOMPOSITION_ENABLED,
+    queryDecompositionMaxSubQueries: env.RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES,
     evidencePlacement: env.RAG_EVIDENCE_PLACEMENT,
     citationVerificationEnabled: env.RAG_CITATION_VERIFICATION_ENABLED,
     cragLoopEnabled: env.RAG_CRAG_LOOP_ENABLED,
@@ -1003,6 +1014,7 @@ async function evaluateQuery(
         scoreScaleComposition: deriveScoreScaleComposition(
           execution.uncached.chunks,
         ),
+        queryDecomposition: execution.uncached.queryDecomposition,
       },
       answer: {
         text: execution.uncached.answer,
@@ -1048,6 +1060,7 @@ async function evaluateQuery(
         },
         chunks: [],
         scoreScaleComposition: "unknown",
+        queryDecomposition: null,
       },
       answer: {
         text: "",
