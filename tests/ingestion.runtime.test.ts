@@ -734,3 +734,44 @@ test("runIngestionBatch passes completed document language to markJobCompleted",
     { jobId: "job-lang", language: "DE" },
   ]);
 });
+
+test("chunkSections never merges sections across a page boundary", () => {
+  // A merged section inherits the first section's pageNumber, so absorbing a
+  // later page relabels its content. Rollen-Basierte-Arbeit-Redesign.pdf is a
+  // sparse deck whose sections all merged: every chunk claimed page 1, so
+  // content from page 14 was cited as page 1.
+  const chunks = chunkSections({
+    sections: [
+      { pageNumber: 1, sectionTitle: "Intro", text: "Short text on page one." },
+      { pageNumber: 2, sectionTitle: "Next", text: "Short text on page two." },
+      { pageNumber: 3, sectionTitle: "Last", text: "Short text on page three." },
+    ],
+    language: "EN",
+    targetTokens: 700,
+    overlapTokens: 120,
+    minChars: 200,
+  });
+
+  assert.equal(chunks.length, 3);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.pageNumber),
+    [1, 2, 3],
+  );
+});
+
+test("chunkSections still merges short sections within one page", () => {
+  const chunks = chunkSections({
+    sections: [
+      { pageNumber: 4, sectionTitle: "Overview", text: "Short introduction." },
+      { pageNumber: 4, sectionTitle: "Scope", text: "Short scope note here." },
+    ],
+    language: "EN",
+    targetTokens: 700,
+    overlapTokens: 120,
+    minChars: 200,
+  });
+
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.pageNumber, 4);
+  assert.equal(chunks[0]?.sectionTitle, "Overview / Scope");
+});

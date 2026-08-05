@@ -313,7 +313,20 @@ function mergeAdjacentSections(
     const combinedTokens = countTokens(combinedText);
     const currentTooSmall = current.text.trim().length < minSectionChars;
     const nextTooSmall = next.text.trim().length < minSectionChars;
+    /*
+     * Never merge across a page boundary. A merged section keeps the *first*
+     * section's `pageNumber`, so absorbing a later page silently relabels its
+     * content — and the page number is what citations, the Evidence Navigator
+     * and `expected_pages` all key on.
+     *
+     * This became load-bearing once item 2.1 stopped deleting heading lines:
+     * `Rollen-Basierte-Arbeit-Redesign.pdf` is a sparse 15-page deck whose
+     * sections are all small enough to merge, and every one of its chunks
+     * ended up claiming page 1 — content from page 14 cited as page 1.
+     */
+    const samePage = current.pageNumber === next.pageNumber;
     const shouldMerge =
+      samePage &&
       combinedTokens <= Math.floor(targetTokens * 1.15) &&
       (currentTooSmall || nextTooSmall);
 
