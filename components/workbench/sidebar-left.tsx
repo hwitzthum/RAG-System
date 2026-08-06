@@ -156,8 +156,9 @@ export function SidebarLeft({
                         <button
                           type="button"
                           onClick={() => onDeleteDocument(doc.id)}
-                          className="fg-muted p-1 transition hover:text-[var(--danger)]"
+                          className="btn-danger p-1.5 transition"
                           title="Delete document"
+                          aria-label={`Delete document: ${displayName}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

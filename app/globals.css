@@ -889,7 +889,11 @@ details[open] > .disclosure-summary::after {
 .themed-dialog {
   border: 1px solid var(--border-strong);
   border-radius: 0;
-  padding: 0;
+  /* Tailwind preflight zeroes margin on every element, which overrides the UA
+     `margin: auto` that centres a modal <dialog>. Without this, showModal()
+     pins the dialog to the top-left corner. Padding is left to the utility on
+     the element — this file is unlayered, so a `padding` here would beat it. */
+  margin: auto;
 }
 
 .themed-dialog::backdrop {
