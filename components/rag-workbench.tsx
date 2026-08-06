@@ -1115,6 +1115,54 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     ],
   );
 
+  // Shared by the desktop rail and the mobile drawer — one object so the two
+  // cannot be wired up differently.
+  const sidebarLeftProps = {
+    documents,
+    documentsLoading,
+    canDeleteDocuments,
+    deletingHistoryIds,
+    queryDocumentScopeIds,
+    toggleQueryDocumentScopeId,
+    onDeleteDocument: requestDeleteDocument,
+    onDeleteHistory: handleDeleteHistoryById,
+    onRefreshDocuments: () => void fetchDocuments(),
+    queryHistory,
+    historyLoading,
+    onRefreshHistory: () => void loadHistory(),
+    onRestoreHistory: handleRestoreHistory,
+    onNewConversation: handleNewConversation,
+  };
+
+  const sidebarRightProps = {
+    activeTurn,
+    uploadFileInputRef,
+    handleUploadFileChange,
+    uploadTitle,
+    setUploadTitle,
+    uploadLanguageHint,
+    setUploadLanguageHint,
+    handleUploadButtonClick,
+    uploading,
+    uploadFile,
+    canUpload,
+    canDeleteDocuments,
+    userRole: user?.role ?? null,
+    batchFileInputRef,
+    handleBatchUpload: (e: ChangeEvent<HTMLInputElement>) =>
+      void handleBatchUpload(e),
+    batchFiles,
+    uploadStatus,
+    onDeleteDocument: requestDeleteDocument,
+    workspaceMessage,
+    documents,
+    documentsLoading,
+    queryDocumentScopeIds,
+    toggleQueryDocumentScopeId,
+    clearQueryDocumentScope,
+    providerVaults,
+  };
+
   return (
     <ErrorBoundary>
       <Toaster position="bottom-right" richColors />
@@ -1138,45 +1186,39 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           className="fixed inset-0 z-30 lg:hidden"
           style={{ background: "var(--bg-overlay)" }}
           onClick={() => setMobilePanel("none")}
+          data-testid="mobile-panel-backdrop"
         />
       )}
 
       <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left sidebar - mobile overlay */}
+        {/* Left sidebar — mobile overlay. Same component as the rail, so the
+            drawer cannot fall behind it in features (it once offered nothing
+            but a "use desktop view" note, hiding document deletion entirely).
+            Navigating away closes the drawer; deleting does not, so several
+            documents can be removed in one pass. */}
         {mobilePanel === "left" && (
-          <div className="nav-surface fixed inset-y-16 left-0 z-40 w-[280px] border-r lg:hidden">
-            <div className="flex h-full flex-col gap-6 overflow-y-auto p-4">
-              <button
-                type="button"
-                onClick={handleNewConversation}
-                className="btn-primary w-full px-3 py-2.5 text-[11px]"
-              >
-                New Chat
-              </button>
-              {/* Simplified mobile sidebar content */}
-              <p className="fg-muted text-xs">
-                Use desktop view for full sidebar.
-              </p>
-            </div>
-          </div>
+          <SidebarLeft
+            {...sidebarLeftProps}
+            variant="drawer"
+            onRestoreHistory={(item) => {
+              setMobilePanel("none");
+              handleRestoreHistory(item);
+            }}
+            onNewConversation={() => {
+              setMobilePanel("none");
+              handleNewConversation();
+            }}
+          />
         )}
 
-        <SidebarLeft
-          documents={documents}
-          documentsLoading={documentsLoading}
-          canDeleteDocuments={canDeleteDocuments}
-          deletingHistoryIds={deletingHistoryIds}
-          queryDocumentScopeIds={queryDocumentScopeIds}
-          toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
-          onDeleteDocument={requestDeleteDocument}
-          onDeleteHistory={handleDeleteHistoryById}
-          onRefreshDocuments={() => void fetchDocuments()}
-          queryHistory={queryHistory}
-          historyLoading={historyLoading}
-          onRefreshHistory={() => void loadHistory()}
-          onRestoreHistory={handleRestoreHistory}
-          onNewConversation={handleNewConversation}
-        />
+        <SidebarLeft {...sidebarLeftProps} />
+
+        {/* Right sidebar — mobile overlay. The toggle previously dimmed the
+            screen and rendered nothing, stranding upload, evidence and the key
+            vault behind a backdrop with no panel. */}
+        {mobilePanel === "right" && (
+          <SidebarRight {...sidebarRightProps} variant="drawer" />
+        )}
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <ChatView
@@ -1209,33 +1251,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           )}
         </div>
 
-        <SidebarRight
-          activeTurn={activeTurn}
-          uploadFileInputRef={uploadFileInputRef}
-          handleUploadFileChange={handleUploadFileChange}
-          uploadTitle={uploadTitle}
-          setUploadTitle={setUploadTitle}
-          uploadLanguageHint={uploadLanguageHint}
-          setUploadLanguageHint={setUploadLanguageHint}
-          handleUploadButtonClick={handleUploadButtonClick}
-          uploading={uploading}
-          uploadFile={uploadFile}
-          canUpload={canUpload}
-          canDeleteDocuments={canDeleteDocuments}
-          userRole={user?.role ?? null}
-          batchFileInputRef={batchFileInputRef}
-          handleBatchUpload={(e) => void handleBatchUpload(e)}
-          batchFiles={batchFiles}
-          uploadStatus={uploadStatus}
-          onDeleteDocument={requestDeleteDocument}
-          workspaceMessage={workspaceMessage}
-          documents={documents}
-          documentsLoading={documentsLoading}
-          queryDocumentScopeIds={queryDocumentScopeIds}
-          toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
-          clearQueryDocumentScope={clearQueryDocumentScope}
-          providerVaults={providerVaults}
-        />
+        <SidebarRight {...sidebarRightProps} />
       </div>
 
       <ConfirmDeleteDialog

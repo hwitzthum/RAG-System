@@ -3,7 +3,15 @@ import type { SidebarLeftProps } from "./types";
 import { getDocumentDisplayName, formatTime, formatLatency } from "./types";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const WRAPPER_CLASSES: Record<"rail" | "drawer", string> = {
+  rail: "nav-surface hidden w-[280px] shrink-0 flex-col gap-8 overflow-y-auto border-r p-5 lg:flex",
+  // inset-y-16 clears the 4rem nav; lg:hidden so it can never coexist with the rail.
+  drawer:
+    "nav-surface fixed inset-y-16 left-0 z-40 flex w-[280px] flex-col gap-8 overflow-y-auto border-r p-5 lg:hidden",
+};
+
 export function SidebarLeft({
+  variant = "rail",
   documents,
   documentsLoading,
   canDeleteDocuments,
@@ -20,7 +28,10 @@ export function SidebarLeft({
   onNewConversation,
 }: SidebarLeftProps) {
   return (
-    <aside className="nav-surface hidden w-[280px] shrink-0 flex-col gap-8 overflow-y-auto border-r p-5 lg:flex">
+    <aside
+      className={WRAPPER_CLASSES[variant]}
+      data-testid={`sidebar-left-${variant}`}
+    >
       {/* New Conversation — the rail's single gold mark. */}
       <button
         type="button"

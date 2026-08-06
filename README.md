@@ -547,7 +547,7 @@ Select up to 10 PDFs at once. Each file gets its own row with individual status 
 
 Deletion is **admin-only** — readers see the document list but no delete control.
 
-1. In the **Documents** list on the left rail, click the red trash button next to a document (or **Delete Document** in the Ingestion Desk's upload status panel)
+1. In the **Documents** list on the left rail, click the red trash button next to a document (or **Delete Document** in the Ingestion Desk's upload status panel). On a narrow window the rail collapses — tap the panel toggle at the top left to open the same list as a drawer
 2. A confirmation dialog names the document and states what will be removed
 3. Click **Delete** to confirm, or **Cancel** to abort
 
@@ -1051,7 +1051,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## Testing
 
-### Unit Tests (181 tests)
+### Unit Tests (345 tests)
 
 ```bash
 npx tsx --test tests/*.test.ts
@@ -1059,7 +1059,7 @@ npx tsx --test tests/*.test.ts
 
 Covers: retrieval cache key generation and TTL behaviour, RRF score computation, lexical reranking weight blending, chunking pipeline boundary conditions, CSRF token generation and timing-safe comparison, rate limit bucket arithmetic, and the full prompt injection scanner category suite.
 
-### End-to-End Tests (63 tests)
+### End-to-End Tests (66 tests)
 
 ```bash
 # The dev server must be running before Playwright executes
@@ -1069,7 +1069,7 @@ curl --retry 5 --retry-delay 2 http://localhost:3001/api/health
 npx playwright test
 ```
 
-Runs against a live Next.js dev server on port 3001 with `workers: 1`. Covers: full auth flows (login, logout, signup, pending redirect, suspended redirect), single and batch document upload, end-to-end query with citation rendering, report download (DOCX and PDF), admin user management, BYOK key storage and removal, query history deletion, and admin document deletion including its confirmation gate.
+Runs against a live Next.js dev server on port 3001 with `workers: 1`. Covers: full auth flows (login, logout, signup, pending redirect, suspended redirect), single and batch document upload, end-to-end query with citation rendering, report download (DOCX and PDF), admin user management, BYOK key storage and removal, query history deletion, admin document deletion including its confirmation gate, and both mobile drawers at a 420px viewport.
 
 **Test users** — must exist in Supabase before running E2E:
 

@@ -7,7 +7,15 @@ import { ProviderKeyVault } from "./provider-key-vault";
 
 type Tab = "evidence" | "upload" | "status";
 
+const WRAPPER_CLASSES: Record<"rail" | "drawer", string> = {
+  rail: "nav-surface hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l lg:flex",
+  // inset-y-16 clears the 4rem nav; lg:hidden so it can never coexist with the rail.
+  drawer:
+    "nav-surface fixed inset-y-16 right-0 z-40 flex w-[320px] max-w-[calc(100vw-2rem)] flex-col overflow-y-auto border-l lg:hidden",
+};
+
 export function SidebarRight({
+  variant = "rail",
   activeTurn,
   uploadFileInputRef,
   handleUploadFileChange,
@@ -44,7 +52,10 @@ export function SidebarRight({
   ];
 
   return (
-    <aside className="nav-surface hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l lg:flex">
+    <aside
+      className={WRAPPER_CLASSES[variant]}
+      data-testid={`sidebar-right-${variant}`}
+    >
       {/* Tab Bar */}
       <div className="flex border-b border-[var(--border)]">
         {tabs.map((tab) => (
