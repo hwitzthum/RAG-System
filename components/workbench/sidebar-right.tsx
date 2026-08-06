@@ -52,10 +52,10 @@ export function SidebarRight({
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 px-3 py-2.5 text-xs font-medium transition ${
+            className={`label-caps flex-1 border-b-2 px-3 py-3.5 transition ${
               activeTab === tab.key
-                ? "border-b-2 border-[var(--accent)] text-[var(--accent-strong)]"
-                : "fg-muted hover:text-[var(--text-primary)]"
+                ? "border-[var(--accent)] text-[var(--text-primary)]"
+                : "border-transparent hover:text-[var(--text-primary)]"
             }`}
           >
             {tab.label}
@@ -67,13 +67,15 @@ export function SidebarRight({
         {/* Evidence Tab */}
         {activeTab === "evidence" && (
           <section>
-            <h3 className="fg-secondary text-xs font-medium">
-              Evidence Navigator
-            </h3>
+            <h3 className="section-label">Evidence Navigator</h3>
             <p className="fg-muted mt-0.5 text-xs">
               Citations for the selected answer.
             </p>
-            <div className="mt-2 space-y-1.5">
+            <div
+              className={
+                activeTurn?.citations.length ? "seam-grid mt-4" : "mt-4"
+              }
+            >
               {activeTurn?.citations.length ? (
                 activeTurn.citations.map((citation) => {
                   const doc = documents.find(
@@ -85,7 +87,7 @@ export function SidebarRight({
                   return (
                     <a
                       key={`${citation.documentId}:${citation.pageNumber}:${citation.chunkId}`}
-                      className="surface-muted fg-secondary block rounded-2xl px-3 py-2 text-xs hover:border-[var(--accent-border)]"
+                      className="card-hover-accent fg-secondary block px-3 py-2.5 text-xs transition-colors hover:bg-[var(--emphasis-soft)]"
                       href={`/api/upload/${citation.documentId}`}
                       target="_blank"
                       rel="noreferrer"
@@ -114,7 +116,7 @@ export function SidebarRight({
                   );
                 })
               ) : (
-                <p className="fg-muted rounded-2xl border border-dashed border-[var(--border)] px-3 py-4 text-xs">
+                <p className="fg-muted border border-dashed border-[var(--border)] px-3 py-4 text-xs">
                   No citations for this turn yet.
                 </p>
               )}
@@ -127,10 +129,8 @@ export function SidebarRight({
           <div className="space-y-4">
             {/* Ingestion Desk */}
             <section>
-              <h3 className="fg-secondary text-xs font-medium">
-                Ingestion Desk
-              </h3>
-              <div className="mt-2 space-y-2">
+              <h3 className="section-label">Ingestion Desk</h3>
+              <div className="mt-4 space-y-3">
                 <input
                   ref={uploadFileInputRef}
                   type="file"
@@ -139,10 +139,7 @@ export function SidebarRight({
                   onChange={handleUploadFileChange}
                   data-testid="single-upload-input"
                 />
-                <label
-                  htmlFor="upload-title-input"
-                  className="fg-secondary text-xs font-medium"
-                >
+                <label htmlFor="upload-title-input" className="label-caps">
                   Document Title
                 </label>
                 <input
@@ -151,7 +148,7 @@ export function SidebarRight({
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   placeholder="Optional title"
-                  className="input-surface w-full rounded-2xl px-3 py-2 text-sm"
+                  className="input-surface w-full px-3 py-2 text-sm"
                   autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="none"
@@ -161,7 +158,7 @@ export function SidebarRight({
                 <select
                   value={uploadLanguageHint}
                   onChange={(e) => setUploadLanguageHint(e.target.value)}
-                  className="input-surface w-full rounded-2xl px-3 py-2 text-sm"
+                  className="input-surface w-full px-3 py-2 text-sm"
                 >
                   <option value="">Language hint (optional)</option>
                   <option value="EN">EN</option>
@@ -174,7 +171,7 @@ export function SidebarRight({
                   type="button"
                   onClick={handleUploadButtonClick}
                   disabled={uploading}
-                  className="btn-primary w-full rounded-2xl px-3 py-2 text-sm font-medium disabled:cursor-not-allowed active:scale-[0.98]"
+                  className="btn-primary w-full px-3 py-2.5 text-[11px] disabled:cursor-not-allowed"
                   data-testid="upload-submit-button"
                 >
                   {uploading
@@ -199,14 +196,12 @@ export function SidebarRight({
                 {/* Document Scope Selector */}
                 <div className="mt-1">
                   <div className="flex items-center justify-between">
-                    <label className="fg-secondary text-xs font-medium">
-                      Query Scope
-                    </label>
+                    <label className="label-caps">Query Scope</label>
                     {queryDocumentScopeIds.length > 0 ? (
                       <button
                         type="button"
                         onClick={clearQueryDocumentScope}
-                        className="btn-ghost rounded px-1.5 py-0.5 text-xs font-medium"
+                        className="btn-ghost px-1.5 py-0.5 text-[10px]"
                       >
                         Clear
                       </button>
@@ -217,13 +212,13 @@ export function SidebarRight({
                       ? `${queryDocumentScopeIds.length} document${queryDocumentScopeIds.length === 1 ? "" : "s"} selected`
                       : "All documents"}
                   </p>
-                  <div className="surface-muted mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-2xl p-2">
-                    <label className="fg-secondary flex items-center gap-2 rounded px-2 py-1 text-xs">
+                  <div className="surface-muted mt-2 max-h-40 space-y-1 overflow-y-auto p-2">
+                    <label className="fg-secondary flex items-center gap-2 px-2 py-1 text-xs">
                       <input
                         type="checkbox"
                         checked={queryDocumentScopeIds.length === 0}
                         onChange={() => clearQueryDocumentScope()}
-                        className="check-accent h-3.5 w-3.5 rounded"
+                        className="check-accent h-3.5 w-3.5"
                         disabled={documentsLoading}
                       />
                       <span>All documents</span>
@@ -233,13 +228,13 @@ export function SidebarRight({
                       return (
                         <label
                           key={doc.id}
-                          className="fg-secondary flex items-center gap-2 rounded px-2 py-1 text-xs transition hover:bg-[var(--bg-elevated)]"
+                          className="fg-secondary flex items-center gap-2 px-2 py-1 text-xs transition hover:bg-[var(--emphasis-soft)]"
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleQueryDocumentScopeId(doc.id)}
-                            className="check-accent h-3.5 w-3.5 rounded"
+                            className="check-accent h-3.5 w-3.5"
                             disabled={documentsLoading}
                           />
                           <span className="truncate">
@@ -254,7 +249,7 @@ export function SidebarRight({
 
               {/* Batch Upload */}
               <div className="mt-3 space-y-2">
-                <p className="fg-secondary text-xs font-medium">Batch Upload</p>
+                <p className="label-caps">Batch Upload</p>
                 <input
                   ref={batchFileInputRef}
                   type="file"
@@ -296,7 +291,7 @@ export function SidebarRight({
               {/* Upload Status */}
               {uploadStatus ? (
                 <div
-                  className="surface-muted fg-secondary mt-3 rounded-2xl p-3 text-xs"
+                  className="surface-muted fg-secondary mt-4 p-3 text-xs"
                   data-testid="upload-status-panel"
                 >
                   <p>
@@ -321,7 +316,7 @@ export function SidebarRight({
                     <button
                       type="button"
                       onClick={() => onDeleteDocument(uploadStatus.document.id)}
-                      className="btn-danger mt-2 w-full rounded-2xl px-3 py-1.5 text-xs font-medium active:scale-[0.98]"
+                      className="btn-danger mt-3 w-full px-3 py-2 text-[10px]"
                       data-testid="delete-document-button"
                     >
                       Delete Document
@@ -344,7 +339,7 @@ export function SidebarRight({
         {/* Status Tab */}
         {activeTab === "status" && (
           <section>
-            <h3 className="fg-secondary text-xs font-medium">Status</h3>
+            <h3 className="section-label">Status</h3>
             <p
               aria-live="polite"
               className={`mt-1 text-xs leading-relaxed ${workspaceToneClass}`}

@@ -5,10 +5,13 @@ export const dynamic = "force-dynamic";
 export default function NotFound() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="surface-card text-center rounded-3xl px-10 py-12">
-        <h1 className="fg-primary text-4xl font-bold">404</h1>
-        <p className="fg-muted mt-2">This page could not be found.</p>
-        <Link href="/" className="link-accent mt-4 inline-block">
+      <div className="surface-card w-full max-w-md px-12 py-14">
+        <hr className="rule-gold mb-10 w-16" />
+        <h1 className="display-1">404</h1>
+        <p className="fg-secondary mt-4 text-sm">
+          This page could not be found.
+        </p>
+        <Link href="/" className="link-accent mt-8 inline-block text-sm">
           Go to workspace
         </Link>
       </div>

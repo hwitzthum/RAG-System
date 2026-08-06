@@ -13,28 +13,28 @@ export function AdminUsersTable(props: {
 }) {
   if (props.loading) {
     return (
-      <div className="surface-card overflow-hidden rounded-2xl">
+      <div className="surface-card">
         <div className="fg-muted p-8 text-center text-sm">Loading users...</div>
       </div>
     );
   }
 
   return (
-    <div className="surface-card overflow-hidden rounded-2xl">
+    <div className="surface-card">
       <table className="w-full text-sm" data-testid="admin-users-table">
         <thead>
           <tr className="surface-muted border-b border-[var(--border)]">
-            <th className="fg-muted px-4 py-3 text-left text-xs font-medium">Email</th>
-            <th className="fg-muted px-4 py-3 text-left text-xs font-medium">Role</th>
-            <th className="fg-muted px-4 py-3 text-left text-xs font-medium">Created</th>
-            <th className="fg-muted px-4 py-3 text-left text-xs font-medium">Last Sign In</th>
-            <th className="fg-muted px-4 py-3 text-left text-xs font-medium">Actions</th>
+            <th className="label-caps px-4 py-4 text-left">Email</th>
+            <th className="label-caps px-4 py-4 text-left">Role</th>
+            <th className="label-caps px-4 py-4 text-left">Created</th>
+            <th className="label-caps px-4 py-4 text-left">Last Sign In</th>
+            <th className="label-caps px-4 py-4 text-left">Actions</th>
           </tr>
         </thead>
         <tbody>
           {props.users.map((user) => (
             <tr key={user.id} className="border-b border-[var(--border)] last:border-0">
-              <td className="fg-primary px-4 py-3 font-medium">{user.email ?? user.id.slice(0, 8)}</td>
+              <td className="fg-primary px-4 py-3">{user.email ?? user.id.slice(0, 8)}</td>
               <td className="px-4 py-3">
                 <span className={roleBadgeColor[user.role] ?? "badge badge-muted"}>
                   {user.role}
@@ -81,7 +81,7 @@ function AdminUserActions(props: {
           <button
             onClick={() => props.onApprove(props.user.id)}
             disabled={loading}
-            className="btn-primary active:scale-[0.98] rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+            className="btn-primary px-3 py-1.5 text-[10px] disabled:opacity-50"
             data-testid={`approve-${props.user.id}`}
           >
             Approve
@@ -96,7 +96,7 @@ function AdminUserActions(props: {
               })
             }
             disabled={loading}
-            className="btn-secondary active:scale-[0.98] rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+            className="btn-secondary px-3 py-1.5 text-[10px] disabled:opacity-50"
             data-testid={`decline-${props.user.id}`}
           >
             Decline
@@ -115,7 +115,7 @@ function AdminUserActions(props: {
             })
           }
           disabled={loading}
-          className="btn-danger active:scale-[0.98] rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+          className="btn-danger px-3 py-1.5 text-[10px] disabled:opacity-50"
           data-testid={`suspend-${props.user.id}`}
         >
           Suspend
@@ -133,7 +133,7 @@ function AdminUserActions(props: {
             })
           }
           disabled={loading}
-          className="btn-primary active:scale-[0.98] rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+          className="btn-primary px-3 py-1.5 text-[10px] disabled:opacity-50"
           data-testid={`reactivate-${props.user.id}`}
         >
           Reactivate
@@ -149,7 +149,7 @@ function AdminUserActions(props: {
           })
         }
         disabled={loading}
-        className="btn-danger active:scale-[0.98] rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+        className="btn-danger px-3 py-1.5 text-[10px] disabled:opacity-50"
         data-testid={`delete-${props.user.id}`}
       >
         Delete

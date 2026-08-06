@@ -16,10 +16,10 @@ type ChatMessageProps = {
 
 function StreamingDots() {
   return (
-    <span className="inline-flex gap-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:300ms]" />
+    <span className="inline-flex items-center gap-1" aria-label="Streaming">
+      <span className="h-1 w-1 bg-[var(--accent)] animate-bounce [animation-delay:0ms]" />
+      <span className="h-1 w-1 bg-[var(--accent)] animate-bounce [animation-delay:150ms]" />
+      <span className="h-1 w-1 bg-[var(--accent)] animate-bounce [animation-delay:300ms]" />
     </span>
   );
 }
@@ -39,7 +39,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium active:scale-[0.98]"
+      className="btn-secondary px-3 py-1.5 text-[10px]"
       title="Copy answer"
     >
       {copied ? (
@@ -59,23 +59,23 @@ export function ChatMessage({
 }: ChatMessageProps) {
   return (
     <article
-      className={`cursor-pointer rounded-2xl border p-4 transition ${
+      className={`cursor-pointer p-6 transition ${
         isActive
-          ? "surface-accent shadow-sm"
-          : "surface-card hover:border-[var(--accent-border)] hover:shadow-sm"
+          ? "surface-accent"
+          : "surface-card hover:bg-[var(--emphasis-soft)]"
       }`}
       onClick={onClick}
       data-testid="chat-turn"
     >
       {/* Query */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <span className="badge badge-muted">You</span>
-        <p className="fg-muted text-xs">{formatTime(turn.createdAt)}</p>
+        <p className="label-caps">{formatTime(turn.createdAt)}</p>
       </div>
-      <p className="fg-primary mt-2 text-sm font-medium">{turn.query}</p>
+      <p className="display-console mt-3">{turn.query}</p>
 
       {/* Separator */}
-      <div className="mt-3 border-t border-[var(--border)] pt-3">
+      <div className="mt-5 border-t border-[var(--border)] pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="badge badge-accent">AI</span>
           <div className="flex flex-wrap gap-1.5">
@@ -125,7 +125,7 @@ export function ChatMessage({
 
       {/* Answer with Markdown */}
       {turn.answer ? (
-        <div className="prose prose-sm prose-themed mt-2 max-w-none">
+        <div className="prose prose-sm prose-themed mt-5 max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {turn.answer}
           </ReactMarkdown>
@@ -135,8 +135,8 @@ export function ChatMessage({
       )}
 
       {turn.webSources && turn.webSources.length > 0 ? (
-        <div className="mt-3 space-y-1">
-          <p className="tone-info text-xs font-medium">Web Sources</p>
+        <div className="mt-6 space-y-1.5">
+          <p className="section-label section-label-sub mb-3">Web Sources</p>
           {turn.webSources
             .filter((source) => /^https?:\/\//i.test(source.url))
             .map((source) => (
@@ -145,7 +145,7 @@ export function ChatMessage({
                 href={source.url}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="badge-info block rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-90"
+                className="badge-info block border px-3 py-2 text-xs transition hover:opacity-80"
               >
                 {source.title}
               </a>
@@ -153,14 +153,14 @@ export function ChatMessage({
         </div>
       ) : null}
       {!turn.pending && !turn.failed && turn.queryHistoryId ? (
-        <div className="mt-3 flex gap-2" data-testid="report-downloads">
+        <div className="mt-6 flex gap-2" data-testid="report-downloads">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               downloadReport(turn.queryHistoryId!, "docx");
             }}
-            className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
+            className="btn-secondary px-3 py-1.5 text-[10px]"
           >
             DOCX
           </button>
@@ -170,7 +170,7 @@ export function ChatMessage({
               e.stopPropagation();
               downloadReport(turn.queryHistoryId!, "pdf");
             }}
-            className="btn-secondary rounded-lg px-2.5 py-1 text-xs font-medium active:scale-[0.98]"
+            className="btn-secondary px-3 py-1.5 text-[10px]"
           >
             PDF
           </button>

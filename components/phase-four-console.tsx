@@ -112,28 +112,28 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
   }
 
   return (
-    <section className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="surface-card space-y-8 p-8">
       <div>
-        <h2 className="text-lg font-semibold">Security Console</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="display-4">Security Console</h2>
+        <p className="fg-secondary mt-2 text-sm">
           Session creation, role-gated actions, and secured API routes.
         </p>
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium">Current Session</p>
-        <p className="text-sm text-slate-700">
+        <p className="section-label section-label-sub">Current Session</p>
+        <p className="fg-secondary text-sm">
           {user ? `user=${user.id}, role=${user.role}, email=${user.email ?? "n/a"}` : "No active session"}
         </p>
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium" htmlFor="token">
+        <label className="label-caps block" htmlFor="token">
           Access Token
         </label>
         <input
           id="token"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="input-surface w-full px-3 py-2 text-sm"
           placeholder="Paste Supabase access token"
           value={token}
           onChange={(event) => setToken(event.target.value)}
@@ -141,14 +141,14 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+            className="btn-primary px-4 py-2 text-[11px]"
             onClick={createSession}
           >
             Create Session
           </button>
           <button
             type="button"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
+            className="btn-secondary px-4 py-2 text-[11px]"
             onClick={clearSession}
           >
             Clear Session
@@ -156,10 +156,10 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-slate-200 pt-4">
-        <p className="text-sm font-medium">Query (reader/admin)</p>
+      <div className="space-y-3 border-t border-[var(--border)] pt-6">
+        <p className="section-label section-label-sub">Query (reader/admin)</p>
         <textarea
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="input-surface w-full px-3 py-2 text-sm"
           rows={3}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -167,17 +167,17 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
         />
         <button
           type="button"
-          className="rounded-md bg-cyan-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="btn-primary px-4 py-2 text-[11px] disabled:cursor-not-allowed"
           onClick={executeQuery}
           disabled={!canQuery || query.trim().length === 0}
         >
           Execute Query
         </button>
-        {!canQuery ? <p className="text-xs text-slate-500">Requires role reader or admin.</p> : null}
+        {!canQuery ? <p className="fg-muted text-xs">Requires role reader or admin.</p> : null}
       </div>
 
-      <div className="space-y-2 border-t border-slate-200 pt-4">
-        <p className="text-sm font-medium">Upload (authenticated session)</p>
+      <div className="space-y-3 border-t border-[var(--border)] pt-6">
+        <p className="section-label section-label-sub">Upload (authenticated session)</p>
         <input
           ref={fileInputRef}
           type="file"
@@ -189,21 +189,21 @@ export function PhaseFourConsole({ initialUser }: PhaseFourConsoleProps) {
               void uploadSelectedFile(selected);
             }
           }}
-          className="block w-full text-sm"
+          className="file-input-surface block w-full text-sm"
         />
         <button
           type="button"
-          className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white"
+          className="btn-primary px-4 py-2 text-[11px]"
           onClick={handleUploadButtonClick}
         >
           {file ? "Upload PDF" : "Select PDF"}
         </button>
-        {!canUpload ? <p className="text-xs text-slate-500">Create a session before uploading.</p> : null}
+        {!canUpload ? <p className="fg-muted text-xs">Create a session before uploading.</p> : null}
       </div>
 
-      <div className="space-y-2 border-t border-slate-200 pt-4">
-        <p className="text-sm font-medium">Response</p>
-        <pre className="max-h-72 overflow-auto rounded-md bg-slate-900 p-3 text-xs text-slate-100">
+      <div className="space-y-3 border-t border-[var(--border)] pt-6">
+        <p className="section-label section-label-sub">Response</p>
+        <pre className="surface-muted fg-primary max-h-72 overflow-auto p-4 font-mono text-xs">
           {output || "No response yet"}
         </pre>
       </div>

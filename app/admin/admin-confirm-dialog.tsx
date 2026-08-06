@@ -21,29 +21,34 @@ export function AdminConfirmDialog(props: {
   return (
     <dialog
       ref={dialogRef}
-      className="themed-dialog surface-card rounded-2xl p-6 shadow-xl"
+      className="themed-dialog surface-card p-8"
       onClose={props.onCancel}
     >
       {props.confirmAction ? (
         <div className="min-w-[320px]">
           <p className="fg-primary text-sm">
-            Are you sure you want to <strong>{props.confirmAction.label}</strong>?
+            Are you sure you want to{" "}
+            <strong>{props.confirmAction.label}</strong>?
           </p>
           {props.confirmAction.action === "delete" ? (
-            <p className="tone-danger mt-2 text-sm font-semibold">This action cannot be undone.</p>
+            <p className="tone-danger mt-3 text-sm">
+              This action cannot be undone.
+            </p>
           ) : null}
-          <div className="mt-4 flex gap-2">
+          <div className="mt-8 flex gap-2">
             <button
               onClick={props.onConfirm}
-              className={`active:scale-[0.98] rounded-2xl px-3 py-1 text-xs font-semibold ${
-                props.confirmAction.action === "delete" ? "btn-danger" : "btn-primary"
+              className={`px-4 py-2 text-[11px] ${
+                props.confirmAction.action === "delete"
+                  ? "btn-danger"
+                  : "btn-primary"
               }`}
             >
               Confirm
             </button>
             <button
               onClick={props.onCancel}
-              className="btn-secondary active:scale-[0.98] rounded-2xl px-3 py-1 text-xs font-semibold"
+              className="btn-secondary px-4 py-2 text-[11px]"
             >
               Cancel
             </button>

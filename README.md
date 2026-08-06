@@ -24,13 +24,14 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 6. [Your Options as a User](#your-options-as-a-user)
 7. [Environment Variables Reference](#environment-variables-reference)
 8. [User Guide](#user-guide)
-9. [Architecture](#architecture)
-10. [Security Architecture](#security-architecture)
-11. [API Reference](#api-reference)
-12. [Testing](#testing)
-13. [Deployment](#deployment)
-14. [Contributing](#contributing)
-15. [License](#license)
+9. [Design System](#design-system)
+10. [Architecture](#architecture)
+11. [Security Architecture](#security-architecture)
+12. [API Reference](#api-reference)
+13. [Testing](#testing)
+14. [Deployment](#deployment)
+15. [Contributing](#contributing)
+16. [License](#license)
 
 ---
 
@@ -109,7 +110,7 @@ This system prioritizes **correctness and trustworthiness** over speed or exhaus
 
 - Speed over accuracy — If the system needs 8 seconds to fetch the best evidence, that's better than 500ms of a wrong answer.
 - Covering everything — The system stops after finding the top few most relevant chunks, not searching for every possible mention.
-- Prettiness — The UI is functional and clear, not designed to impress.
+- Decoration — The UI follows the Rautaki corporate design: editorial, rectilinear and restrained. Every visual choice serves clarity, not impression. See [Design System](#design-system).
 
 ---
 
@@ -609,6 +610,50 @@ Store your own API keys for OpenAI, Cohere, and Anthropic in the **Key Vault** p
 Admins see an **Admin** link in the navigation. The panel shows a paginated table of all users with current roles. Role changes take effect immediately without requiring a user sign-out.
 
 > **Example:** A new analyst signs up. Visit `/admin`, find their entry under **Pending**, click **Approve**. They are immediately redirected from `/pending-approval` into the workbench on their next page load.
+
+---
+
+## Design System
+
+The interface follows the **Rautaki corporate design** — editorial, rectilinear and restrained.
+The full specification lives in **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)**; read it before
+adding UI. The essentials:
+
+**Palette.** Eight colours, and only these eight: Gold `#f5a623`, Gold Light `#ffd07a`,
+Obsidian `#0a0a0a`, Ink `#1c1c1c`, Cream `#f4f2ee`, White `#fafafa`, Warm Grey `#e8e5df`,
+Mid Grey `#9a9590`. They are declared once as brand constants in `app/globals.css`.
+
+**The Gold Rule.** One gold element per visual unit — gold is precious because it is rare, and it is
+never a large-area background. The token layer enforces this by splitting `--accent` (gold; primary
+buttons, active states, section rules, focus) from `--emphasis*` (ink/warm-grey; the many quiet
+hover borders, soft fills and secondary badges that would otherwise all turn gold).
+
+**Typography.** Georgia at weight 400 for all display type, always with negative tracking — use the
+`.display-1` … `.display-5` classes rather than hand-rolling a heading. DM Sans (300/400/500) for
+body and UI. The signature gesture is `.gold-italic`: one or two italic gold words inside a serif
+heading.
+
+**Edges.** Zero border-radius everywhere. No shadows, no backdrop blur — depth comes from hairlines
+and surface value. Spacing runs on a 4px grid.
+
+### Themes
+
+Two themes, selectable from the nav and every auth page, persisted in `localStorage` under
+`rag.workspace.theme` and applied pre-paint via a blocking script in `app/layout.tsx` (no flash of
+wrong theme). They are the light and dark renderings of one identity, so both carry the same gold
+accent.
+
+| Theme               | id      | Ground    | Text      | Accent    |
+| ------------------- | ------- | --------- | --------- | --------- |
+| **Cream** (default) | `light` | `#f4f2ee` | `#1c1c1c` | `#f5a623` |
+| **Obsidian**        | `dark`  | `#0a0a0a` | `#fafafa` | `#f5a623` |
+
+### Documented exceptions
+
+Two deliberate departures, both because this is an operational console rather than client collateral:
+a desaturated **functional status palette** (success/warning/danger/info) for ingestion state and
+failures, used for state only and never decoratively; and **JetBrains Mono** for chunk IDs, JSON and
+`<pre>` blocks.
 
 ---
 

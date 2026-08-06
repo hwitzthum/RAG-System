@@ -40,7 +40,10 @@ function LoginFormInner() {
         // failure — surface it as a notice so the user knows to check their
         // inbox instead of retrying a password that was never the problem.
         if (serverData.code === "email_not_confirmed") {
-          setNotice(serverData.error ?? "Please confirm your email address before signing in.");
+          setNotice(
+            serverData.error ??
+              "Please confirm your email address before signing in.",
+          );
           return;
         }
         setError(serverData.error ?? "Login failed");
@@ -57,7 +60,10 @@ function LoginFormInner() {
 
       // Step 2: Create Supabase browser session (sets cookies for middleware)
       const supabase = getSupabaseBrowserClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (authError) {
         setError(authError.message);
@@ -65,7 +71,8 @@ function LoginFormInner() {
       }
 
       const next = searchParams?.get("next") || serverData.redirect || "/";
-      const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      const safeNext =
+        next.startsWith("/") && !next.startsWith("//") ? next : "/";
       router.push(safeNext);
       router.refresh();
     } finally {
@@ -78,33 +85,37 @@ function LoginFormInner() {
 
   return (
     <>
-      <h1 className="fg-primary text-3xl font-bold">Sign In</h1>
-      <p className="fg-secondary mt-2 text-sm">Enter your credentials to access the workspace.</p>
+      <h1 className="display-2">Sign In</h1>
+      <p className="fg-secondary mt-4 text-sm">
+        Enter your credentials to access the workspace.
+      </p>
 
       {confirmed && (
-        <p className="badge badge-accent mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
+        <p className="callout callout-success mt-8">
           Email confirmed — you can now sign in.
         </p>
       )}
       {urlError === "suspended" && (
-        <p className="badge badge-danger mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
+        <p className="callout callout-danger mt-8">
           Your account has been suspended. Contact an administrator.
         </p>
       )}
       {urlError === "rejected" && (
-        <p className="badge badge-danger mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
-          Your account request has been declined. Contact an administrator if you believe this is an error.
+        <p className="callout callout-danger mt-8">
+          Your account request has been declined. Contact an administrator if
+          you believe this is an error.
         </p>
       )}
       {urlError === "confirmation_failed" && (
-        <p className="badge badge-danger mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
-          Email confirmation failed or the link has expired. Please try signing up again.
+        <p className="callout callout-danger mt-8">
+          Email confirmation failed or the link has expired. Please try signing
+          up again.
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-10 space-y-6">
         <div>
-          <label htmlFor="email" className="fg-secondary block text-xs font-medium">
+          <label htmlFor="email" className="label-caps block">
             Email
           </label>
           <input
@@ -114,12 +125,12 @@ function LoginFormInner() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+            className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="fg-secondary block text-xs font-medium">
+          <label htmlFor="password" className="label-caps block">
             Password
           </label>
           <input
@@ -129,23 +140,27 @@ function LoginFormInner() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+            className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             placeholder="Enter your password"
           />
         </div>
 
         {notice && (
-          <p className="badge badge-accent flex rounded-2xl px-4 py-2.5 text-sm font-medium" role="status" aria-live="polite">
+          <p className="callout" role="status" aria-live="polite">
             {notice}
           </p>
         )}
 
-        {error && <p className="tone-danger text-sm" role="alert" aria-live="assertive">{error}</p>}
+        {error && (
+          <p className="tone-danger text-sm" role="alert" aria-live="assertive">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full px-4 py-3 text-[11px] disabled:cursor-not-allowed"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
@@ -154,7 +169,7 @@ function LoginFormInner() {
       <div className="fg-secondary mt-6 space-y-2 text-center text-sm">
         <p>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="link-accent font-semibold">
+          <Link href="/signup" className="link-accent">
             Sign up
           </Link>
         </p>
@@ -170,7 +185,11 @@ function LoginFormInner() {
 
 export default function LoginForm() {
   return (
-    <Suspense fallback={<div className="fg-muted p-4 text-center text-sm">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="fg-muted p-4 text-center text-sm">Loading...</div>
+      }
+    >
       <LoginFormInner />
     </Suspense>
   );

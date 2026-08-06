@@ -5,7 +5,12 @@ import { MessageSquare } from "lucide-react";
 import type { ChatViewProps } from "./types";
 import { ChatMessage } from "./chat-message";
 
-export function ChatView({ turns, activeTurn, setActiveTurnId, downloadReport }: ChatViewProps) {
+export function ChatView({
+  turns,
+  activeTurn,
+  setActiveTurnId,
+  downloadReport,
+}: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,11 +21,20 @@ export function ChatView({ turns, activeTurn, setActiveTurnId, downloadReport }:
 
   if (turns.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center animate-fade-in p-4" id="main-content">
-        <div className="surface-card rounded-[1.75rem] px-8 py-10 text-center">
-          <MessageSquare className="mx-auto h-10 w-10 text-[var(--accent-strong)] opacity-45" />
-          <p className="fg-secondary mt-3 text-sm font-medium">Ask about your documents</p>
-          <p className="fg-muted mt-1 text-xs">
+      <div
+        className="flex flex-1 items-center justify-center animate-fade-in p-8"
+        id="main-content"
+      >
+        <div className="max-w-md">
+          <MessageSquare
+            className="h-8 w-8 text-[var(--text-muted)]"
+            strokeWidth={1}
+          />
+          <hr className="rule-gold mt-8 w-16" />
+          <p className="display-3 mt-6">
+            Ask about your <span className="gold-italic">documents</span>
+          </p>
+          <p className="fg-secondary mt-4 text-sm">
             Upload a PDF and ask questions to get grounded, cited answers.
           </p>
         </div>
@@ -29,7 +43,7 @@ export function ChatView({ turns, activeTurn, setActiveTurnId, downloadReport }:
   }
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-4" id="main-content">
+    <div className="flex-1 space-y-4 overflow-y-auto p-6" id="main-content">
       {turns.map((turn) => (
         <ChatMessage
           key={turn.id}
