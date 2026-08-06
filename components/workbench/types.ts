@@ -72,6 +72,12 @@ export type ChatInputProps = {
 };
 
 export type SidebarLeftProps = {
+  /**
+   * "rail" is the fixed desktop column; "drawer" is the same content as a
+   * mobile overlay. One component serves both so the drawer cannot drift out
+   * of parity with the rail.
+   */
+  variant?: "rail" | "drawer";
   documents: DocumentListItem[];
   documentsLoading: boolean;
   canDeleteDocuments: boolean;
@@ -89,6 +95,8 @@ export type SidebarLeftProps = {
 };
 
 export type SidebarRightProps = {
+  /** See {@link SidebarLeftProps.variant} — same rail/drawer split. */
+  variant?: "rail" | "drawer";
   activeTurn: Turn | null;
   uploadFileInputRef: RefObject<HTMLInputElement | null>;
   handleUploadFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -104,7 +112,12 @@ export type SidebarRightProps = {
   userRole: string | null;
   batchFileInputRef: RefObject<HTMLInputElement | null>;
   handleBatchUpload: (event: ChangeEvent<HTMLInputElement>) => void;
-  batchFiles: Array<{ file: File; status: string; error?: string; documentId?: string }>;
+  batchFiles: Array<{
+    file: File;
+    status: string;
+    error?: string;
+    documentId?: string;
+  }>;
   uploadStatus: UploadStatusSnapshot | null;
   onDeleteDocument: (docId: string) => void;
   workspaceMessage: string;
@@ -146,13 +159,17 @@ export function formatLatency(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
-export function getDocumentDisplayName(doc: { title: string | null; id: string }): string {
+export function getDocumentDisplayName(doc: {
+  title: string | null;
+  id: string;
+}): string {
   return doc.title ?? doc.id.slice(0, 8);
 }
 
 export function getMessageToneClass(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("failed")) return "tone-danger";
-  if (lower.includes("ready") || lower.includes("complete")) return "tone-success";
+  if (lower.includes("ready") || lower.includes("complete"))
+    return "tone-success";
   return "tone-muted";
 }
