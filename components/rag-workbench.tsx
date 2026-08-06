@@ -26,6 +26,7 @@ import { AppNav } from "@/components/layout/app-nav";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ChatView } from "@/components/workbench/chat-view";
 import { ChatInput } from "@/components/workbench/chat-input";
+import { ConfirmDeleteDialog } from "@/components/workbench/confirm-delete-dialog";
 import { SidebarLeft } from "@/components/workbench/sidebar-left";
 import { SidebarRight } from "@/components/workbench/sidebar-right";
 import { DevSessionControls } from "@/components/workbench/dev-session-controls";
@@ -184,6 +185,9 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
   const queryInFlightRef = useRef(false);
   const uploadInFlightRef = useRef(false);
   const deletingDocumentIdsRef = useRef(new Set<string>());
+  const [pendingDeleteDocumentId, setPendingDeleteDocumentId] = useState<
+    string | null
+  >(null);
 
   const canQuery = user?.role === "reader" || user?.role === "admin";
   const canUpload = Boolean(user);
@@ -221,6 +225,20 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
 
     return `${labels.join(", ")} +${effectiveQueryScopeIds.length - labels.length}`;
   }, [effectiveQueryScopeIds, documents]);
+
+  // Falls back to the upload panel's own record: a just-uploaded document can
+  // be deleted from there before the list has refetched.
+  const pendingDeleteDocumentName = useMemo(() => {
+    if (pendingDeleteDocumentId === null) return null;
+    const doc =
+      documents.find((item) => item.id === pendingDeleteDocumentId) ??
+      (uploadStatus?.document.id === pendingDeleteDocumentId
+        ? uploadStatus.document
+        : null);
+    return doc
+      ? getDocumentDisplayName(doc)
+      : pendingDeleteDocumentId.slice(0, 8);
+  }, [pendingDeleteDocumentId, documents, uploadStatus]);
 
   // --- Data loading ---
 
@@ -736,6 +754,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
     await fetchDocuments();
   }
 
+  // Both delete entry points (rail trash, upload panel button) route through
+  // requestDeleteDocument so the irreversible-delete gate cannot be bypassed.
+  function requestDeleteDocument(docId: string): void {
+    if (!canDeleteDocuments) {
+      setWorkspaceMessage("Only admins can delete documents.");
+      return;
+    }
+    setPendingDeleteDocumentId(docId);
+  }
+
   async function handleDeleteDocumentById(docId: string): Promise<void> {
     if (!canDeleteDocuments) {
       setWorkspaceMessage("Only admins can delete documents.");
@@ -1140,7 +1168,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           deletingHistoryIds={deletingHistoryIds}
           queryDocumentScopeIds={queryDocumentScopeIds}
           toggleQueryDocumentScopeId={toggleQueryDocumentScopeId}
-          onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
+          onDeleteDocument={requestDeleteDocument}
           onDeleteHistory={handleDeleteHistoryById}
           onRefreshDocuments={() => void fetchDocuments()}
           queryHistory={queryHistory}
@@ -1199,7 +1227,7 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           handleBatchUpload={(e) => void handleBatchUpload(e)}
           batchFiles={batchFiles}
           uploadStatus={uploadStatus}
-          onDeleteDocument={(id) => void handleDeleteDocumentById(id)}
+          onDeleteDocument={requestDeleteDocument}
           workspaceMessage={workspaceMessage}
           documents={documents}
           documentsLoading={documentsLoading}
@@ -1209,6 +1237,16 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
           providerVaults={providerVaults}
         />
       </div>
+
+      <ConfirmDeleteDialog
+        documentName={pendingDeleteDocumentName}
+        onConfirm={() => {
+          const docId = pendingDeleteDocumentId;
+          setPendingDeleteDocumentId(null);
+          if (docId) void handleDeleteDocumentById(docId);
+        }}
+        onCancel={() => setPendingDeleteDocumentId(null)}
+      />
     </ErrorBoundary>
   );
 }
