@@ -7,9 +7,9 @@ export function DevSessionControls({
   clearSession,
 }: DevSessionControlsProps) {
   return (
-    <div className="nav-surface border-t p-4">
+    <div className="nav-surface border-t p-5">
       <details className="group">
-        <summary className="fg-secondary cursor-pointer text-xs font-medium group-open:mb-3">
+        <summary className="label-caps cursor-pointer group-open:mb-3">
           Dev Session
         </summary>
 
@@ -19,19 +19,19 @@ export function DevSessionControls({
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="Paste Supabase access token"
-              className="input-surface flex-1 rounded-2xl px-3 py-2 text-sm"
+              className="input-surface flex-1 px-3 py-2 text-sm"
             />
             <button
               type="button"
               onClick={createSession}
-              className="btn-primary rounded-2xl px-3 py-2 text-xs font-medium active:scale-[0.98]"
+              className="btn-primary px-4 py-2 text-[10px]"
             >
               Create Session
             </button>
             <button
               type="button"
               onClick={clearSession}
-              className="btn-secondary rounded-2xl px-3 py-2 text-xs font-medium active:scale-[0.98]"
+              className="btn-secondary px-4 py-2 text-[10px]"
             >
               Clear
             </button>

@@ -7,18 +7,28 @@ import type { Role } from "@/lib/auth/types";
 import { getCsrfToken } from "@/lib/security/csrf-client";
 import { AdminConfirmDialog } from "@/app/admin/admin-confirm-dialog";
 import { AdminRuntimeSignals } from "@/app/admin/admin-runtime-signals";
-import { type AdminUser, type ConfirmAction } from "@/app/admin/admin-panel.types";
+import {
+  type AdminUser,
+  type ConfirmAction,
+} from "@/app/admin/admin-panel.types";
 import { AdminUsersTable } from "@/app/admin/admin-users-table";
 
-export default function AdminPanel({ currentUserId }: { currentUserId: string }) {
+export default function AdminPanel({
+  currentUserId,
+}: {
+  currentUserId: string;
+}) {
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [runtimeStatus, setRuntimeStatus] = useState<AdminRuntimeStatusResponse | null>(null);
+  const [runtimeStatus, setRuntimeStatus] =
+    useState<AdminRuntimeStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+    null,
+  );
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -71,7 +81,10 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
         body: JSON.stringify({ role }),
       });
       if (!response.ok) {
-        const msg = await response.json().then((d) => (d as { error?: string }).error).catch(() => null);
+        const msg = await response
+          .json()
+          .then((d) => (d as { error?: string }).error)
+          .catch(() => null);
         throw new Error(msg ?? "Failed to update role");
       }
       const updated = (await response.json()) as AdminUser;
@@ -92,7 +105,10 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
         headers: { "X-CSRF-Token": getCsrfToken() },
       });
       if (!response.ok) {
-        const msg = await response.json().then((d) => (d as { error?: string }).error).catch(() => null);
+        const msg = await response
+          .json()
+          .then((d) => (d as { error?: string }).error)
+          .catch(() => null);
         throw new Error(msg ?? "Failed to delete user");
       }
       setUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -118,17 +134,17 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="fg-primary text-3xl font-bold">User Management</h1>
+          <p className="label-caps">Administration</p>
+          <h1 className="display-2 mt-3">User Management</h1>
         </div>
-        <Link
-          href="/"
-          className="btn-secondary rounded-2xl px-4 py-2 text-sm font-semibold"
-        >
+        <Link href="/" className="btn-secondary px-4 py-2 text-[11px]">
           Back to Workbench
         </Link>
       </div>
+
+      <hr className="rule-gold my-8" />
 
       <AdminRuntimeSignals
         runtimeStatus={runtimeStatus}
@@ -142,9 +158,9 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
       />
 
       {error && (
-        <div className="surface-muted tone-danger mb-4 rounded-2xl px-4 py-3 text-sm">
+        <div className="callout callout-danger mb-6">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 font-semibold underline">
+          <button onClick={() => setError(null)} className="ml-2 underline">
             Dismiss
           </button>
         </div>
@@ -174,7 +190,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: string })
             void fetchRuntimeStatus();
           }}
           disabled={loading || runtimeLoading}
-          className="btn-secondary rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className="btn-secondary px-4 py-2 text-[11px] disabled:opacity-50"
         >
           Refresh All
         </button>

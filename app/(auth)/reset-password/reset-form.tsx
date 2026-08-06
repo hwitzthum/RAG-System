@@ -96,13 +96,13 @@ export default function ResetForm() {
   if (mode === "success-request") {
     return (
       <>
-        <h1 className="fg-primary text-3xl font-bold">Check Your Email</h1>
+        <h1 className="display-2">Check Your Email</h1>
         <p className="fg-secondary mt-4 text-sm leading-relaxed">
           If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link.
         </p>
         <Link
           href="/login"
-          className="btn-primary mt-6 block w-full rounded-2xl px-4 py-2.5 text-center text-sm font-semibold active:scale-[0.98]"
+          className="btn-primary mt-10 block w-full px-4 py-3 text-center text-[11px]"
         >
           Back to Sign In
         </Link>
@@ -113,7 +113,7 @@ export default function ResetForm() {
   if (mode === "success-set") {
     return (
       <>
-        <h1 className="fg-primary text-3xl font-bold">Password Updated</h1>
+        <h1 className="display-2">Password Updated</h1>
         <p className="fg-secondary mt-4 text-sm leading-relaxed">
           Your password has been set. Redirecting to sign in…
         </p>
@@ -124,12 +124,12 @@ export default function ResetForm() {
   if (mode === "set-password") {
     return (
       <>
-        <h1 className="fg-primary text-3xl font-bold">Set New Password</h1>
-        <p className="fg-secondary mt-2 text-sm">Choose a new password for your account.</p>
+        <h1 className="display-2">Set New Password</h1>
+        <p className="fg-secondary mt-4 text-sm">Choose a new password for your account.</p>
 
-        <form onSubmit={handleSetPassword} className="mt-6 space-y-4">
+        <form onSubmit={handleSetPassword} className="mt-10 space-y-6">
           <div>
-            <label htmlFor="password" className="fg-secondary block text-xs font-medium">
+            <label htmlFor="password" className="label-caps block">
               New Password
             </label>
             <input
@@ -140,11 +140,11 @@ export default function ResetForm() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+              className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             />
           </div>
           <div>
-            <label htmlFor="confirm" className="fg-secondary block text-xs font-medium">
+            <label htmlFor="confirm" className="label-caps block">
               Confirm Password
             </label>
             <input
@@ -155,7 +155,7 @@ export default function ResetForm() {
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+              className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             />
           </div>
 
@@ -164,7 +164,7 @@ export default function ResetForm() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-primary w-full px-4 py-3 text-[11px] disabled:cursor-not-allowed"
           >
             {loading ? "Updating…" : "Set Password"}
           </button>
@@ -176,12 +176,12 @@ export default function ResetForm() {
   // Default: request reset email
   return (
     <>
-      <h1 className="fg-primary text-3xl font-bold">Reset Password</h1>
-      <p className="fg-secondary mt-2 text-sm">Enter your email to receive a password reset link.</p>
+      <h1 className="display-2">Reset Password</h1>
+      <p className="fg-secondary mt-4 text-sm">Enter your email to receive a password reset link.</p>
 
-      <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
+      <form onSubmit={handleRequestReset} className="mt-10 space-y-6">
         <div>
-          <label htmlFor="email" className="fg-secondary block text-xs font-medium">
+          <label htmlFor="email" className="label-caps block">
             Email
           </label>
           <input
@@ -191,7 +191,7 @@ export default function ResetForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+            className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             placeholder="you@example.com"
           />
         </div>
@@ -201,13 +201,13 @@ export default function ResetForm() {
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full px-4 py-3 text-[11px] disabled:cursor-not-allowed"
         >
           {loading ? "Sending…" : "Send Reset Link"}
         </button>
       </form>
 
-      <p className="fg-secondary mt-6 text-center text-sm">
+      <p className="fg-secondary mt-8 text-center text-sm">
         <Link href="/login" className="link-accent">
           Back to Sign In
         </Link>

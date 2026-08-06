@@ -12,7 +12,7 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8">
+    <main className="min-h-screen p-6 md:p-12">
       <AdminPanel currentUserId={user.id} />
     </main>
   );

@@ -1113,17 +1113,17 @@ export function RagWorkbench({ initialUser }: RagWorkbenchProps) {
         />
       )}
 
-      <div className="flex h-[calc(100vh-3.5rem)]">
+      <div className="flex h-[calc(100vh-4rem)]">
         {/* Left sidebar - mobile overlay */}
         {mobilePanel === "left" && (
-          <div className="nav-surface fixed inset-y-14 left-0 z-40 w-[280px] border-r lg:hidden">
-            <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+          <div className="nav-surface fixed inset-y-16 left-0 z-40 w-[280px] border-r lg:hidden">
+            <div className="flex h-full flex-col gap-6 overflow-y-auto p-4">
               <button
                 type="button"
                 onClick={handleNewConversation}
-                className="btn-primary w-full rounded-2xl px-3 py-2 text-sm font-medium active:scale-[0.98]"
+                className="btn-primary w-full px-3 py-2.5 text-[11px]"
               >
-                + New Chat
+                New Chat
               </button>
               {/* Simplified mobile sidebar content */}
               <p className="fg-muted text-xs">

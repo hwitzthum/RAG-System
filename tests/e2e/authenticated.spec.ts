@@ -1,5 +1,16 @@
-import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
-import { READER_STATE_PATH, READER_TOKEN_PATH, getTestAdminClient, loadToken } from "./auth-states";
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
+import {
+  READER_STATE_PATH,
+  READER_TOKEN_PATH,
+  getTestAdminClient,
+  loadToken,
+} from "./auth-states";
+import { expectNoHorizontalOverflow } from "./layout-assertions";
 
 async function createPdfBuffer(text: string): Promise<Buffer> {
   const { default: PDFDocument } = await import("pdfkit");
@@ -32,7 +43,11 @@ async function triggerIngestionPass(request: APIRequestContext): Promise<void> {
   expect(response.ok()).toBe(true);
 }
 
-async function waitForDocumentReady(request: APIRequestContext, accessToken: string, documentId: string): Promise<void> {
+async function waitForDocumentReady(
+  request: APIRequestContext,
+  accessToken: string,
+  documentId: string,
+): Promise<void> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     await triggerIngestionPass(request);
 
@@ -49,14 +64,22 @@ async function waitForDocumentReady(request: APIRequestContext, accessToken: str
       return;
     }
 
-    if (payload.document.status === "failed" || payload.latestIngestionJob?.status === "dead_letter") {
-      throw new Error(payload.latestIngestionJob?.last_error ?? `Document ${documentId} failed to ingest`);
+    if (
+      payload.document.status === "failed" ||
+      payload.latestIngestionJob?.status === "dead_letter"
+    ) {
+      throw new Error(
+        payload.latestIngestionJob?.last_error ??
+          `Document ${documentId} failed to ingest`,
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
-  throw new Error(`Document ${documentId} did not reach ready within the smoke timeout`);
+  throw new Error(
+    `Document ${documentId} did not reach ready within the smoke timeout`,
+  );
 }
 
 async function cleanupSmokeDocument(documentId: string): Promise<void> {
@@ -78,21 +101,33 @@ async function cleanupSmokeDocument(documentId: string): Promise<void> {
 
 /** Click the Upload tab in the right sidebar to reveal upload controls */
 async function clickUploadTab(page: Page): Promise<void> {
-  await page.locator("aside button").filter({ hasText: /^Upload$/ }).click();
+  await page
+    .locator("aside button")
+    .filter({ hasText: /^Upload$/ })
+    .click();
 }
 
 /** Click the Status tab in the right sidebar */
 async function clickStatusTab(page: Page): Promise<void> {
-  await page.locator("aside button").filter({ hasText: /^Status$/ }).click();
+  await page
+    .locator("aside button")
+    .filter({ hasText: /^Status$/ })
+    .click();
 }
 
-async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> {
+async function uploadSmokePdf(
+  page: Page,
+  uniqueToken: string,
+): Promise<string> {
   const pdfBuffer = await createPdfBuffer(
     `The uploaded document contains the phrase ${uniqueToken}. This line is used for end-to-end retrieval verification.`,
   );
 
   const uploadResponsePromise = page.waitForResponse((response) => {
-    return response.url().endsWith("/api/upload") && response.request().method() === "POST";
+    return (
+      response.url().endsWith("/api/upload") &&
+      response.request().method() === "POST"
+    );
   });
 
   // Click Upload tab to reveal the single-upload-input
@@ -104,7 +139,9 @@ async function uploadSmokePdf(page: Page, uniqueToken: string): Promise<string> 
     buffer: pdfBuffer,
   });
 
-  await expect(page.getByTestId("upload-title-input")).toHaveValue("rag-smoke.pdf");
+  await expect(page.getByTestId("upload-title-input")).toHaveValue(
+    "rag-smoke.pdf",
+  );
   await page.getByTestId("upload-submit-button").click();
 
   const uploadResponse = await uploadResponsePromise;
@@ -121,7 +158,9 @@ test.describe("Authenticated API flows", () => {
     accessToken = loadToken(READER_TOKEN_PATH);
   });
 
-  test("POST /api/query with valid auth returns SSE stream", async ({ request }) => {
+  test("POST /api/query with valid auth returns SSE stream", async ({
+    request,
+  }) => {
     const response = await request.post("/api/query", {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { query: "What is this system about?", topK: 3 },
@@ -134,7 +173,9 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).not.toBe(403);
   });
 
-  test("POST /api/query with enableWebResearch and valid auth succeeds", async ({ request }) => {
+  test("POST /api/query with enableWebResearch and valid auth succeeds", async ({
+    request,
+  }) => {
     const response = await request.post("/api/query", {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { query: "test question", enableWebResearch: true, topK: 3 },
@@ -145,7 +186,9 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).not.toBe(403);
   });
 
-  test("POST /api/query accepts multi-document scope ids", async ({ request }) => {
+  test("POST /api/query accepts multi-document scope ids", async ({
+    request,
+  }) => {
     const response = await request.post("/api/query", {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: {
@@ -166,7 +209,9 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).not.toBe(400);
   });
 
-  test("GET /api/query-history with valid auth returns items array", async ({ request }) => {
+  test("GET /api/query-history with valid auth returns items array", async ({
+    request,
+  }) => {
     const response = await request.get("/api/query-history?limit=5", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -179,7 +224,9 @@ test.describe("Authenticated API flows", () => {
     }
   });
 
-  test("POST /api/upload with valid auth but non-PDF returns 400", async ({ request }) => {
+  test("POST /api/upload with valid auth but non-PDF returns 400", async ({
+    request,
+  }) => {
     const response = await request.post("/api/upload", {
       headers: { Authorization: `Bearer ${accessToken}` },
       multipart: {
@@ -196,7 +243,9 @@ test.describe("Authenticated API flows", () => {
     expect(json.error).toContain("PDF");
   });
 
-  test("POST /api/upload with valid auth but fake PDF magic bytes returns 400", async ({ request }) => {
+  test("POST /api/upload with valid auth but fake PDF magic bytes returns 400", async ({
+    request,
+  }) => {
     const response = await request.post("/api/upload", {
       headers: { Authorization: `Bearer ${accessToken}` },
       multipart: {
@@ -213,7 +262,9 @@ test.describe("Authenticated API flows", () => {
     expect(json.error).toContain("signature");
   });
 
-  test("POST /api/upload with valid auth and real PDF header succeeds or fails gracefully", async ({ request }) => {
+  test("POST /api/upload with valid auth and real PDF header succeeds or fails gracefully", async ({
+    request,
+  }) => {
     // Create minimal valid PDF
     const minimalPdf = Buffer.from(
       "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF",
@@ -236,7 +287,9 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).not.toBe(400);
   });
 
-  test("POST /api/reports with valid auth but missing queryHistoryId returns 400", async ({ request }) => {
+  test("POST /api/reports with valid auth but missing queryHistoryId returns 400", async ({
+    request,
+  }) => {
     const response = await request.post("/api/reports", {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { format: "docx" },
@@ -245,16 +298,23 @@ test.describe("Authenticated API flows", () => {
     expect(response.status()).toBe(400);
   });
 
-  test("POST /api/reports with valid auth but nonexistent queryHistoryId returns 404", async ({ request }) => {
+  test("POST /api/reports with valid auth but nonexistent queryHistoryId returns 404", async ({
+    request,
+  }) => {
     const response = await request.post("/api/reports", {
       headers: { Authorization: `Bearer ${accessToken}` },
-      data: { queryHistoryId: "00000000-0000-0000-0000-000000000000", format: "docx" },
+      data: {
+        queryHistoryId: "00000000-0000-0000-0000-000000000000",
+        format: "docx",
+      },
     });
 
     expect(response.status()).toBe(404);
   });
 
-  test("GET /api/byok/openai with valid auth returns vault status", async ({ request }) => {
+  test("GET /api/byok/openai with valid auth returns vault status", async ({
+    request,
+  }) => {
     const response = await request.get("/api/byok/openai", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -266,7 +326,9 @@ test.describe("Authenticated API flows", () => {
     }
   });
 
-  test("GET /api/byok/cohere with valid auth returns vault status", async ({ request }) => {
+  test("GET /api/byok/cohere with valid auth returns vault status", async ({
+    request,
+  }) => {
     const response = await request.get("/api/byok/cohere", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -278,7 +340,9 @@ test.describe("Authenticated API flows", () => {
     }
   });
 
-  test("GET /api/byok/anthropic with valid auth returns vault status", async ({ request }) => {
+  test("GET /api/byok/anthropic with valid auth returns vault status", async ({
+    request,
+  }) => {
     const response = await request.get("/api/byok/anthropic", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -303,7 +367,9 @@ test.describe("Authenticated Workbench UI", () => {
 
   test("workbench renders after Supabase login", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=Response Workspace")).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator("text=Grounded Answer Operations")).toBeVisible();
 
     // Evidence tab is the default — Evidence Navigator should be visible
@@ -319,7 +385,9 @@ test.describe("Authenticated Workbench UI", () => {
 
   test("workbench has web research toggle", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=Response Workspace")).toBeVisible({
+      timeout: 10_000,
+    });
 
     const toggle = page.locator('[data-testid="web-research-toggle"]');
     await expect(toggle).toBeVisible({ timeout: 10_000 });
@@ -332,7 +400,9 @@ test.describe("Authenticated Workbench UI", () => {
 
   test("workbench has batch upload input", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=Response Workspace")).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Click Upload tab to see batch upload input
     await clickUploadTab(page);
@@ -348,11 +418,19 @@ test.describe("Authenticated Workbench UI", () => {
   test("workbench shows session identity after login", async ({ page }) => {
     await page.goto("/");
     // Storage state includes the reload from setup, so session cookie is already synced
-    await expect(page.locator("text=Signed in as reader")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("text=Signed in as reader")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
-  test("workbench can upload a PDF and answer a grounded query for it", async ({ page, request }) => {
-    test.skip(!process.env.CRON_SECRET, "CRON_SECRET is required for the upload-to-query smoke");
+  test("workbench can upload a PDF and answer a grounded query for it", async ({
+    page,
+    request,
+  }) => {
+    test.skip(
+      !process.env.CRON_SECRET,
+      "CRON_SECRET is required for the upload-to-query smoke",
+    );
     test.setTimeout(180_000);
 
     const accessToken = loadToken(READER_TOKEN_PATH);
@@ -361,33 +439,67 @@ test.describe("Authenticated Workbench UI", () => {
 
     try {
       await page.goto("/");
-      await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator("text=Response Workspace")).toBeVisible({
+        timeout: 15_000,
+      });
 
       documentId = await uploadSmokePdf(page, uniqueToken);
       await waitForDocumentReady(request, accessToken, documentId);
 
       // Click Status tab to check workspace status
       await clickStatusTab(page);
-      await expect(page.getByTestId("workspace-status-message")).toContainText("ready", { timeout: 30_000 });
+      await expect(page.getByTestId("workspace-status-message")).toContainText(
+        "ready",
+        { timeout: 30_000 },
+      );
 
       // Click Upload tab to check upload status panel
       await clickUploadTab(page);
-      await expect(page.getByTestId("upload-status-panel")).toContainText("Status: ready", { timeout: 30_000 });
-      await expect(page.getByTestId("upload-status-panel")).toContainText("Document: rag-smoke.pdf", { timeout: 30_000 });
+      await expect(page.getByTestId("upload-status-panel")).toContainText(
+        "Status: ready",
+        { timeout: 30_000 },
+      );
+      await expect(page.getByTestId("upload-status-panel")).toContainText(
+        "Document: rag-smoke.pdf",
+        { timeout: 30_000 },
+      );
 
-      await page.getByTestId("chat-query-input").fill("What is this document about?");
+      await page
+        .getByTestId("chat-query-input")
+        .fill("What is this document about?");
       await page.getByTestId("chat-send-button").click();
 
       // Click Status tab to check query completion
       await clickStatusTab(page);
-      await expect(page.getByTestId("workspace-status-message")).toContainText("Query complete.", { timeout: 60_000 });
-      await expect(page.getByTestId("chat-turn").last()).toContainText("What is this document about?");
-      await expect(page.getByTestId("chat-turn").last()).not.toContainText("Query failed.");
-      await expect(page.getByTestId("chat-turn").last()).not.toContainText("I do not have enough evidence");
+      await expect(page.getByTestId("workspace-status-message")).toContainText(
+        "Query complete.",
+        { timeout: 60_000 },
+      );
+      await expect(page.getByTestId("chat-turn").last()).toContainText(
+        "What is this document about?",
+      );
+      await expect(page.getByTestId("chat-turn").last()).not.toContainText(
+        "Query failed.",
+      );
+      await expect(page.getByTestId("chat-turn").last()).not.toContainText(
+        "I do not have enough evidence",
+      );
 
       // Switch to Evidence tab to check citation link
-      await page.locator("aside button").filter({ hasText: /^Evidence$/ }).click();
-      await expect(page.locator(`a[href="/api/upload/${documentId}"]`).first()).toBeVisible({ timeout: 30_000 });
+      await page
+        .locator("aside button")
+        .filter({ hasText: /^Evidence$/ })
+        .click();
+      await expect(
+        page.locator(`a[href="/api/upload/${documentId}"]`).first(),
+      ).toBeVisible({ timeout: 30_000 });
+
+      // This is the only place real citation cards render, so it is the only
+      // place their layout can be guarded. See tests/e2e/layout-assertions.ts.
+      await expectNoHorizontalOverflow(
+        page.locator("aside").last(),
+        "Right rail · Evidence tab with citations",
+      );
     } finally {
       if (documentId) {
         await cleanupSmokeDocument(documentId);

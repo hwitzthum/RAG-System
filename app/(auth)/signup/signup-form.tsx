@@ -39,8 +39,8 @@ export default function SignUpForm() {
   if (success) {
     return (
       <>
-        <h1 className="fg-primary text-3xl font-bold">Account Created</h1>
-        <p className="badge badge-accent mt-4 flex rounded-2xl px-4 py-2.5 text-sm font-medium">
+        <h1 className="display-2">Account Created</h1>
+        <p className="callout mt-8">
           Check your inbox and click the confirmation link to verify your email — remember to look in your spam folder. You cannot sign in until your email is confirmed.
         </p>
         <p className="fg-secondary mt-4 text-sm leading-relaxed">
@@ -51,7 +51,7 @@ export default function SignUpForm() {
         </p>
         <Link
           href="/login"
-          className="btn-primary mt-6 block w-full rounded-2xl px-4 py-2.5 text-center text-sm font-semibold active:scale-[0.98]"
+          className="btn-primary mt-10 block w-full px-4 py-3 text-center text-[11px]"
         >
           Go to Sign In
         </Link>
@@ -61,12 +61,12 @@ export default function SignUpForm() {
 
   return (
     <>
-      <h1 className="fg-primary text-3xl font-bold">Create Account</h1>
-      <p className="fg-secondary mt-2 text-sm">Sign up to request access to the retrieval workspace.</p>
+      <h1 className="display-2">Create Account</h1>
+      <p className="fg-secondary mt-4 text-sm">Sign up to request access to the retrieval workspace.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-10 space-y-6">
         <div>
-          <label htmlFor="email" className="fg-secondary block text-xs font-medium">
+          <label htmlFor="email" className="label-caps block">
             Email
           </label>
           <input
@@ -76,12 +76,12 @@ export default function SignUpForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+            className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="fg-secondary block text-xs font-medium">
+          <label htmlFor="password" className="label-caps block">
             Password
           </label>
           <input
@@ -92,7 +92,7 @@ export default function SignUpForm() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input-surface mt-1 w-full rounded-2xl px-3.5 py-2.5 text-sm"
+            className="input-surface mt-2 w-full px-4 py-2.5 text-sm"
             placeholder="At least 6 characters"
           />
         </div>
@@ -102,15 +102,15 @@ export default function SignUpForm() {
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full rounded-2xl px-4 py-2.5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary w-full px-4 py-3 text-[11px] disabled:cursor-not-allowed"
         >
           {loading ? "Creating account..." : "Sign Up"}
         </button>
       </form>
 
-      <p className="fg-secondary mt-6 text-center text-sm">
+      <p className="fg-secondary mt-8 text-center text-sm">
         Already have an account?{" "}
-        <Link href="/login" className="link-accent font-semibold">
+        <Link href="/login" className="link-accent">
           Sign in
         </Link>
       </p>

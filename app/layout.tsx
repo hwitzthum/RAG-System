@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { getThemeInitScript } from "@/lib/theme";
 import "./globals.css";
 
-const inter = Inter({
+// DM Sans carries all UI copy. Georgia — the display face — is a system serif
+// and is declared as --font-serif in globals.css, so it needs no loader.
+const dmSans = DM_Sans({
   subsets: ["latin"],
+  weight: ["300", "400", "500"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -16,8 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RAG Workspace",
-  description: "Professional workspace for secure retrieval operations and evidence-grounded AI responses.",
+  title: "Rautaki · RAG Workspace",
+  description:
+    "Professional workspace for secure retrieval operations and evidence-grounded AI responses.",
 };
 
 export default function RootLayout({
@@ -26,7 +30,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${dmSans.variable} ${jetbrainsMono.variable}`}
+    >
       <body className="antialiased">
         <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {children}

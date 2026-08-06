@@ -37,20 +37,21 @@ test.describe("Phase 1: Supabase Auth", () => {
     await expect(page.locator('a[href="/login"]')).toBeVisible();
   });
 
-  test("theme selector offers five themes and persists across auth pages", async ({ page }) => {
+  test("theme selector offers both Rautaki themes and persists across auth pages", async ({
+    page,
+  }) => {
     const themeSelector = page.getByTestId("theme-selector");
-    const expectedThemes = ["light", "dark", "ocean", "forest", "sunset"] as const;
+    // Cream and Obsidian are the light and dark renderings of one brand
+    // identity, so both carry the same gold accent.
+    const expectedThemes = ["light", "dark"] as const;
     const expectedAccents: Record<(typeof expectedThemes)[number], string> = {
-      light: "#4f46e5",
-      dark: "#60a5fa",
-      ocean: "#14b8a6",
-      forest: "#22c55e",
-      sunset: "#ea580c",
+      light: "#f5a623",
+      dark: "#f5a623",
     };
 
     await page.goto("/login");
     await expect(themeSelector).toBeVisible();
-    await expect(themeSelector.locator("option")).toHaveCount(5);
+    await expect(themeSelector.locator("option")).toHaveCount(2);
 
     for (const theme of expectedThemes) {
       await themeSelector.selectOption(theme);
@@ -59,21 +60,27 @@ test.describe("Phase 1: Supabase Auth", () => {
         .toBe(theme);
       await expect
         .poll(() =>
-          page.evaluate(
-            () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+          page.evaluate(() =>
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--accent")
+              .trim(),
           ),
         )
         .toBe(expectedAccents[theme]);
     }
 
-    await page.goto("/signup", { waitUntil: "domcontentloaded" }).catch(async () => {
-      await page.goto("/signup", { waitUntil: "domcontentloaded" });
-    });
+    await page
+      .goto("/signup", { waitUntil: "domcontentloaded" })
+      .catch(async () => {
+        await page.goto("/signup", { waitUntil: "domcontentloaded" });
+      });
     await expect(page.locator("h1")).toHaveText("Create Account");
-    await expect(page.getByTestId("theme-selector")).toHaveValue("sunset");
+    await expect(page.getByTestId("theme-selector")).toHaveValue("dark");
     await expect
-      .poll(() => page.evaluate(() => window.localStorage.getItem("rag.workspace.theme")))
-      .toBe("sunset");
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("rag.workspace.theme")),
+      )
+      .toBe("dark");
   });
 
   test("login with invalid credentials shows error", async ({ page }) => {
@@ -84,7 +91,11 @@ test.describe("Phase 1: Supabase Auth", () => {
     await page.click('button[type="submit"]');
 
     // Should show error message (rendered with .tone-danger class)
-    await expect(page.locator("text=Invalid login credentials").or(page.locator(".tone-danger"))).toBeVisible({
+    await expect(
+      page
+        .locator("text=Invalid login credentials")
+        .or(page.locator(".tone-danger")),
+    ).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -101,10 +112,14 @@ test.describe("Phase 1: Supabase Auth", () => {
 
     // Button should briefly show "Signing in..." before the request completes
     // We use a short timeout since it may resolve quickly
-    await expect(submitButton).toHaveText(/Signing in|Sign In/, { timeout: 5000 });
+    await expect(submitButton).toHaveText(/Signing in|Sign In/, {
+      timeout: 5000,
+    });
   });
 
-  test("API routes are accessible without redirect (handle own auth)", async ({ page }) => {
+  test("API routes are accessible without redirect (handle own auth)", async ({
+    page,
+  }) => {
     const response = await page.goto("/api/health");
     expect(response?.status()).toBe(200);
     const json = await response?.json();
