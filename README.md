@@ -19,20 +19,21 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 1. [How It Works (Plain English)](#how-it-works-plain-english)
 2. [Quality Goals](#quality-goals)
 3. [Key Features](#key-features)
-4. [Quick Start](#quick-start)
-5. [Practical Usage Examples](#practical-usage-examples)
-6. [Your Options as a User](#your-options-as-a-user)
-7. [Environment Variables Reference](#environment-variables-reference)
-8. [LLM Tracing (Langfuse)](#llm-tracing-langfuse)
-9. [User Guide](#user-guide)
-10. [Design System](#design-system)
-11. [Architecture](#architecture)
-12. [Security Architecture](#security-architecture)
-13. [API Reference](#api-reference)
-14. [Testing](#testing)
-15. [Deployment](#deployment)
-16. [Contributing](#contributing)
-17. [License](#license)
+4. [Understanding the System (A Complete Guide for Non-Technical Readers)](#understanding-the-system-a-complete-guide-for-non-technical-readers)
+5. [Quick Start](#quick-start)
+6. [Practical Usage Examples](#practical-usage-examples)
+7. [Your Options as a User](#your-options-as-a-user)
+8. [Environment Variables Reference](#environment-variables-reference)
+9. [LLM Tracing (Langfuse)](#llm-tracing-langfuse)
+10. [User Guide](#user-guide)
+11. [Design System](#design-system)
+12. [Architecture](#architecture)
+13. [Security Architecture](#security-architecture)
+14. [API Reference](#api-reference)
+15. [Testing](#testing)
+16. [Deployment](#deployment)
+17. [Contributing](#contributing)
+18. [License](#license)
 
 ---
 
@@ -161,6 +162,424 @@ This system prioritizes **correctness and trustworthiness** over speed or exhaus
 </td>
 </tr>
 </table>
+
+---
+
+## Understanding the System (A Complete Guide for Non-Technical Readers)
+
+This section explains, without assuming any technical background, what this
+application does, how it was built, how we know it works, and what the
+observability tooling gives you. It is longer than a typical README section on
+purpose: the goal is that someone who has never seen the code can finish it with
+an accurate mental model of the whole system.
+
+If you only read one paragraph: **this app answers questions about your own PDF
+documents, shows you exactly which page each fact came from, refuses to answer
+when the documents do not support an answer, and is continuously measured
+against a fixed exam so that changes which quietly make it worse get caught
+before release.**
+
+---
+
+### Part 1 — How the system was built, stage by stage
+
+The application is best understood as four stages. Three of them run every time
+you ask a question; the first runs once per document.
+
+#### Stage 1: Taking documents in ("ingestion")
+
+A PDF is not text. It is a set of drawing instructions — "put this glyph at this
+coordinate" — designed for human eyes. Before anything can search it, it must be
+turned into clean, structured text. That happens in six steps:
+
+1. **The file is checked.** The system looks at the first few bytes to confirm
+   it really is a PDF, and takes a fingerprint (a hash) of the file. If you
+   upload the same document twice, the fingerprint matches and the work is
+   skipped — no duplicate content, no wasted cost.
+2. **Text is extracted page by page.** Page numbers are captured here and
+   carried through every later step. This is what makes citations possible: an
+   answer can only say "page 31" if page 31 was recorded at the very beginning.
+3. **The text is cut into chunks** of roughly 700 tokens — about 500 words —
+   with around 120 tokens of overlap, cutting only at sentence boundaries. The overlap
+   matters: if an important sentence sits exactly on a boundary, it appears at
+   the end of one chunk _and_ the start of the next, so it cannot be lost.
+4. **Each chunk is given a short context header.** A chunk that reads "The limit
+   is 10 per minute" is meaningless on its own. A small AI model writes a
+   one-line description situating the chunk in its document, which is stored
+   alongside it. If that model is unavailable, a simple rule-based header is
+   used instead, so ingestion never stalls.
+5. **Each chunk is turned into an embedding** — a long list of numbers
+   representing the _meaning_ of the text, so passages with similar meaning end
+   up numerically close together. The chunk is stored twice over: once as this
+   embedding, once as ordinary searchable text.
+6. **All of this happens in the background.** Uploading returns immediately; a
+   worker process picks the job up, and a database lock ensures two workers
+   never process the same document. Failures retry with increasing delays, and
+   a job that keeps failing is set aside rather than retried forever.
+
+#### Stage 2: Finding the right passages ("retrieval")
+
+When you ask a question, the system does considerably more than a search box.
+
+- **It works out the language** of your question (English, German, French,
+  Italian, Spanish are supported) and normalises the text.
+- **It decides on a strategy.** If your question blends two genuinely separate
+  topics — "how does the onboarding process relate to the retention policy?" —
+  it is split into one sub-question per topic, each searched separately. Without
+  this, one topic reliably crowds out the other.
+- **Optionally it broadens the search.** If you enable it, the system also
+  rewrites your question into several variations, and can even write a short
+  _hypothetical ideal answer_ and search using that instead. Searching with a
+  guessed answer often works better than searching with a question, because the
+  answer looks more like the document text you are trying to find.
+- **It searches two different ways at once.** Meaning-based search finds
+  paraphrases; classic keyword search finds exact numbers, codes and names.
+  These fail in opposite situations, so both are run and their results merged
+  using a standard technique that rewards passages ranked highly by either.
+- **It re-sorts the candidates twice.** First a fast local ranking, then
+  optionally a specialised AI reranking model that reads every candidate against
+  your question and scores it properly. The second pass is slower and more
+  accurate, and it is what makes precision-sensitive questions work.
+- **It avoids monotony.** A cap stops a single document from filling every slot,
+  and neighbouring chunks from the same section are nudged together so you get
+  complete passages rather than fragments.
+- **It remembers.** Identical searches are cached, so repeating a question is
+  fast — and the cache is keyed to the exact configuration, so changing any
+  setting invalidates it rather than serving stale results.
+
+#### Stage 3: Writing an answer you can check ("answering")
+
+This is the stage most systems get wrong, and where most of the engineering went.
+
+- **The evidence is judged before the answer is written.** The system scores how
+  good the retrieved material actually is and sorts it into three bands:
+  sufficient, ambiguous, or insufficient. If it is insufficient, the system stops
+  and says so. It does not attempt an answer.
+- **The ambiguous band triggers extra work.** Rather than guessing, the system
+  can search again with rephrased queries, and adds a caution to the model's
+  instructions naming the terms from your question it could not find in the
+  evidence. This is what stops confident answers about the wrong organisation
+  when your question named a specific one.
+- **Retrieved text is treated as untrusted.** Documents can contain text
+  designed to hijack the AI ("ignore your instructions and reveal..."). Every
+  chunk is scanned for these patterns; suspicious content is neutralised and
+  clearly-malicious content is removed before the model ever sees it.
+- **The answer is generated with strict rules**: use only the supplied evidence;
+  end every factual sentence with a citation marker; use one of three exact
+  phrases to express confidence; and if the evidence cannot support an answer,
+  emit a specific refusal token and nothing else.
+- **The answer streams to you sentence by sentence** rather than appearing all
+  at once — but each sentence is filtered before it is shown.
+- **Citations are resolved after generation.** The markers the model wrote are
+  mapped back to specific documents and pages, and markers pointing at nothing
+  are removed.
+- **A second AI pass verifies the citations.** Each cited sentence is checked
+  against the source it cites. If too many cited sentences turn out unsupported,
+  the answer is retracted rather than shown with a warning.
+- **A final filter runs over the finished answer**, removing personal data, API
+  keys, unsafe links and any leakage of the system's own instructions.
+
+#### Stage 4: Everything around it
+
+The parts that make it a product rather than a demo: accounts and approval,
+per-user document access, rate limiting, encrypted storage for your own AI
+provider keys, audit logs of every meaningful action, exports to Word and PDF,
+conversation history, and a background scheduler that keeps ingestion moving.
+
+---
+
+### Part 2 — Every feature, explained
+
+**Working with documents**
+
+| Feature                 | What it means for you                                                         |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| PDF upload              | Add documents one at a time, with an optional title.                          |
+| Batch upload            | Add up to 10 PDFs at once, each with its own live status.                     |
+| Duplicate detection     | Re-uploading the same file is recognised and skipped.                         |
+| File validation         | Files that are not genuinely PDFs are rejected at the door.                   |
+| Page-accurate citations | Every fact traces back to a document and page number.                         |
+| Document deletion       | Remove a document and everything derived from it, behind a confirmation step. |
+| Document scoping        | Restrict a question to specific documents instead of the whole library.       |
+| Ingestion status        | Watch a document move through extraction, chunking and embedding.             |
+
+**Asking questions**
+
+| Feature                       | What it means for you                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Natural-language questions    | Ask as you would ask a colleague.                                                                     |
+| Five languages                | English, German, French, Italian, Spanish — ask in one, source in another.                            |
+| Hybrid search                 | Meaning-based and keyword search run together, so neither paraphrases nor exact figures are missed.   |
+| Query decomposition           | Multi-topic questions are split so both topics get properly researched.                               |
+| Broaden search                | An optional mode that rewrites your question several ways and searches more widely.                   |
+| AI reranking                  | An optional precision pass that reads every candidate passage against your question.                  |
+| Web research                  | Optionally blends live web results with your documents, marked separately so you can tell them apart. |
+| Streaming answers             | The answer appears as it is written.                                                                  |
+| Evidence panel                | See the exact passages the answer was based on.                                                       |
+| Conversation history          | Past questions and answers are saved and can be reopened or deleted.                                  |
+| Refusal when evidence is thin | "I don't have enough evidence" instead of a confident guess.                                          |
+
+**Trust and safety**
+
+| Feature                  | What it means for you                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| Evidence gate            | The system checks its evidence is good enough _before_ answering.                          |
+| Self-correction loop     | Weak evidence triggers a second search and a more cautious prompt.                         |
+| Citation verification    | A second AI pass checks each cited sentence against its source.                            |
+| Prompt-injection defence | Malicious instructions hidden inside documents or web pages are neutralised.               |
+| Output filtering         | Personal data, credentials and unsafe links are stripped from answers.                     |
+| Confidence vocabulary    | The model may only use three fixed phrases to express certainty, so hedging is consistent. |
+| Audit logging            | Every login, upload, question, export and admin action is recorded.                        |
+
+**Accounts and access**
+
+| Feature                    | What it means for you                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Five roles                 | `admin`, `reader`, `pending`, `suspended`, `rejected`.                                      |
+| Approval workflow          | New sign-ups wait for an administrator rather than getting instant access.                  |
+| Admin panel                | Approve, promote, suspend or reactivate users.                                              |
+| Per-user document access   | Readers only ever search documents they are entitled to see.                                |
+| Bring your own keys        | Store your own OpenAI, Cohere or Anthropic keys, encrypted, used instead of the platform's. |
+| Rate limiting              | Protects the system and your API budget from runaway usage.                                 |
+| CSRF and session hardening | Standard protections against a hostile site acting as you.                                  |
+
+**Getting answers out**
+
+| Feature               | What it means for you                                          |
+| --------------------- | -------------------------------------------------------------- |
+| Word export           | Download any answer as a formatted `.docx`.                    |
+| PDF export            | Download any answer as a formatted PDF.                        |
+| Light and dark themes | A restrained editorial design that follows the Rautaki system. |
+| Mobile layout         | Full functionality on a phone, including both side panels.     |
+
+---
+
+### Part 3 — The golden set: how we know the system actually works
+
+#### The problem it solves
+
+Every part of this system is a judgement call. Should chunks be 500 tokens or
+700? Should the reranker consider 20 candidates or 100? Should the evidence gate
+be strict or lenient? Each choice makes some questions better and others worse,
+and **you cannot tell which by trying a few questions by hand.** Human spot-checks
+find improvements and miss regressions, because nobody re-tests the forty
+questions that used to work.
+
+The golden set is the answer to that. It is a fixed exam the system sits after
+every meaningful change.
+
+#### What it actually is
+
+A file of **63 questions** drawn from the real document corpus, each recorded
+with the answer's correct location and the points a good answer should make:
+
+- **37 German, 26 English** — matching the real corpus, so a change that helps
+  one language and hurts the other cannot hide behind an average.
+- **41 straightforward questions**, answerable from a single passage.
+- **7 multi-topic questions**, which require evidence from more than one place.
+- **15 deliberately unanswerable questions.**
+
+That last group is the clever part. They are questions the documents _cannot_
+answer. A system that invents a plausible response scores badly on them. Without
+unanswerable questions, an eager system that always produces something confident
+would look excellent — because nothing would ever ask it to say "I don't know".
+
+#### How it is made
+
+The questions are generated from the actual corpus: the system samples passages
+from every document and drafts realistic questions and expected answer points
+from them, then writes a human review sheet so a person can check them. This
+matters because a hand-written exam tends to test what the author already knows
+the system does. A corpus-derived exam asks about whatever is genuinely in the
+documents.
+
+#### What it measures
+
+Two different kinds of measurement, deliberately:
+
+**Mechanical measurements** — no AI involved, perfectly repeatable. Did the right
+passage appear in the top five results? How high up? These answer "is retrieval
+finding the right material?"
+
+**Judged measurements** — a second, different AI model reads the answer and the
+evidence and grades it: is every statement actually supported? Does it address
+the question? Was the retrieved context relevant?
+
+The judge is deliberately a **different model family** from the one that writes
+answers, and the benchmark refuses to run if they are the same. A model grading
+its own output rewards its own habits and reports flattering nonsense.
+
+#### The safety rails
+
+Some measurements are **gates**: fall below the threshold and the release fails.
+Faithfulness (are statements actually supported?) must be at least 0.9. Retrieval
+must find the right passage in the top five at least 85% of the time. There are
+also gates on citation quality, on inventing answers to unanswerable questions,
+and on speed.
+
+Others are **report-only** — informative but not blocking, often because they
+have been shown to be unreliable.
+
+#### The fingerprint
+
+Each golden set records a **fingerprint of the corpus it was built from**. If
+documents are re-chunked, the recorded answer locations no longer point anywhere
+real, and every score becomes meaningless. The fingerprint makes that impossible
+to miss: a golden set built from a different corpus is a different golden set,
+and runs against it are not comparable with earlier ones. This is the single most
+important safeguard in the evaluation system, because the failure it prevents —
+silently comparing incomparable numbers — is invisible.
+
+---
+
+### Part 4 — Langfuse: seeing inside the system
+
+#### What Langfuse is
+
+Langfuse is a separate service that acts as a **flight recorder for AI
+applications**. Every time the system does something, it sends a structured
+record of what happened. You then browse those records in a web interface.
+
+This matters because AI systems fail _quietly_. A traditional application that
+breaks throws an error. An AI application that breaks returns a fluent,
+confident, wrong answer — and the logs show a successful request. Without a
+recording of what the model was actually shown, diagnosing that is guesswork.
+
+#### What was integrated
+
+Every meaningful step now reports itself. A single question produces a tree like
+this — a real one, from production:
+
+```
+rag-query                        the whole question
+├─ route-query                   which search strategy was chosen
+│  └─ retrieve-candidates        (once per sub-question)
+│     ├─ embed-query             turning the question into numbers
+│     ├─ search-vector           meaning-based search
+│     ├─ search-keyword          exact-term search
+│     ├─ rerank-candidates       fast local re-sorting
+│     └─ rerank-cross-encoder    the precision AI reranker
+├─ search-web                    live web results, if enabled
+└─ generate-answer               deciding whether and how to answer
+   ├─ guard-retrieved-chunks     scanning documents for hidden instructions
+   ├─ write-answer               the actual answer, with the full prompt
+   ├─ verify-citations           checking each citation
+   └─ filter-output              removing personal data
+```
+
+Each step records how long it took, what went in, what came out, and — for AI
+calls — which model was used, how many tokens it consumed and what it cost.
+The same applies to document ingestion and to benchmark runs.
+
+#### What you can actually do with it
+
+- **See exactly what the AI was shown.** The complete prompt, including every
+  retrieved passage, is recorded. When an answer is wrong, you can tell within
+  seconds whether the model reasoned badly or was simply given the wrong
+  material — completely different problems with completely different fixes.
+- **Understand refusals.** When the system declines to answer, the recording
+  shows the evidence scores that led to that decision.
+- **See what every question costs**, broken down by step, and per user.
+- **Find slow steps.** Each stage is timed, so a slow response can be attributed
+  to a specific stage rather than guessed at.
+- **Replay a conversation.** Questions from one conversation are grouped
+  together.
+- **Spot attacks.** Prompt-injection counts are recorded per question, so
+  malicious content in an uploaded document becomes visible after the fact.
+- **Separate environments.** Local, preview and production traffic are tagged
+  separately, so testing never pollutes production statistics.
+
+#### Editing prompts without a deployment
+
+The instructions given to the AI are stored in Langfuse rather than buried in
+code. A subject-matter expert can adjust the wording in a web interface and it
+takes effect within a minute — no developer, no release.
+
+Three safeguards make that safe:
+
+- **The application cannot be broken by an edit.** The original instructions
+  remain in the code as a fallback and are used automatically if Langfuse is
+  unreachable.
+- **Every answer records which version produced it**, so an edit that helps or
+  hurts is attributable.
+- **The refusal keyword is injected by the code, not written in the editable
+  text.** Had it been editable, changing it would have silently turned every
+  "I don't know" into a normal-looking answer, with no error anywhere.
+
+#### What is sent, and what is protected
+
+Questions, retrieved document text, and answers are all recorded — that is what
+makes the recording useful. Everything passes through a filter that removes
+email addresses, US social security numbers, API keys and access tokens first.
+
+Two honest caveats. The filter recognises _patterns_, so it will not catch
+unstructured personal information such as a name next to a salary figure. And
+retrieval stages record passage identifiers and scores rather than full text, so
+document text appears once — in the prompt — rather than seven times over. If
+your documents are sensitive enough that none of this may leave your
+infrastructure, Langfuse can be self-hosted.
+
+---
+
+### Part 5 — How the golden set and Langfuse work together
+
+They answer different halves of the same question.
+
+**The golden set tells you _whether_ the system is good.** It produces numbers:
+retrieval found the right passage 87% of the time; faithfulness is 0.94.
+
+**Langfuse tells you _why_.** It shows what happened inside any individual
+question.
+
+Historically these lived apart — the numbers in report files, the detail in a
+separate tool, with nothing connecting them. So the golden set is now also
+mirrored into Langfuse as a dataset, and every benchmark run publishes its
+results there. Concretely:
+
+- The exam becomes a **dataset**; each question becomes an **item** with its
+  expected answer location.
+- Each benchmark becomes a **run**, and each question's score is attached to the
+  recording of that question being answered.
+
+The practical effect: when a score drops, you click it and land in the recording
+of the exact question that produced it — the passages retrieved, their scores,
+the prompt, the answer. Diagnosis becomes a click instead of an investigation.
+
+Three deliberate design decisions are worth knowing:
+
+- **The file remains the source of truth, and the release gate stays local.**
+  Whether a release passes is decided from the local result file, never over the
+  network, so an outage at a third-party service cannot block a release or —
+  worse — wave a bad one through.
+- **The corpus fingerprint is part of the dataset's name.** Re-chunking the
+  corpus creates a _new_ dataset rather than quietly overwriting the exam earlier
+  runs were graded against.
+- **Practice runs never publish.** The harness self-test uses fabricated results;
+  recording those as real would corrupt the history.
+
+---
+
+### Part 6 — The complete picture
+
+1. You upload PDFs. They are validated, split into passages, described,
+   converted to numerical meaning, and stored — in the background.
+2. You ask a question. The system works out what kind of question it is,
+   searches several ways at once, and re-ranks the results for precision.
+3. It grades its own evidence before answering, and refuses rather than guesses.
+   Retrieved text is treated as hostile throughout.
+4. It writes an answer where every factual sentence carries a citation, verifies
+   those citations with a second AI pass, and filters the result.
+5. Everything is recorded in Langfuse — the prompts, the passages, the costs, the
+   decisions.
+6. After every meaningful change, the system sits a 63-question exam. If quality
+   falls below the thresholds, the release fails.
+7. When a score moves, the recording of the exact question that moved it is one
+   click away.
+
+The through-line is that **the system is designed to be checkable**. Citations
+so you can verify an answer. Refusals so it does not bluff. An exam so quality is
+measured rather than assumed. Recordings so failures can be explained rather than
+guessed at.
 
 ---
 
