@@ -2,7 +2,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { propagateAttributes, startActiveObservation } from "@langfuse/tracing";
+import {
+  getActiveTraceId,
+  propagateAttributes,
+  startActiveObservation,
+} from "@langfuse/tracing";
+import { LangfuseClient } from "@langfuse/client";
+import {
+  benchmarkScores,
+  datasetNameForFingerprint,
+} from "../../lib/evaluation/langfuse-dataset";
 import type {
   Citation,
   RetrievedChunk,
@@ -40,6 +49,12 @@ type RunnerArgs = {
   runsDir: string;
   /** Groups this run's per-record traces into one Langfuse session. */
   runId: string;
+  /**
+   * Corpus fingerprint of the golden set actually loaded, resolved after
+   * validation. Identifies which Langfuse dataset this run belongs to; null
+   * disables dataset linking.
+   */
+  corpusFingerprint: string | null;
   mode: RunnerMode;
   topK: number;
   sampleSize: number | null;
@@ -161,6 +176,7 @@ function parseArgs(argv: string[]): RunnerArgs {
     reportsDir: "evaluation/reports",
     runsDir: "evaluation/runs",
     runId: `benchmark-${new Date().toISOString()}`,
+    corpusFingerprint: null,
     mode: "live",
     topK: 8,
     sampleSize: null,
@@ -951,6 +967,85 @@ function deriveScoreScaleComposition(
   return scales.has("cross_encoder") ? "cross_encoder" : "heuristic";
 }
 
+let langfuseClient: LangfuseClient | null = null;
+
+function getLangfuseClient(): LangfuseClient | null {
+  if (!process.env.LANGFUSE_PUBLIC_KEY || !process.env.LANGFUSE_SECRET_KEY) {
+    return null;
+  }
+  langfuseClient ??= new LangfuseClient();
+  return langfuseClient;
+}
+
+/**
+ * Attaches this record's trace to the Langfuse dataset run and publishes its
+ * metrics as scores, so a run can be compared against earlier ones and any
+ * metric can be opened as the retrieval that produced it.
+ *
+ * Never throws. This script gates releases: the gate is computed locally from
+ * the run artifact, and a publishing failure must not change its verdict.
+ */
+async function linkDatasetRun(input: {
+  args: RunnerArgs;
+  query: EvaluationQueryRecord;
+  result: QueryBenchmarkResult;
+  traceId: string | undefined;
+}): Promise<void> {
+  const { args, query, result, traceId } = input;
+
+  // Dry runs execute no retrieval and no model — their numbers are fixtures,
+  // and publishing them as a dataset run would corrupt the comparison history
+  // that the real runs are read against.
+  if (args.mode !== "live" || !args.corpusFingerprint || !traceId) {
+    return;
+  }
+
+  const langfuse = getLangfuseClient();
+  if (!langfuse) {
+    return;
+  }
+
+  try {
+    await langfuse.api.datasetRunItems.create({
+      runName: args.runId,
+      runDescription: `topK=${args.topK}, expansion=${args.expansion}, judge=${args.judge}`,
+      metadata: {
+        topK: args.topK,
+        expansion: args.expansion,
+        judge: args.judge,
+        ignoreExpectedSection: args.ignoreExpectedSection,
+        corpusFingerprint: args.corpusFingerprint,
+        dataset: datasetNameForFingerprint(args.corpusFingerprint),
+      },
+      datasetItemId: query.id,
+      traceId,
+    });
+
+    for (const score of benchmarkScores(result)) {
+      langfuse.score.create({
+        traceId,
+        name: score.name,
+        value: score.value,
+        ...(score.comment ? { comment: score.comment } : {}),
+      });
+    }
+
+    // Flushed per record rather than once at the end. score.create() is
+    // fire-and-forget and batched, and a batch that is dropped surfaces as a
+    // missing score — which, when runs are compared, is indistinguishable from
+    // a genuine metric regression. A measured 3-record run lost two scores from
+    // one record without any error; per-record flushing makes delivery
+    // deterministic, at the cost of one request per record.
+    await langfuse.flush();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `langfuse_dataset_link_failed ${query.id}: ${message}. ` +
+        `If the dataset item is missing, run: npm run obs:dataset:sync`,
+    );
+  }
+}
+
 /**
  * One trace per golden-set record, so a benchmark run reads in Langfuse as a
  * set of comparable traces rather than a single opaque span. `sessionId` is
@@ -986,6 +1081,16 @@ async function evaluateQuery(
               judge: result.judge,
             },
           });
+
+          // Inside the observation so the trace id is the one this record's
+          // work actually wrote to.
+          await linkDatasetRun({
+            args,
+            query,
+            result,
+            traceId: getActiveTraceId(),
+          });
+
           return result;
         },
         { asType: "chain" },
@@ -1196,6 +1301,10 @@ async function run(): Promise<void> {
     minTotalQueries: 25,
     minPerLanguage: 5,
   });
+  // Resolved from the golden set actually loaded, not from configuration, so a
+  // run can only ever be linked to the dataset it was measured against.
+  args.corpusFingerprint = validated.corpusFingerprint;
+
   const selectedRecords = selectRecords(validated.records, args);
 
   if (selectedRecords.length === 0) {
@@ -1350,6 +1459,17 @@ run()
     console.error(`Benchmark runner failed: ${message}`);
     process.exitCode = 1;
   })
-  // Buffered spans are lost if the process exits first, and a gate failure
-  // (exit code 2) is exactly the run whose traces need inspecting.
-  .finally(stopNodeTracing);
+  // Buffered spans and scores are lost if the process exits first, and a gate
+  // failure (exit code 2) is exactly the run whose traces need inspecting.
+  // Scores are batched by the client, so they need their own flush.
+  .finally(async () => {
+    try {
+      await langfuseClient?.flush();
+    } catch (error) {
+      console.warn(
+        "langfuse_score_flush_failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    await stopNodeTracing();
+  });
