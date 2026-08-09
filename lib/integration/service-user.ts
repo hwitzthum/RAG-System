@@ -40,7 +40,11 @@ let inFlight: Promise<Session> | null = null;
 const RENEW_MARGIN_MS = 5 * 60 * 1000;
 
 function required(name: string): string {
-  const value = process.env[name];
+  // Trimmed because these values bypass the Zod schema in lib/config/env.ts:
+  // `anonKey` goes straight into an `apikey` header, where a stray newline is
+  // an illegal header value, and `password` is compared by Supabase verbatim.
+  // A whitespace-only value counts as missing rather than as a credential.
+  const value = process.env[name]?.trim();
   if (!value) {
     throw new ServiceUserError(
       `${name} is required for the dashboard integration`,

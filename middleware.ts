@@ -50,9 +50,11 @@ export async function middleware(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
+  // Trimmed for the same reason as lib/supabase/client.ts: these bypass the
+  // env schema, and the anon key becomes an `apikey` header.
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
     {
       cookies: {
         getAll() {
@@ -104,7 +106,11 @@ export async function middleware(request: NextRequest) {
       const response = NextResponse.redirect(loginUrl);
       // Clear Supabase auth cookies
       for (const cookie of request.cookies.getAll()) {
-        if (cookie.name.startsWith("sb-") || cookie.name === "rag_access_token" || cookie.name === "__Host-rag_access_token") {
+        if (
+          cookie.name.startsWith("sb-") ||
+          cookie.name === "rag_access_token" ||
+          cookie.name === "__Host-rag_access_token"
+        ) {
           response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" });
         }
       }
@@ -147,7 +153,9 @@ export async function middleware(request: NextRequest) {
     const { data: sessionData } = await supabase.auth.getSession();
     if (sessionData.session?.access_token) {
       const isProduction = process.env.NODE_ENV === "production";
-      const cookieName = isProduction ? "__Host-rag_access_token" : "rag_access_token";
+      const cookieName = isProduction
+        ? "__Host-rag_access_token"
+        : "rag_access_token";
       supabaseResponse.cookies.set({
         name: cookieName,
         value: sessionData.session.access_token,
@@ -163,5 +171,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
