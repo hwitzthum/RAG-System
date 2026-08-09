@@ -827,6 +827,253 @@ You don't need a separate monitoring tool — all key metrics are queryable from
 
 ---
 
+#### Understanding Benchmark Report Metrics: Complete Glossary
+
+When you open a benchmark report (`evaluation/reports/latest.md`), you'll see many metrics with names like "nDCG@10" and "Context Precision". This section explains every metric so you understand what the numbers mean.
+
+---
+
+##### **Retrieval Quality Metrics** — _Did we find the right passages?_
+
+**Recall@5** — "Did the correct passage appear in the top 5 results?"
+
+- **Range:** 0 to 1 (0% to 100%)
+- **Target:** ≥ 0.85
+- **Example:** If 85% of questions had the correct answer in the top 5, Recall@5 = 0.85
+- **What it means:** If you need an answer, the system finds it in the first few tries
+- **If it's bad:** Retrieval is missing relevant passages. Fix by increasing Top K or enabling Broaden Search
+
+**nDCG@10** — "How well are the top 10 results ranked?"
+
+- **Range:** 0 to 1 (0% to 100%)
+- **Target:** ≥ 0.8
+- **Meaning:** "Normalized Discounted Cumulative Gain" — a measure of ranking quality. Higher-ranked correct answers are worth more than lower-ranked ones
+- **Example:** If the correct answer is at position 1, that's perfect. If it's at position 5, that's OK. If it's at position 10, that hurts the score
+- **What it means:** Not only do we find the answer, but we rank it high so the user sees it first
+- **If it's bad:** Reranking isn't working well. Try enabling Cross-Encoder Reranking or adjusting the ranking weights
+
+**MRR (Mean Reciprocal Rank)** — "On average, at what position is the correct answer?"
+
+- **Range:** 0 to 1
+- **Target:** Not gated, but should be > 0.8
+- **Example:** If the correct answer is at position 1 half the time and position 2 the other half, MRR ≈ 0.67
+- **What it means:** How quickly users find the right answer (first result = 1.0, second = 0.5, etc.)
+- **If it's bad:** Similar causes to nDCG. Ranking needs improvement
+
+---
+
+##### **Citation Quality Metrics** — _Are the citations correct?_
+
+**Citation Evidence Hit Rate** — "Did we cite passages that actually existed in the documents?"
+
+- **Range:** 0 to 1
+- **Target:** ≥ 0.8
+- **Example:** If 95 out of 100 citations pointed to real passages, hit rate = 0.95
+- **What it means:** When the answer says "[Source 3]", that source actually exists and is relevant
+- **If it's bad:** Either retrieval is returning wrong passages, or the model is citing passages that aren't in the context. Check the failure samples
+
+**Verified Citation Rate** — "Do the cited facts actually appear in the cited passages?"
+
+- **Range:** 0 to 1
+- **Target:** ≥ 0.9
+- **Example:** A second LLM checks each citation: "Does [fact] actually appear in [passage]?" If yes for 95%, rate = 0.95
+- **What it means:** Users can trust citations — when they click a citation link, they'll find the fact there
+- **If it's bad:** The model is citing passages but paraphrasing them beyond what the text says. Adjust the evidence gate to be stricter
+
+**Citation Accuracy (Strict)** — "Does each citation match the exact expected chunk from the golden set?"
+
+- **Range:** 0 to 1
+- **Target:** Not gated (report-only), but ideally > 0.5
+- **Meaning:** Very strict — the citation must match the exact chunk ID from the golden set
+- **What it means:** Even if the citation is correct, if it's a _different_ correct chunk than expected, this metric fails
+- **Note:** This is overly strict and not used for gating. It's kept for continuity only
+
+---
+
+##### **Answer Quality Metrics** — _Is the answer faithful to the evidence?_
+
+**Faithfulness (LLM Judge)** — "Are the statements in the answer actually supported by the retrieved evidence?"
+
+- **Range:** 0 to 1
+- **Target:** ≥ 0.9 (GATED — must pass to release)
+- **Example:** An answer makes 10 statements. A judge LLM checks each one. 9 are supported, 1 is extrapolation. Faithfulness = 0.9
+- **What it means:** Users won't get made-up facts. The answer sticks to what the documents actually say
+- **If it's bad:** The model is extrapolating beyond the evidence. Tighten the evidence gate (make it require stronger passages before answering)
+- **How it's measured:** A separate Claude LLM reads the answer and evidence, and judges whether each statement is supported
+
+**Answer Relevance** — "Does the answer address the user's question?"
+
+- **Range:** 0 to 1
+- **Target:** Not gated, but should be > 0.85
+- **Example:** User asks "What's the rate limit?", answer says "The API rate limit is 1000 requests per minute". Relevance = high
+- **What it means:** The answer actually answers the question (not a tangent)
+- **If it's bad:** Retrieval is finding off-topic passages, or the prompt is steering the model off-topic
+
+**Context Precision** — "Are all the retrieved passages actually relevant to the question?"
+
+- **Range:** 0 to 1
+- **Target:** Not gated, but > 0.6 is good
+- **Example:** If 6 out of 8 retrieved passages are relevant, precision = 0.75
+- **What it means:** The passages retrieved are useful (low precision means junk is mixed in)
+- **If it's bad:** Reranking isn't filtering out irrelevant passages. Enable Cross-Encoder Reranking or lower the retrieval pool size
+
+**Context Recall** — "Did we retrieve passages covering all the answer points?"
+
+- **Range:** 0 to 1
+- **Target:** ≥ 0.99 is ideal, but > 0.9 is acceptable
+- **Example:** A complete answer needs passages A, B, and C. We retrieved all three. Recall = 1.0
+- **What it means:** We didn't miss any important supporting evidence
+- **If it's bad:** Top K is too small. Increase it to retrieve more passages, ensuring we get all necessary evidence
+
+---
+
+##### **Hallucination Control Metrics** — _Does the system make things up?_
+
+**False Answer Rate** — "On unanswerable questions, how often does the system hallucinate?"
+
+- **Range:** 0 to 1
+- **Target:** ≤ 0.1 (10% is acceptable)
+- **Example:** 15 questions have no answer in the documents. System hallucinated on 1 of them. Rate = 0.067 (6.7%)
+- **What it means:** When documents don't have the answer, the system usually admits it (doesn't guess)
+- **If it's bad:** Evidence gate is too loose. Tighten thresholds so the system refuses more often when evidence is weak
+
+**False Abstention Rate** — "On answerable questions, how often does the system refuse to answer?"
+
+- **Range:** 0 to 1
+- **Target:** ≤ 0.05 (5% is acceptable)
+- **Example:** 48 questions have good answers. System refused 1 of them. Rate = 0.021 (2.1%)
+- **What it means:** When information exists, the system usually finds and answers it
+- **If it's bad:** Evidence gate is too strict. Loosen thresholds so the system answers more when evidence exists
+
+**Abstention Rate** — "Overall, how often does the system say 'I don't know'?"
+
+- **Range:** 0 to 1
+- **Target:** ≤ 0.05 (5% is good)
+- **Meaning:** Sum of refusals / total questions
+- **What it means:** The system has confidence when it should, and admits uncertainty when it shouldn't
+
+---
+
+##### **Performance Metrics** — _How fast is the system?_
+
+**Uncached p50 Latency (ms)** — "Typical response time (first request, not cached)"
+
+- **Range:** milliseconds
+- **Target:** < 8000 ms (8 seconds)
+- **Example:** "7110 ms" means typical requests take 7.1 seconds
+- **What it means:** Users wait this long for an answer
+- **If it's bad:** Something is slow. Check which step: embedding, retrieval, LLM, or cross-encoder timeout
+
+**Uncached p95 Latency (ms)** — "Worst-case response time (first request)"
+
+- **Range:** milliseconds
+- **Target:** < 15000 ms (15 seconds)
+- **Meaning:** p95 = 95th percentile (worst 5% of requests)
+- **Example:** "11025 ms" means 95% of requests finish in 11.1 seconds or less
+- **What it means:** Even when something goes slow, users won't wait more than this
+- **If it's bad:** Tail latency is too high. One step (maybe cross-encoder) is timing out. Increase timeout or disable it
+
+**Cached p50 Latency (ms)** — "Typical response time (cached result)"
+
+- **Range:** milliseconds
+- **Target:** < 7000 ms (7 seconds)
+- **Example:** "5806 ms" means cached responses come back in 5.8 seconds
+- **What it means:** When we've seen this question before, it's faster
+- **Note:** Still not instant because we still run citation verification and filtering, just skip retrieval
+
+**Cached p95 Latency (ms)** — "Worst-case cached response time"
+
+- **Range:** milliseconds
+- **Target:** < 12000 ms (12 seconds)
+- **Example:** "8780 ms" means 95% of cached requests finish in 8.8 seconds
+- **What it means:** Even worst-case cached responses are reasonably fast
+
+**Cache Hit Rate** — "What percentage of queries were already cached?"
+
+- **Range:** 0 to 1 (0% to 100%)
+- **Target:** ≥ 0.3 (30% is acceptable, 50%+ is excellent)
+- **Example:** 0.9841 means 98.41% of queries came from cache
+- **What it means:** Most users asking similar questions get instant answers
+- **If it's bad:** Users are asking very diverse questions, or cache TTL is too short. Not a failure — just cache working as expected
+
+---
+
+##### **System Health Metrics** — _Is anything broken?_
+
+**System Error Count** — "How many queries crashed or timed out?"
+
+- **Range:** Count (0, 1, 2, ...)
+- **Target:** 0 (should be 0)
+- **Example:** 0 means no crashes
+- **What it means:** System is stable
+- **If it's bad:** Something is broken. Check logs for errors
+
+**Answer Truncation Rate** — "How many answers were cut off mid-sentence?"
+
+- **Range:** 0 to 1
+- **Target:** 0 (should be 0)
+- **Example:** 0 means no answers were truncated
+- **What it means:** All answers complete properly
+- **If it's bad:** LLM_MAX_OUTPUT_TOKENS is too low. Increase it
+
+**Grounding Score** — "Bag-of-words overlap between answer and retrieved evidence"
+
+- **Range:** 0 to 1
+- **Target:** > 0.95 (report-only, not gated)
+- **Meaning:** Measures if the answer quotes the evidence
+- **Note:** This metric is unreliable — the system is instructed to quote evidence, so high scores just mean it follows instructions. Not useful for quality assessment
+
+**Hallucination Rate** — "Token-overlap metric for hallucination detection"
+
+- **Range:** 0 to 1
+- **Target:** < 0.05 (report-only, not gated)
+- **Note:** Like Grounding Score, this is unreliable. Use Faithfulness (LLM Judge) instead
+
+---
+
+##### **Per-Language Metrics** — _Do all languages perform equally?_
+
+All metrics above are broken down by language (EN, DE, FR, IT, ES) so you can spot language-specific issues.
+
+**What to look for:**
+
+- If EN nDCG is much lower than DE, a change favored one language
+- If DE citations are weaker, the corpus might have translation quality issues
+- If FR/IT/ES show 0 queries, there's no test data for those languages (not tested)
+
+---
+
+##### **Reading the Report: Quick Reference**
+
+When you see `evaluation/reports/latest.md`, here's what to check first:
+
+| Section                    | What to look at                       | What it means               |
+| -------------------------- | ------------------------------------- | --------------------------- |
+| **Threshold Gates**        | All PASS?                             | System quality is good      |
+| **Summary**                | nDCG, Faithfulness, False answer rate | Overall system quality      |
+| **Per-Language**           | EN vs. DE columns                     | Are languages equally good? |
+| **Failure Sample**         | Top 5 failures                        | What are the patterns?      |
+| **Release Recommendation** | "Proceed"?                            | Safe to ship?               |
+
+---
+
+##### **How Metrics Connect: Root Cause Diagnosis**
+
+When a metric is bad, here's how to find the root cause:
+
+| Bad metric               | Likely cause                     | How to fix                                            |
+| ------------------------ | -------------------------------- | ----------------------------------------------------- |
+| Recall@5 low             | Retrieval isn't finding passages | Increase Top K, enable Broaden Search                 |
+| nDCG low but Recall high | Ranking is bad                   | Enable Cross-Encoder Reranking, adjust weights        |
+| Faithfulness low         | Model extrapolating              | Tighten evidence gate, increase evidence requirements |
+| Citation accuracy low    | Citations pointing wrong way     | Check retrieval or model context window               |
+| Latency high             | Something is slow                | Check which step (embedding, LLM, cross-encoder)      |
+| Cache hit low            | Diverse queries or short TTL     | Normal for diverse workloads, or increase TTL         |
+| False answer high        | System guessing on unanswerable  | Tighten evidence gate significantly                   |
+| False abstention high    | System too cautious              | Loosen evidence gate                                  |
+
+---
+
 #### Complete Operations Manual: What to Do, When, and Why
 
 This is your operations calendar — exactly when to run what, what to look for, and when to take action.
