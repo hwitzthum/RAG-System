@@ -22,7 +22,8 @@ export class DeliveryError extends Error {
 
 export function deliveryConfigured(): boolean {
   return Boolean(
-    process.env.RAUTAKI_DASHBOARD_URL && process.env.RAUTAKI_RESULTS_TOKEN,
+    process.env.RAUTAKI_DASHBOARD_URL?.trim() &&
+    process.env.RAUTAKI_RESULTS_TOKEN?.trim(),
   );
 }
 
@@ -47,7 +48,10 @@ export async function deliverAnswer({
   meta: Record<string, unknown>;
   signal?: AbortSignal;
 }): Promise<{ resultId: string; resultUrl: string; replayed: boolean }> {
-  const base = process.env.RAUTAKI_DASHBOARD_URL!.replace(/\/$/, "");
+  // Trimmed before the trailing-slash strip, not after: a trailing newline
+  // leaves the slash mid-string so the regex no longer matches it, and the
+  // newline then lands inside the request URL.
+  const base = process.env.RAUTAKI_DASHBOARD_URL!.trim().replace(/\/$/, "");
 
   const form = new FormData();
   form.set(
@@ -80,7 +84,9 @@ export async function deliverAnswer({
     response = await fetch(`${base}/api/results`, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${process.env.RAUTAKI_RESULTS_TOKEN!}`,
+        // A newline here is not merely wrong, it is an illegal header value:
+        // fetch throws before the request is ever made.
+        authorization: `Bearer ${process.env.RAUTAKI_RESULTS_TOKEN!.trim()}`,
       },
       body: form,
       signal,

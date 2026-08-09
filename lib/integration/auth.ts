@@ -31,9 +31,9 @@ function equal(a: string, b: string): boolean {
  */
 export function configured(): boolean {
   return Boolean(
-    process.env.DASHBOARD_TOKEN &&
-      process.env.DASHBOARD_USER_EMAIL &&
-      process.env.DASHBOARD_USER_PASSWORD,
+    process.env.DASHBOARD_TOKEN?.trim() &&
+    process.env.DASHBOARD_USER_EMAIL?.trim() &&
+    process.env.DASHBOARD_USER_PASSWORD?.trim(),
   );
 }
 
@@ -42,7 +42,11 @@ export function configured(): boolean {
  * malformed or wrong token — nothing here should help a caller narrow it down.
  */
 export function authenticated(request: Request): boolean {
-  const expected = process.env.DASHBOARD_TOKEN;
+  // Trimmed to match the incoming token, which is trimmed below. Without this,
+  // a stray newline on DASHBOARD_TOKEN makes every comparison fail and locks
+  // the dashboard out entirely, with the deliberately vague failure above
+  // giving no hint as to why.
+  const expected = process.env.DASHBOARD_TOKEN?.trim();
   if (!expected) return false;
 
   const header = request.headers.get("authorization");

@@ -48,16 +48,19 @@ export async function GET(request: NextRequest) {
   // session for updateUser(). Exchanging server-side would put the session in
   // HTTP-only cookies invisible to the browser client, AND the middleware would
   // redirect the now-authenticated user away from /reset-password.
-  const isRecovery = type === "recovery" || (next && next.includes("reset-password"));
+  const isRecovery =
+    type === "recovery" || (next && next.includes("reset-password"));
   if (isRecovery) {
     return NextResponse.redirect(`${origin}/reset-password?code=${code}`);
   }
 
   // All other flows (email confirmation, etc.) — exchange server-side.
   const cookieStore = await cookies();
+  // Trimmed for the same reason as lib/supabase/client.ts: these bypass the
+  // env schema, and the anon key becomes an `apikey` header.
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim(),
     {
       cookies: {
         getAll() {
@@ -72,7 +75,8 @@ export async function GET(request: NextRequest) {
     },
   );
 
-  const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data: sessionData, error } =
+    await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     console.error("[auth/callback] code exchange failed:", error.message);
@@ -98,8 +102,12 @@ export async function GET(request: NextRequest) {
       // pattern) leaks the admin email's length via response timing, the same
       // class of bug fixed for CSRF token comparison in lib/security/csrf.ts.
       const key = "admin-email-compare";
-      const confirmedDigest = createHmac("sha256", key).update(confirmedEmail.toLowerCase()).digest();
-      const adminDigest = createHmac("sha256", key).update((env.ADMIN_EMAIL ?? "").toLowerCase()).digest();
+      const confirmedDigest = createHmac("sha256", key)
+        .update(confirmedEmail.toLowerCase())
+        .digest();
+      const adminDigest = createHmac("sha256", key)
+        .update((env.ADMIN_EMAIL ?? "").toLowerCase())
+        .digest();
       return timingSafeEqual(confirmedDigest, adminDigest);
     })()
   ) {
@@ -129,7 +137,8 @@ export async function GET(request: NextRequest) {
         ipAddress,
         metadata: {
           reason: "admin_promote_failed",
-          message: promoteError instanceof Error ? promoteError.message : "unknown",
+          message:
+            promoteError instanceof Error ? promoteError.message : "unknown",
         },
       });
     }
