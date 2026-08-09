@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
+import { propagateAttributes, startActiveObservation } from "@langfuse/tracing";
+import { flushTracing } from "@/lib/observability/langfuse";
 import {
   generateGroundedAnswer,
   generateWebAugmentedAnswer,
@@ -509,384 +511,493 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Narrowing on authResult.ok does not flow into the closures below, and the
+  // streamed work outlives this scope; capture the narrowed user once.
+  const authUser = authResult.user;
+
+  // Serverless runtimes freeze the sandbox as soon as the response completes,
+  // discarding anything still buffered. after() runs once the stream has
+  // closed, which is the last moment spans can still be shipped.
+  after(flushTracing);
+
   return runWithRuntimeSecrets(
     {
       openAiApiKey: userOpenAiApiKey ?? undefined,
       cohereApiKey: userCohereApiKey ?? undefined,
     },
-    async () => {
-      const startedAt = Date.now();
-      const topK = requestBody.topK ?? env.RAG_DEFAULT_TOP_K;
-
-      try {
-        const retrievalResult = await retrieveRankedCandidatesWithRouting({
-          query: requestBody.query,
-          topK,
-          languageHint: requestBody.languageHint,
-          documentIds:
-            scopedDocumentIds && scopedDocumentIds.length > 0
-              ? scopedDocumentIds
-              : undefined,
-          cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
-          enableQueryExpansion: requestBody.enableQueryExpansion,
-        });
-
-        let webSources: WebSource[] = [];
-        if (requestBody.enableWebResearch && env.RAG_WEB_SEARCH_ENABLED) {
-          try {
-            webSources = await performWebResearch(requestBody.query);
-          } catch {
-            // Continue without web sources if search fails.
-          }
-        }
-
-        // The relaxed single-chunk evidence requirement is reserved for scopes
-        // the user explicitly selected. A reader's injected RBAC list (every
-        // document they can access) is not a deliberate scoping decision and
-        // must not weaken the gate.
-        const explicitScopeId =
-          requestedDocumentIds.length > 0 &&
-          scopedDocumentIds &&
-          scopedDocumentIds.length > 0
-            ? scopedDocumentIds.join(",")
-            : null;
-
-        type AnswerResult = Awaited<ReturnType<typeof generateGroundedAnswer>>;
-
-        // Narrowing on authResult.ok does not flow into these closures once
-        // the work moves inside the stream; capture the narrowed user once.
-        const authUser = authResult.user;
-
-        // Meta with answer-dependent fields at their defaults; the `final`
-        // event carries the authoritative values.
-        const buildRetrievalOnlyMeta = () => ({
-          cacheHit: retrievalResult.trace.cacheHit,
-          latencyMs: Date.now() - startedAt,
-          selectedChunkIds: retrievalResult.chunks.map(
-            (chunk) => chunk.chunkId,
-          ),
-          selectedDocumentIds: [
-            ...new Set(retrievalResult.chunks.map((chunk) => chunk.documentId)),
+    async () =>
+      // Applied to the root and inherited by every child observation, so a
+      // trace can be found by user or replayed as a conversation.
+      propagateAttributes(
+        {
+          // Without traceName the trace lands in the Langfuse trace table
+          // with a blank name, which makes it unfilterable.
+          traceName: "rag-query",
+          userId: authUser.id,
+          sessionId: conversationId,
+          tags: [
+            "query",
+            requestBody.enableWebResearch ? "web-research" : "documents-only",
           ],
-          retrievalTrace: retrievalResult.trace,
-          insufficientEvidence: false,
-          conversationId,
-          documentScopeId:
-            scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
-          documentScopeIds: scopedDocumentIds ?? [],
-          rateLimit: {
-            remaining: rate.remaining,
-            retryAfterSeconds: rate.retryAfterSeconds,
-          },
-          promptInjection: {
-            blockedUserQuery: false,
-            suspiciousChunkCount: 0,
-            blockedChunkCount: 0,
-            suspiciousWebSourceCount: 0,
-            blockedWebSourceCount: 0,
-          },
-          outputFilter: {
-            blocked: false,
-            filtered: false,
-            reasons: [] as string[],
-            redactionCount: 0,
-          },
-          queryExpansion: retrievalResult.queryExpansion,
-          citationAttribution: {
-            markerCount: 0,
-            invalidMarkerCount: 0,
-            fellBack: false,
-          },
-          citationVerification: null as
-            AnswerResult["citationVerification"] | null,
-          evidenceAssessment: null as AnswerResult["evidenceAssessment"],
-          answerTruncated: false,
-        });
-
-        const buildFullMeta = (
-          answerResult: AnswerResult,
-          latencyMs: number,
-        ) => ({
-          ...buildRetrievalOnlyMeta(),
-          latencyMs,
-          insufficientEvidence: answerResult.insufficientEvidence,
-          promptInjection: answerResult.promptInjection,
-          outputFilter: answerResult.outputFilter,
-          citationAttribution: answerResult.citationAttribution,
-          citationVerification: answerResult.citationVerification,
-          evidenceAssessment: answerResult.evidenceAssessment,
-          answerTruncated: answerResult.answerTruncated,
-        });
-
-        const persistQueryHistory = async (
-          answerResult: AnswerResult,
-          latencyMs: number,
-        ): Promise<string | undefined> => {
-          const supabase = getSupabaseAdminClient();
-          try {
-            const { data: historyRow, error: historyError } = await supabase
-              .from("query_history")
-              .insert({
-                user_id: authUser.id,
-                conversation_id: conversationId,
-                query: requestBody.query,
-                answer: answerResult.answer,
-                citations: answerResult.citations,
-                latency_ms: latencyMs,
-                cache_hit: retrievalResult.trace.cacheHit,
-              })
-              .select("id")
-              .single();
-
-            if (historyError) {
-              logAuditEvent({
-                action: "query.history.write",
-                actorId: authUser.id,
-                actorRole: authUser.role,
-                outcome: "failure",
-                resource: "query_history",
-                ipAddress,
+          metadata: { role: authUser.role, route: "/api/query" },
+        },
+        async () =>
+          startActiveObservation(
+            "rag-query",
+            async (rootObservation) => {
+              rootObservation.update({
+                input: requestBody.query,
                 metadata: {
-                  reason: "query_history_insert_failed",
-                  message: historyError.message,
+                  topK: requestBody.topK ?? env.RAG_DEFAULT_TOP_K,
+                  languageHint: requestBody.languageHint ?? null,
+                  documentScopeIds: scopedDocumentIds ?? [],
+                  enableQueryExpansion: Boolean(
+                    requestBody.enableQueryExpansion,
+                  ),
+                  queryId,
                 },
               });
-              return undefined;
-            }
-            return historyRow?.id;
-          } catch {
-            // Continue response path if history write fails entirely.
-            return undefined;
-          }
-        };
 
-        const touchByokKeys = (): void => {
-          if (userOpenAiApiKey) {
-            void markUserOpenAiApiKeyUsed(authUser.id).catch((touchError) => {
-              logAuditEvent({
-                action: "openai.byok.touch",
-                actorId: authUser.id,
-                actorRole: authUser.role,
-                outcome: "failure",
-                resource: "openai_byok_vault",
-                ipAddress,
-                metadata: {
-                  reason: "touch_failed",
-                  message:
-                    touchError instanceof Error
-                      ? touchError.message
-                      : "unknown_error",
-                },
-              });
-            });
-          }
+              const startedAt = Date.now();
+              const topK = requestBody.topK ?? env.RAG_DEFAULT_TOP_K;
 
-          if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
-            void markUserCohereApiKeyUsed(authUser.id).catch((touchError) => {
-              logAuditEvent({
-                action: "cohere.byok.touch",
-                actorId: authUser.id,
-                actorRole: authUser.role,
-                outcome: "failure",
-                resource: "cohere_byok_vault",
-                ipAddress,
-                metadata: {
-                  reason: "touch_failed",
-                  message:
-                    touchError instanceof Error
-                      ? touchError.message
-                      : "unknown_error",
-                },
-              });
-            });
-          }
-        };
-
-        const logSuccessAudit = (answerResult: AnswerResult): void => {
-          logAuditEvent({
-            action: "query.execute",
-            actorId: authUser.id,
-            actorRole: authUser.role,
-            outcome: "success",
-            resource: "query",
-            ipAddress,
-            metadata: {
-              conversationId: requestBody.conversationId ?? null,
-              languageHint: requestBody.languageHint ?? null,
-              topK,
-              documentId:
-                scopedDocumentIds?.length === 1 ? scopedDocumentIds[0]! : null,
-              documentIds: scopedDocumentIds ?? [],
-              selectedChunkCount: retrievalResult.chunks.length,
-              selectedDocumentIds: [
-                ...new Set(
-                  retrievalResult.chunks.map((chunk) => chunk.documentId),
-                ),
-              ],
-              cacheHit: retrievalResult.trace.cacheHit,
-              retrievalVersion: retrievalResult.trace.retrievalVersion,
-              retrievalConfigFingerprint:
-                retrievalResult.trace.configFingerprint,
-              insufficientEvidence: answerResult.insufficientEvidence,
-              promptInjection: answerResult.promptInjection,
-              outputFilter: answerResult.outputFilter,
-              queryExpansion: retrievalResult.queryExpansion,
-              citationAttribution: answerResult.citationAttribution,
-              citationVerification: answerResult.citationVerification,
-              evidenceAssessment: answerResult.evidenceAssessment,
-              citationCount: answerResult.citations.length,
-              resolvedConversationId: conversationId,
-              openAiKeySource: userOpenAiApiKey ? "byok_vault" : "server_env",
-              cohereKeySource: userCohereApiKey ? "byok_vault" : "server_env",
-            },
-          });
-        };
-
-        // True streaming: answer generation runs inside the SSE stream so
-        // per-sentence-redacted sentences reach the client as they are
-        // generated. The `final` event stays authoritative — its answer has
-        // passed the full output filter and the client replaces streamed
-        // text with it (which is also how a rare late retraction works).
-        // NOTE: start() is invoked synchronously at construction, inside
-        // runWithRuntimeSecrets, so BYOK runtime secrets propagate into the
-        // streamed LLM call via AsyncLocalStorage.
-        const stream = new ReadableStream<Uint8Array>({
-          start: async (controller) => {
-            let clientGone = false;
-            const emit = (event: string, data: unknown) => {
-              if (clientGone) {
-                return;
-              }
               try {
-                controller.enqueue(encodeSseEvent(event, data));
-              } catch {
-                // Client disconnected mid-stream; keep finishing side
-                // effects (history, audit) without emitting.
-                clientGone = true;
-              }
-            };
+                const retrievalResult =
+                  await retrieveRankedCandidatesWithRouting({
+                    query: requestBody.query,
+                    topK,
+                    languageHint: requestBody.languageHint,
+                    documentIds:
+                      scopedDocumentIds && scopedDocumentIds.length > 0
+                        ? scopedDocumentIds
+                        : undefined,
+                    cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
+                    enableQueryExpansion: requestBody.enableQueryExpansion,
+                  });
 
-            try {
-              emit("meta", {
-                queryId,
-                retrievalMeta: buildRetrievalOnlyMeta(),
-              });
+                let webSources: WebSource[] = [];
+                if (
+                  requestBody.enableWebResearch &&
+                  env.RAG_WEB_SEARCH_ENABLED
+                ) {
+                  try {
+                    webSources = await performWebResearch(requestBody.query);
+                  } catch {
+                    // Continue without web sources if search fails.
+                  }
+                }
 
-              const answerResult =
-                webSources.length > 0
-                  ? await generateWebAugmentedAnswer({
-                      query: requestBody.query,
-                      language: retrievalResult.trace.language,
-                      chunks: retrievalResult.chunks,
-                      minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-                      minRerankScore: env.RAG_MIN_RERANK_SCORE,
-                      minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
-                      maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                      documentScopeId: explicitScopeId,
-                      webSources,
-                      minWebSources: env.RAG_WEB_MIN_SOURCES,
-                      onSentence: (sentence) =>
-                        emit("token", { queryId, token: sentence }),
-                    })
-                  : await generateGroundedAnswer(
-                      {
-                        query: requestBody.query,
-                        language: retrievalResult.trace.language,
-                        chunks: retrievalResult.chunks,
-                        minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
-                        minRerankScore: env.RAG_MIN_RERANK_SCORE,
-                        minHeuristicRelevance: env.RAG_MIN_HEURISTIC_RELEVANCE,
-                        maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
-                        documentScopeId: explicitScopeId,
-                        onSentence: (sentence) =>
-                          emit("token", { queryId, token: sentence }),
+                // The relaxed single-chunk evidence requirement is reserved for scopes
+                // the user explicitly selected. A reader's injected RBAC list (every
+                // document they can access) is not a deliberate scoping decision and
+                // must not weaken the gate.
+                const explicitScopeId =
+                  requestedDocumentIds.length > 0 &&
+                  scopedDocumentIds &&
+                  scopedDocumentIds.length > 0
+                    ? scopedDocumentIds.join(",")
+                    : null;
+
+                type AnswerResult = Awaited<
+                  ReturnType<typeof generateGroundedAnswer>
+                >;
+
+                // Meta with answer-dependent fields at their defaults; the `final`
+                // event carries the authoritative values.
+                const buildRetrievalOnlyMeta = () => ({
+                  cacheHit: retrievalResult.trace.cacheHit,
+                  latencyMs: Date.now() - startedAt,
+                  selectedChunkIds: retrievalResult.chunks.map(
+                    (chunk) => chunk.chunkId,
+                  ),
+                  selectedDocumentIds: [
+                    ...new Set(
+                      retrievalResult.chunks.map((chunk) => chunk.documentId),
+                    ),
+                  ],
+                  retrievalTrace: retrievalResult.trace,
+                  insufficientEvidence: false,
+                  conversationId,
+                  documentScopeId:
+                    scopedDocumentIds?.length === 1
+                      ? scopedDocumentIds[0]!
+                      : null,
+                  documentScopeIds: scopedDocumentIds ?? [],
+                  rateLimit: {
+                    remaining: rate.remaining,
+                    retryAfterSeconds: rate.retryAfterSeconds,
+                  },
+                  promptInjection: {
+                    blockedUserQuery: false,
+                    suspiciousChunkCount: 0,
+                    blockedChunkCount: 0,
+                    suspiciousWebSourceCount: 0,
+                    blockedWebSourceCount: 0,
+                  },
+                  outputFilter: {
+                    blocked: false,
+                    filtered: false,
+                    reasons: [] as string[],
+                    redactionCount: 0,
+                  },
+                  queryExpansion: retrievalResult.queryExpansion,
+                  citationAttribution: {
+                    markerCount: 0,
+                    invalidMarkerCount: 0,
+                    fellBack: false,
+                  },
+                  citationVerification: null as
+                    AnswerResult["citationVerification"] | null,
+                  evidenceAssessment:
+                    null as AnswerResult["evidenceAssessment"],
+                  answerTruncated: false,
+                });
+
+                const buildFullMeta = (
+                  answerResult: AnswerResult,
+                  latencyMs: number,
+                ) => ({
+                  ...buildRetrievalOnlyMeta(),
+                  latencyMs,
+                  insufficientEvidence: answerResult.insufficientEvidence,
+                  promptInjection: answerResult.promptInjection,
+                  outputFilter: answerResult.outputFilter,
+                  citationAttribution: answerResult.citationAttribution,
+                  citationVerification: answerResult.citationVerification,
+                  evidenceAssessment: answerResult.evidenceAssessment,
+                  answerTruncated: answerResult.answerTruncated,
+                });
+
+                const persistQueryHistory = async (
+                  answerResult: AnswerResult,
+                  latencyMs: number,
+                ): Promise<string | undefined> => {
+                  const supabase = getSupabaseAdminClient();
+                  try {
+                    const { data: historyRow, error: historyError } =
+                      await supabase
+                        .from("query_history")
+                        .insert({
+                          user_id: authUser.id,
+                          conversation_id: conversationId,
+                          query: requestBody.query,
+                          answer: answerResult.answer,
+                          citations: answerResult.citations,
+                          latency_ms: latencyMs,
+                          cache_hit: retrievalResult.trace.cacheHit,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (historyError) {
+                      logAuditEvent({
+                        action: "query.history.write",
+                        actorId: authUser.id,
+                        actorRole: authUser.role,
+                        outcome: "failure",
+                        resource: "query_history",
+                        ipAddress,
+                        metadata: {
+                          reason: "query_history_insert_failed",
+                          message: historyError.message,
+                        },
+                      });
+                      return undefined;
+                    }
+                    return historyRow?.id;
+                  } catch {
+                    // Continue response path if history write fails entirely.
+                    return undefined;
+                  }
+                };
+
+                const touchByokKeys = (): void => {
+                  if (userOpenAiApiKey) {
+                    void markUserOpenAiApiKeyUsed(authUser.id).catch(
+                      (touchError) => {
+                        logAuditEvent({
+                          action: "openai.byok.touch",
+                          actorId: authUser.id,
+                          actorRole: authUser.role,
+                          outcome: "failure",
+                          resource: "openai_byok_vault",
+                          ipAddress,
+                          metadata: {
+                            reason: "touch_failed",
+                            message:
+                              touchError instanceof Error
+                                ? touchError.message
+                                : "unknown_error",
+                          },
+                        });
                       },
-                      // The corrective pass is wired only when its flag is
-                      // on, so the disabled configuration cannot even reach
-                      // the second retrieval path.
-                      env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
-                        ? { correctiveRetrieve }
-                        : {},
                     );
-              const latencyMs = Date.now() - startedAt;
+                  }
 
-              emitQueryLatency(latencyMs, { userId: authUser.id });
-              emitCacheHit(retrievalResult.trace.cacheHit, {
-                userId: authUser.id,
-              });
+                  if (userCohereApiKey && env.RAG_CROSS_ENCODER_ENABLED) {
+                    void markUserCohereApiKeyUsed(authUser.id).catch(
+                      (touchError) => {
+                        logAuditEvent({
+                          action: "cohere.byok.touch",
+                          actorId: authUser.id,
+                          actorRole: authUser.role,
+                          outcome: "failure",
+                          resource: "cohere_byok_vault",
+                          ipAddress,
+                          metadata: {
+                            reason: "touch_failed",
+                            message:
+                              touchError instanceof Error
+                                ? touchError.message
+                                : "unknown_error",
+                          },
+                        });
+                      },
+                    );
+                  }
+                };
 
-              const retrievalMeta = buildFullMeta(answerResult, latencyMs);
-              const queryHistoryId = await persistQueryHistory(
-                answerResult,
-                latencyMs,
-              );
-              touchByokKeys();
-              logSuccessAudit(answerResult);
+                const logSuccessAudit = (answerResult: AnswerResult): void => {
+                  logAuditEvent({
+                    action: "query.execute",
+                    actorId: authUser.id,
+                    actorRole: authUser.role,
+                    outcome: "success",
+                    resource: "query",
+                    ipAddress,
+                    metadata: {
+                      conversationId: requestBody.conversationId ?? null,
+                      languageHint: requestBody.languageHint ?? null,
+                      topK,
+                      documentId:
+                        scopedDocumentIds?.length === 1
+                          ? scopedDocumentIds[0]!
+                          : null,
+                      documentIds: scopedDocumentIds ?? [],
+                      selectedChunkCount: retrievalResult.chunks.length,
+                      selectedDocumentIds: [
+                        ...new Set(
+                          retrievalResult.chunks.map(
+                            (chunk) => chunk.documentId,
+                          ),
+                        ),
+                      ],
+                      cacheHit: retrievalResult.trace.cacheHit,
+                      retrievalVersion: retrievalResult.trace.retrievalVersion,
+                      retrievalConfigFingerprint:
+                        retrievalResult.trace.configFingerprint,
+                      insufficientEvidence: answerResult.insufficientEvidence,
+                      promptInjection: answerResult.promptInjection,
+                      outputFilter: answerResult.outputFilter,
+                      queryExpansion: retrievalResult.queryExpansion,
+                      citationAttribution: answerResult.citationAttribution,
+                      citationVerification: answerResult.citationVerification,
+                      evidenceAssessment: answerResult.evidenceAssessment,
+                      citationCount: answerResult.citations.length,
+                      resolvedConversationId: conversationId,
+                      openAiKeySource: userOpenAiApiKey
+                        ? "byok_vault"
+                        : "server_env",
+                      cohereKeySource: userCohereApiKey
+                        ? "byok_vault"
+                        : "server_env",
+                    },
+                  });
+                };
 
-              emit("final", {
-                queryId,
-                answer: answerResult.answer,
-                citations: answerResult.citations,
-                retrievalMeta,
-                webSources: webSources.length ? webSources : undefined,
-                queryHistoryId,
-              });
-              emit("done", { queryId });
-            } catch (error) {
-              const message =
-                error instanceof Error ? error.message : "unknown_error";
-              logAuditEvent({
-                action: "query.execute",
-                actorId: authUser.id,
-                actorRole: authUser.role,
-                outcome: "failure",
-                resource: "query",
-                ipAddress,
-                metadata: {
-                  reason: "answer_generation_failed",
-                  message,
-                },
-              });
-              emit("final", {
-                queryId,
-                answer: "The answer could not be generated. Please retry.",
-                citations: [],
-                retrievalMeta: buildRetrievalOnlyMeta(),
-                error: "answer_generation_failed",
-              });
-              emit("done", { queryId });
-            } finally {
-              try {
-                controller.close();
-              } catch {
-                // Already closed or cancelled.
+                // True streaming: answer generation runs inside the SSE stream so
+                // per-sentence-redacted sentences reach the client as they are
+                // generated. The `final` event stays authoritative — its answer has
+                // passed the full output filter and the client replaces streamed
+                // text with it (which is also how a rare late retraction works).
+                // NOTE: start() is invoked synchronously at construction, inside
+                // runWithRuntimeSecrets, so BYOK runtime secrets propagate into the
+                // streamed LLM call via AsyncLocalStorage.
+                const stream = new ReadableStream<Uint8Array>({
+                  start: async (controller) => {
+                    let clientGone = false;
+                    const emit = (event: string, data: unknown) => {
+                      if (clientGone) {
+                        return;
+                      }
+                      try {
+                        controller.enqueue(encodeSseEvent(event, data));
+                      } catch {
+                        // Client disconnected mid-stream; keep finishing side
+                        // effects (history, audit) without emitting.
+                        clientGone = true;
+                      }
+                    };
+
+                    try {
+                      emit("meta", {
+                        queryId,
+                        retrievalMeta: buildRetrievalOnlyMeta(),
+                      });
+
+                      const answerResult =
+                        webSources.length > 0
+                          ? await generateWebAugmentedAnswer({
+                              query: requestBody.query,
+                              language: retrievalResult.trace.language,
+                              chunks: retrievalResult.chunks,
+                              minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                              minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                              minHeuristicRelevance:
+                                env.RAG_MIN_HEURISTIC_RELEVANCE,
+                              maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                              documentScopeId: explicitScopeId,
+                              webSources,
+                              minWebSources: env.RAG_WEB_MIN_SOURCES,
+                              onSentence: (sentence) =>
+                                emit("token", { queryId, token: sentence }),
+                            })
+                          : await generateGroundedAnswer(
+                              {
+                                query: requestBody.query,
+                                language: retrievalResult.trace.language,
+                                chunks: retrievalResult.chunks,
+                                minEvidenceChunks: env.RAG_MIN_EVIDENCE_CHUNKS,
+                                minRerankScore: env.RAG_MIN_RERANK_SCORE,
+                                minHeuristicRelevance:
+                                  env.RAG_MIN_HEURISTIC_RELEVANCE,
+                                maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
+                                documentScopeId: explicitScopeId,
+                                onSentence: (sentence) =>
+                                  emit("token", { queryId, token: sentence }),
+                              },
+                              // The corrective pass is wired only when its flag is
+                              // on, so the disabled configuration cannot even reach
+                              // the second retrieval path.
+                              env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
+                                ? { correctiveRetrieve }
+                                : {},
+                            );
+                      const latencyMs = Date.now() - startedAt;
+
+                      emitQueryLatency(latencyMs, { userId: authUser.id });
+                      emitCacheHit(retrievalResult.trace.cacheHit, {
+                        userId: authUser.id,
+                      });
+
+                      const retrievalMeta = buildFullMeta(
+                        answerResult,
+                        latencyMs,
+                      );
+                      const queryHistoryId = await persistQueryHistory(
+                        answerResult,
+                        latencyMs,
+                      );
+                      touchByokKeys();
+                      logSuccessAudit(answerResult);
+
+                      // The authoritative answer — the one that passed the
+                      // full output filter — is what the trace reports, not
+                      // the streamed text, which a late retraction can undo.
+                      rootObservation.update({
+                        output: answerResult.answer,
+                        metadata: {
+                          latencyMs,
+                          cacheHit: retrievalResult.trace.cacheHit,
+                          insufficientEvidence:
+                            answerResult.insufficientEvidence,
+                          citationCount: answerResult.citations.length,
+                          queryHistoryId: queryHistoryId ?? null,
+                        },
+                      });
+
+                      emit("final", {
+                        queryId,
+                        answer: answerResult.answer,
+                        citations: answerResult.citations,
+                        retrievalMeta,
+                        webSources: webSources.length ? webSources : undefined,
+                        queryHistoryId,
+                      });
+                      emit("done", { queryId });
+                    } catch (error) {
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : "unknown_error";
+                      logAuditEvent({
+                        action: "query.execute",
+                        actorId: authUser.id,
+                        actorRole: authUser.role,
+                        outcome: "failure",
+                        resource: "query",
+                        ipAddress,
+                        metadata: {
+                          reason: "answer_generation_failed",
+                          message,
+                        },
+                      });
+                      emit("final", {
+                        queryId,
+                        answer:
+                          "The answer could not be generated. Please retry.",
+                        citations: [],
+                        retrievalMeta: buildRetrievalOnlyMeta(),
+                        error: "answer_generation_failed",
+                      });
+                      emit("done", { queryId });
+
+                      rootObservation.update({
+                        output: { error: "answer_generation_failed", message },
+                        level: "ERROR",
+                        statusMessage: message,
+                      });
+                    } finally {
+                      // endOnExit is disabled on the root observation, so this
+                      // is the only place the streamed path closes it. Missing
+                      // it would leave every trace permanently unfinished.
+                      rootObservation.end();
+                      try {
+                        controller.close();
+                      } catch {
+                        // Already closed or cancelled.
+                      }
+                    }
+                  },
+                });
+
+                return sseResponse(stream);
+              } catch (error) {
+                const message =
+                  error instanceof Error ? error.message : "unknown_error";
+                logAuditEvent({
+                  action: "query.execute",
+                  actorId: authResult.user.id,
+                  actorRole: authResult.user.role,
+                  outcome: "failure",
+                  resource: "query",
+                  ipAddress,
+                  metadata: {
+                    reason: "retrieval_failed",
+                    message,
+                  },
+                });
+
+                // Retrieval threw before the stream existed, so nothing downstream
+                // will close the root observation.
+                rootObservation.update({
+                  output: { error: "retrieval_failed", message },
+                  level: "ERROR",
+                  statusMessage: message,
+                });
+                rootObservation.end();
+
+                return NextResponse.json(
+                  { error: "Failed to retrieve ranked chunks" },
+                  { status: 500 },
+                );
               }
-            }
-          },
-        });
-
-        return sseResponse(stream);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "unknown_error";
-        logAuditEvent({
-          action: "query.execute",
-          actorId: authResult.user.id,
-          actorRole: authResult.user.role,
-          outcome: "failure",
-          resource: "query",
-          ipAddress,
-          metadata: {
-            reason: "retrieval_failed",
-            message,
-          },
-        });
-
-        return NextResponse.json(
-          { error: "Failed to retrieve ranked chunks" },
-          { status: 500 },
-        );
-      }
-    },
+            },
+            // The answer is generated inside the SSE stream, long after this
+            // callback returns the Response. Ending on exit would cut the root
+            // span short, before the answer it is supposed to report exists.
+            { asType: "span", endOnExit: false },
+          ),
+      ),
   );
 }

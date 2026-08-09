@@ -1,9 +1,11 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
 import { resolveRelevance } from "@/lib/answering/policy";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 import { retrieveRankedCandidates } from "@/lib/retrieval/service";
 
@@ -38,6 +40,22 @@ export function mergeCandidatePools(
  * and expanding them again would cost branches x variations embedding calls.
  */
 export async function correctiveRetrieve(
+  query: string,
+  language: SupportedLanguage,
+): Promise<RetrievedChunk[]> {
+  return startActiveObservation(
+    "corrective-retrieve",
+    async (observation) => {
+      observation.update({ input: { query, language } });
+      const chunks = await correctiveRetrieveUntraced(query, language);
+      observation.update({ output: summarizeChunks(chunks) });
+      return chunks;
+    },
+    { asType: "span" },
+  );
+}
+
+async function correctiveRetrieveUntraced(
   query: string,
   language: SupportedLanguage,
 ): Promise<RetrievedChunk[]> {

@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   Citation,
   RetrievedChunk,
@@ -59,8 +60,7 @@ const SECRET_PATTERNS = [
 // Always applied (except in `off`). Specific enough not to collide with other
 // dash-separated numeric identifiers: US SSN (XXX-XX-XXXX), excluding
 // SSA-reserved ranges (area 000/666/900-999, group 00, serial 0000).
-const SSN_PATTERN =
-  /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g;
+const SSN_PATTERN = /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g;
 
 const EMAIL_PATTERN =
   /\b[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+\b/g;
@@ -335,11 +335,53 @@ export function redactStreamedSentence(
   return { text: value, halted: false };
 }
 
+/**
+ * Redaction pass for payloads leaving the process as observability data.
+ *
+ * Deliberately `numbers_safe` rather than `strict`: the strict phone pattern
+ * eats grouped figures ("12 500 000" -> "[REDACTED]"), which would destroy
+ * exactly the retrieval detail a trace exists to make debuggable. Emails are
+ * always redacted here — the evidence-email exemption exists because the
+ * caller's own RBAC scope already grants them that address, and a trace
+ * exported to a third-party service is outside that scope.
+ */
+export function maskForTracing(value: string): string {
+  const normalized = stripControlChars(value.normalize("NFKC"));
+  const withoutSecrets = redactSecrets(normalized).value;
+  return redactPii(withoutSecrets, { mode: "numbers_safe" }).value;
+}
+
 export function filterAnswerOutput(input: {
   answer: string;
   citations: Citation[];
   language: SupportedLanguage;
   /** Evidence-aware PII redaction; defaults to env config with no evidence. */
+  pii?: PiiRedactionOptions;
+}): OutputFilterResult {
+  return startActiveObservation(
+    "filter-output",
+    (observation) => {
+      observation.update({ input: input.answer });
+      const result = filterAnswerOutputUntraced(input);
+      observation.update({
+        output: result.answer,
+        metadata: {
+          blocked: result.blocked,
+          filtered: result.filtered,
+          reasons: result.reasons,
+          redactionCount: result.redactionCount,
+        },
+      });
+      return result;
+    },
+    { asType: "guardrail" },
+  );
+}
+
+function filterAnswerOutputUntraced(input: {
+  answer: string;
+  citations: Citation[];
+  language: SupportedLanguage;
   pii?: PiiRedactionOptions;
 }): OutputFilterResult {
   const reasons: string[] = [];

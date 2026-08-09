@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   IngestionRuntimeSettings,
   RuntimeLogger,
@@ -7,6 +8,9 @@ type OpenAiEmbeddingResponse = {
   data?: Array<{
     embedding?: number[];
   }>;
+  usage?: {
+    prompt_tokens?: number;
+  };
   error?: {
     message?: string;
   };
@@ -28,6 +32,42 @@ export class EmbeddingProvider {
       return [];
     }
 
+    // One observation for the whole call rather than one per HTTP batch: the
+    // batching is a rate-limit detail, not a step a reviewer reasons about.
+    return startActiveObservation(
+      "embed-chunks",
+      async (observation) => {
+        observation.update({
+          input: { textCount: texts.length },
+          model: this.settings.embeddingModel,
+          ...(this.settings.embeddingDimensions
+            ? {
+                modelParameters: {
+                  dimensions: this.settings.embeddingDimensions,
+                },
+              }
+            : {}),
+        });
+
+        const { vectors, promptTokens } = await this.embedTextsUntraced(texts);
+
+        observation.update({
+          output: {
+            vectorCount: vectors.length,
+            dimensions: vectors[0]?.length ?? 0,
+          },
+          usageDetails: { input: promptTokens },
+        });
+
+        return vectors;
+      },
+      { asType: "embedding" },
+    );
+  }
+
+  private async embedTextsUntraced(
+    texts: string[],
+  ): Promise<{ vectors: number[][]; promptTokens: number }> {
     if (!this.apiKey) {
       // Previously this silently wrote SHA-256-derived fake vectors that were
       // indistinguishable from real embeddings in the database. Failing the
@@ -42,6 +82,7 @@ export class EmbeddingProvider {
     }
 
     const vectors: number[][] = [];
+    let promptTokens = 0;
     const batchSize = Math.max(1, this.settings.embeddingBatchSize);
 
     for (let index = 0; index < texts.length; index += batchSize) {
@@ -74,12 +115,14 @@ export class EmbeddingProvider {
         throw new Error(message);
       }
 
+      promptTokens += payload.usage?.prompt_tokens ?? 0;
+
       for (const item of payload.data ?? []) {
         const embedding = item.embedding ?? [];
         vectors.push(embedding);
       }
     }
 
-    return vectors;
+    return { vectors, promptTokens };
   }
 }

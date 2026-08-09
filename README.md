@@ -23,15 +23,16 @@ RAG System is a production-ready Retrieval-Augmented Generation platform for tea
 5. [Practical Usage Examples](#practical-usage-examples)
 6. [Your Options as a User](#your-options-as-a-user)
 7. [Environment Variables Reference](#environment-variables-reference)
-8. [User Guide](#user-guide)
-9. [Design System](#design-system)
-10. [Architecture](#architecture)
-11. [Security Architecture](#security-architecture)
-12. [API Reference](#api-reference)
-13. [Testing](#testing)
-14. [Deployment](#deployment)
-15. [Contributing](#contributing)
-16. [License](#license)
+8. [LLM Tracing (Langfuse)](#llm-tracing-langfuse)
+9. [User Guide](#user-guide)
+10. [Design System](#design-system)
+11. [Architecture](#architecture)
+12. [Security Architecture](#security-architecture)
+13. [API Reference](#api-reference)
+14. [Testing](#testing)
+15. [Deployment](#deployment)
+16. [Contributing](#contributing)
+17. [License](#license)
 
 ---
 
@@ -445,11 +446,142 @@ All variables are validated at startup via Zod. Missing required variables throw
 
 ### Observability
 
-| Variable                                | Required | Default | Description                                                                                       |
-| --------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No       | —       | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
-| `INGESTION_BATCH_SIZE`                  | No       | `50`    | Chunks processed per ingestion worker batch                                                       |
-| `INGESTION_LOCK_TIMEOUT_SECONDS`        | No       | `900`   | Distributed lock timeout for ingestion jobs                                                       |
+| Variable                                | Required | Default  | Description                                                                                       |
+| --------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No       | —        | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
+| `INGESTION_BATCH_SIZE`                  | No       | `50`     | Chunks processed per ingestion worker batch                                                       |
+| `INGESTION_LOCK_TIMEOUT_SECONDS`        | No       | `900`    | Distributed lock timeout for ingestion jobs                                                       |
+| `LANGFUSE_PUBLIC_KEY`                   | No       | —        | Langfuse project public key. Tracing is disabled entirely unless both keys are set.               |
+| `LANGFUSE_SECRET_KEY`                   | No       | —        | Langfuse project secret key                                                                       |
+| `LANGFUSE_BASE_URL`                     | No       | EU cloud | `https://cloud.langfuse.com` (EU), `https://us.cloud.langfuse.com` (US), or a self-hosted URL     |
+| `LANGFUSE_TRACING_ENVIRONMENT`          | No       | derived  | Overrides the traced environment. Derived from `VERCEL_ENV`/`NODE_ENV` when unset.                |
+
+---
+
+## LLM Tracing (Langfuse)
+
+Every LLM call, retrieval stage, and guardrail is traced to [Langfuse](https://langfuse.com)
+when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set. With them unset,
+tracing is a no-op — the application behaves exactly as it did before, so
+running without Langfuse credentials is fully supported.
+
+### What gets traced
+
+Three trace types, each one self-contained unit of work:
+
+| Trace             | Created by            | Grouped into a session by |
+| ----------------- | --------------------- | ------------------------- |
+| `rag-query`       | `POST /api/query`     | `conversationId`          |
+| `ingest-document` | One ingestion job     | `documentId`              |
+| `benchmark-query` | One golden-set record | Benchmark run id          |
+
+A `rag-query` trace nests the full pipeline:
+
+```
+rag-query                         input = user query, output = final answer
+├─ route-query                    which expansion strategy ran, and why
+│  ├─ decompose-query             ┐ generations: model, tokens, cost
+│  ├─ generate-query-variations   │ (only the ones the router actually used)
+│  ├─ generate-hypothetical-document ┘
+│  └─ retrieve-candidates         once per branch; reports cache hits
+│     ├─ embed-query              embedding: model + token usage
+│     ├─ search-vector            retriever
+│     ├─ search-keyword           retriever
+│     ├─ rerank-candidates        heuristic ranking + score scale
+│     └─ rerank-cross-encoder     Cohere; flags silent fallbacks
+├─ search-web                     Tavily, when web research is enabled
+└─ generate-answer                CRAG verdict, refusal reasons
+   ├─ guard-retrieved-chunks      prompt-injection counts
+   ├─ corrective-retrieve         only when the ambiguous band fires
+   ├─ write-answer                the full prompt, tokens, cost, TTFT
+   ├─ verify-citations            citation check + its own model cost
+   └─ filter-output               PII redaction and block reasons
+```
+
+Traces carry `userId`, `sessionId`, and `feature` tags, so you can filter by
+user, replay a conversation in the Sessions view, and break costs down per
+feature.
+
+### Data sent to Langfuse
+
+Trace payloads include the user's query, the assembled prompt (with retrieved
+document text), and the generated answer. Everything is passed through a
+masking hook before export, which redacts email addresses, US SSNs, API keys,
+and bearer tokens. Numeric figures are deliberately **not** redacted — the
+strict phone-number pattern would otherwise destroy the very figures a RAG
+system exists to surface.
+
+Retrieval stages record chunk **identity and scores**, not chunk bodies: the
+text the model actually saw appears once, in the `write-answer` prompt, rather
+than being repeated at each of the seven ranking stages.
+
+> **Note:** masking is pattern-based. It will not catch unstructured personal
+> data in document text (for example a name next to a salary). If your corpus
+> contains that and it must not leave your infrastructure, either self-host
+> Langfuse or drop `write-answer`'s input via the `mask` hook in
+> `lib/observability/langfuse.ts`.
+
+### Runtime wiring
+
+Tracing is registered in two places because two runtimes need it:
+
+- **Next.js** — `instrumentation.ts` registers the span processor through
+  `@vercel/otel`. Route handlers call `after(flushTracing)`; without it, the
+  serverless sandbox freezes on response and buffered spans are lost.
+- **Scripts** (ingestion worker, benchmark runner) — `lib/observability/langfuse-node.ts`
+  starts the OpenTelemetry Node SDK and flushes on exit.
+
+The OpenTelemetry Node SDK is deliberately kept out of any module the Next.js
+bundler can reach: it pulls in gRPC exporters that fail to bundle.
+
+### Prompt management
+
+The two answering prompts are managed in Langfuse, so they can be edited and
+versioned in the dashboard without a deploy:
+
+| Prompt name            | Used by                      | Variables                                                                      |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
+| `grounded-answer`      | Document-only answers        | `query`, `language`, `evidence_chunks`, `evidence_caution`, `abstention_token` |
+| `web-augmented-answer` | Answers with web research on | `query`, `language`, `evidence_chunks`, `web_sources`, `abstention_token`      |
+
+Both are `chat` prompts (a system and a user message) fetched by the
+`production` label and cached for 60 seconds, so an edit goes live within a
+minute and steady-state traffic pays no fetch latency. Each generation is
+linked to the prompt version that produced it, so you can compare quality and
+cost across versions in Langfuse.
+
+```bash
+npm run obs:prompts:sync     # seed the prompts (first-time setup / recovery)
+npm run obs:prompts:sync -- --force   # publish a new version from code
+npm run obs:prompts:verify   # assert the managed prompts still render identically
+```
+
+`sync` deliberately **skips prompts that already exist** — Langfuse is the
+source of truth once seeded, and re-uploading on every deploy would silently
+revert dashboard edits. It is not a deploy step.
+
+**Three safety properties worth knowing before you edit a prompt:**
+
+- **Editing cannot take the app down.** The in-code templates in
+  `lib/answering/prompts.ts` remain a complete runnable copy and are used as
+  the fallback whenever Langfuse is unreachable, unconfigured, or has no such
+  prompt. A generation served by the fallback is _not_ linked to a prompt
+  version and is tagged `promptManaged: false`, so it never silently pollutes
+  per-version metrics.
+- **The abstention token is injected from code**, not written into the managed
+  prompt. `{{abstention_token}}` resolves to `INSUFFICIENT_EVIDENCE`, which
+  `isModelAbstention()` matches exactly. Had the literal lived in the prompt,
+  editing it in the UI would have turned every refusal into a normal-looking
+  answer with no error anywhere.
+- **Run `obs:prompts:verify` after a cosmetic edit.** It fails on drift from
+  the in-code templates, on unsubstituted `{{variables}}` (the usual result of
+  renaming one in the UI), and on a missing abstention token.
+
+> Whitespace is load-bearing: the templates are assembled with the same
+> `join("\n\n")` structure the prompts have always used, and the optional
+> `evidence_caution` block carries its own trailing separator. This keeps
+> rendered prompts byte-identical to pre-migration output, so existing
+> benchmark numbers stay comparable.
 
 ---
 

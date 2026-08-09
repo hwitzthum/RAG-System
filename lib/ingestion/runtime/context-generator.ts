@@ -1,4 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  startActiveObservation,
+  updateActiveObservation,
+} from "@langfuse/tracing";
 
 import type {
   ChunkCandidate,
@@ -105,6 +109,10 @@ type OpenAiChatCompletionResponse = {
       content?: string | null;
     };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
   error?: {
     message?: string;
   };
@@ -196,6 +204,23 @@ export class ContextGenerator {
     });
 
     const payload = (await response.json()) as OpenAiChatCompletionResponse;
+
+    updateActiveObservation(
+      {
+        model: this.settings.contextModel,
+        modelParameters: { temperature: 0, max_tokens: 140 },
+        ...(payload.usage
+          ? {
+              usageDetails: {
+                input: payload.usage.prompt_tokens ?? 0,
+                output: payload.usage.completion_tokens ?? 0,
+              },
+            }
+          : {}),
+      },
+      { asType: "generation" },
+    );
+
     if (!response.ok) {
       const message =
         payload.error?.message ??
@@ -307,6 +332,24 @@ export class ContextGenerator {
       messages: [{ role: "user", content }],
     });
 
+    // Cache reads and writes are billed at different rates, so they are
+    // reported separately: collapsing them into `input` would misprice the
+    // document-caching strategy this path exists to exploit.
+    updateActiveObservation(
+      {
+        model: CONTEXT_MODEL,
+        modelParameters: { max_tokens: 140 },
+        usageDetails: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+          cache_creation_input_tokens:
+            response.usage.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: response.usage.cache_read_input_tokens ?? 0,
+        },
+      },
+      { asType: "generation" },
+    );
+
     if (cacheable) {
       // The acceptance test for this whole item: reads staying at zero means
       // the document is being re-billed per chunk, not cached.
@@ -327,6 +370,35 @@ export class ContextGenerator {
   }
 
   private async enrichSingle(
+    chunk: ChunkCandidate,
+    document: DocumentContextMeta,
+  ): Promise<ChunkWithContext> {
+    return startActiveObservation(
+      "generate-chunk-context",
+      async (observation) => {
+        observation.update({
+          input: [{ role: "user", content: chunk.content }],
+          metadata: {
+            chunkIndex: chunk.chunkIndex,
+            contextEnabled: this.settings.contextEnabled,
+          },
+        });
+
+        const enriched = await this.enrichSingleUntraced(chunk, document);
+
+        // Every provider failure falls back to a locally derived context. That
+        // fallback is silent in the output but changes retrieval quality, so
+        // the trace has to distinguish it from a real generation: a heuristic
+        // result carries no model or token usage.
+        observation.update({ output: enriched.context });
+
+        return enriched;
+      },
+      { asType: "generation" },
+    );
+  }
+
+  private async enrichSingleUntraced(
     chunk: ChunkCandidate,
     document: DocumentContextMeta,
   ): Promise<ChunkWithContext> {
@@ -380,6 +452,22 @@ export class ContextGenerator {
   async enrich(
     chunks: ChunkCandidate[],
     document: DocumentContextMeta = { title: null, summary: null },
+  ): Promise<ChunkWithContext[]> {
+    return startActiveObservation(
+      "generate-chunk-contexts",
+      async (observation) => {
+        observation.update({ input: { chunkCount: chunks.length } });
+        const enriched = await this.enrichUntraced(chunks, document);
+        observation.update({ output: { chunkCount: enriched.length } });
+        return enriched;
+      },
+      { asType: "chain" },
+    );
+  }
+
+  private async enrichUntraced(
+    chunks: ChunkCandidate[],
+    document: DocumentContextMeta,
   ): Promise<ChunkWithContext[]> {
     // Process in parallel batches of 5 to balance throughput vs rate limits.
     const BATCH_SIZE = 5;

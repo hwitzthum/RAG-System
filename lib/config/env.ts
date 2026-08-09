@@ -224,6 +224,15 @@ const envSchema = z.object({
   RAG_WEB_SEARCH_MAX_RESULTS: z.coerce.number().int().positive().default(5),
   RAG_MAX_BATCH_UPLOAD_COUNT: z.coerce.number().int().positive().default(10),
   COHERE_API_KEY: z.string().min(1).optional(),
+  // Langfuse tracing. All optional: with the key pair unset, tracing is a
+  // no-op and the application behaves exactly as it did before. Consumed by
+  // lib/observability/langfuse.ts directly from process.env (it must load
+  // before this schema does); declared here so validate-env and the .env
+  // templates document them.
+  LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
+  LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
+  LANGFUSE_BASE_URL: z.string().url().optional(),
+  LANGFUSE_TRACING_ENVIRONMENT: z.string().min(1).optional(),
   RAG_MULTI_QUERY_ENABLED: z.preprocess(
     (val) => val === "true" || val === "1" || val === true,
     z.boolean().default(false),
@@ -330,6 +339,11 @@ const parsed = envSchema.safeParse({
   RAG_WEB_SEARCH_MAX_RESULTS: process.env.RAG_WEB_SEARCH_MAX_RESULTS,
   RAG_MAX_BATCH_UPLOAD_COUNT: process.env.RAG_MAX_BATCH_UPLOAD_COUNT,
   COHERE_API_KEY: process.env.COHERE_API_KEY || undefined,
+  LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY || undefined,
+  LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY || undefined,
+  LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL || undefined,
+  LANGFUSE_TRACING_ENVIRONMENT:
+    process.env.LANGFUSE_TRACING_ENVIRONMENT || undefined,
   RAG_MULTI_QUERY_ENABLED: process.env.RAG_MULTI_QUERY_ENABLED,
   RAG_MULTI_QUERY_VARIATIONS: process.env.RAG_MULTI_QUERY_VARIATIONS,
   RAG_QUERY_DECOMPOSITION_ENABLED: process.env.RAG_QUERY_DECOMPOSITION_ENABLED,

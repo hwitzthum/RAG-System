@@ -1,4 +1,8 @@
-import type { RetrievedChunk, SupportedLanguage } from "@/lib/contracts/retrieval";
+import { startActiveObservation } from "@langfuse/tracing";
+import type {
+  RetrievedChunk,
+  SupportedLanguage,
+} from "@/lib/contracts/retrieval";
 import type { WebSource } from "@/lib/web-research/types";
 
 type PromptInjectionRule = {
@@ -27,21 +31,72 @@ export type ProtectedWebSourcesResult = {
 };
 
 const PROMPT_INJECTION_RULES: PromptInjectionRule[] = [
-  { label: "instruction_override", pattern: /\bignore (?:all|any|the|these|previous|prior|above) (?:instructions|directions|rules)\b/i, score: 6 },
-  { label: "role_override", pattern: /\byou are now\b|\bact as\b|\bnew role\b/i, score: 5 },
-  { label: "system_prompt_exfiltration", pattern: /\bsystem prompt\b|\bdeveloper message\b|\bhidden instructions\b|\brepeat (?:everything|all|the text) (?:above|before) this (?:line|point)\b/i, score: 7 },
-  { label: "secret_exfiltration", pattern: /\bapi key\b|\bsecret\b|\btoken\b|\bcredential\b|\bpassword\b/i, score: 7 },
-  { label: "tool_or_browse_command", pattern: /\bbrowse the web\b|\buse the tool\b|\bcall the tool\b|\bexecute code\b|\brun command\b/i, score: 6 },
-  { label: "prompt_delimiter_markup", pattern: /<(?:system|assistant|developer|tool)>|BEGIN (?:SYSTEM|DEVELOPER|PROMPT)|role:\s*(?:system|assistant|developer|tool)|#{2,}\s*(?:SYSTEM|DEVELOPER|ASSISTANT|TOOL)\s*:/i, score: 6 },
-  { label: "data_exfiltration", pattern: /\bexfiltrat\w*\b|\bleak\b|\breveal\b.*\bprompt\b/i, score: 7 },
-  { label: "jailbreak_phrasing", pattern: /\bdo not follow\b.*\bpolicy\b|\boverride safety\b|\bjailbreak\b|\bpretend you have no (?:content policy|restrictions|rules)\b|\byou have no restrictions\b/i, score: 7 },
+  {
+    label: "instruction_override",
+    pattern:
+      /\bignore (?:all|any|the|these|previous|prior|above) (?:instructions|directions|rules)\b/i,
+    score: 6,
+  },
+  {
+    label: "role_override",
+    pattern: /\byou are now\b|\bact as\b|\bnew role\b/i,
+    score: 5,
+  },
+  {
+    label: "system_prompt_exfiltration",
+    pattern:
+      /\bsystem prompt\b|\bdeveloper message\b|\bhidden instructions\b|\brepeat (?:everything|all|the text) (?:above|before) this (?:line|point)\b/i,
+    score: 7,
+  },
+  {
+    label: "secret_exfiltration",
+    pattern: /\bapi key\b|\bsecret\b|\btoken\b|\bcredential\b|\bpassword\b/i,
+    score: 7,
+  },
+  {
+    label: "tool_or_browse_command",
+    pattern:
+      /\bbrowse the web\b|\buse the tool\b|\bcall the tool\b|\bexecute code\b|\brun command\b/i,
+    score: 6,
+  },
+  {
+    label: "prompt_delimiter_markup",
+    pattern:
+      /<(?:system|assistant|developer|tool)>|BEGIN (?:SYSTEM|DEVELOPER|PROMPT)|role:\s*(?:system|assistant|developer|tool)|#{2,}\s*(?:SYSTEM|DEVELOPER|ASSISTANT|TOOL)\s*:/i,
+    score: 6,
+  },
+  {
+    label: "data_exfiltration",
+    pattern: /\bexfiltrat\w*\b|\bleak\b|\breveal\b.*\bprompt\b/i,
+    score: 7,
+  },
+  {
+    label: "jailbreak_phrasing",
+    pattern:
+      /\bdo not follow\b.*\bpolicy\b|\boverride safety\b|\bjailbreak\b|\bpretend you have no (?:content policy|restrictions|rules)\b|\byou have no restrictions\b/i,
+    score: 7,
+  },
   // README-documented category: coercing the model to encode its answer so that
   // downstream output filtering (which matches plaintext patterns) cannot inspect it.
-  { label: "output_format_manipulation", pattern: /\b(?:respond|answer|reply|output)\b[^\n.!?]{0,40}\bonly in\b[^\n.!?]{0,10}\b(?:base64|rot13|hex(?:adecimal)?|binary|morse(?: code)?)\b|\bencode your (?:response|answer|reply) (?:in|as|using)\b/i, score: 5 },
+  {
+    label: "output_format_manipulation",
+    pattern:
+      /\b(?:respond|answer|reply|output)\b[^\n.!?]{0,40}\bonly in\b[^\n.!?]{0,10}\b(?:base64|rot13|hex(?:adecimal)?|binary|morse(?: code)?)\b|\bencode your (?:response|answer|reply) (?:in|as|using)\b/i,
+    score: 5,
+  },
   // README-documented category: fabricated multi-turn Q&A / Human-Assistant transcripts
   // embedded in content to condition the model into treating them as prior turns.
-  { label: "few_shot_poisoning", pattern: /(?:^|\n)\s*Q\s*:\s*.+\n\s*A\s*:\s*.+\n\s*Q\s*:\s*.+\n\s*A\s*:/i, score: 5 },
-  { label: "few_shot_poisoning", pattern: /(?:^|\n)\s*(?:human|user)\s*:\s*.+\n\s*(?:assistant|ai)\s*:\s*.+\n\s*(?:human|user)\s*:/i, score: 5 },
+  {
+    label: "few_shot_poisoning",
+    pattern: /(?:^|\n)\s*Q\s*:\s*.+\n\s*A\s*:\s*.+\n\s*Q\s*:\s*.+\n\s*A\s*:/i,
+    score: 5,
+  },
+  {
+    label: "few_shot_poisoning",
+    pattern:
+      /(?:^|\n)\s*(?:human|user)\s*:\s*.+\n\s*(?:assistant|ai)\s*:\s*.+\n\s*(?:human|user)\s*:/i,
+    score: 5,
+  },
   // README-documented category: the same instruction-override intent, phrased in the
   // other languages this app explicitly supports (DE/FR/IT/ES) so a scanner that only
   // matches English phrasing is trivially bypassed by non-English documents/queries.
@@ -118,11 +173,15 @@ const HIGH_CONFIDENCE_BLOCK_LABELS = new Set([
 
 export function scanPromptInjection(value: string): PromptInjectionScan {
   const normalized = stripControlChars(value.normalize("NFKC"));
-  const matchedRules = PROMPT_INJECTION_RULES.filter((rule) => rule.pattern.test(normalized));
+  const matchedRules = PROMPT_INJECTION_RULES.filter((rule) =>
+    rule.pattern.test(normalized),
+  );
   const matchedLabels = matchedRules.map((rule) => rule.label);
   const score = matchedRules.reduce((sum, rule) => sum + rule.score, 0);
 
-  const hasHighConfidenceMatch = matchedLabels.some((label) => HIGH_CONFIDENCE_BLOCK_LABELS.has(label));
+  const hasHighConfidenceMatch = matchedLabels.some((label) =>
+    HIGH_CONFIDENCE_BLOCK_LABELS.has(label),
+  );
 
   return {
     score,
@@ -136,7 +195,10 @@ export function scanPromptInjection(value: string): PromptInjectionScan {
   };
 }
 
-export function sanitizePromptPayload(value: string, fallbackLabel: string): string {
+export function sanitizePromptPayload(
+  value: string,
+  fallbackLabel: string,
+): string {
   const cleaned = stripControlChars(value).trim();
   if (!cleaned) {
     return `[No ${fallbackLabel} available]`;
@@ -159,13 +221,40 @@ export function sanitizePromptPayload(value: string, fallbackLabel: string): str
   return redacted;
 }
 
-export function protectRetrievedChunks(chunks: RetrievedChunk[]): ProtectedChunksResult {
+export function protectRetrievedChunks(
+  chunks: RetrievedChunk[],
+): ProtectedChunksResult {
+  return startActiveObservation(
+    "guard-retrieved-chunks",
+    (observation) => {
+      observation.update({ input: { chunkCount: chunks.length } });
+      const result = protectRetrievedChunksUntraced(chunks);
+      // Retrieved text is attacker-controlled in a RAG system: these two
+      // counts are how a prompt-injection attempt in an ingested document
+      // becomes visible after the fact.
+      observation.update({
+        output: {
+          suspiciousCount: result.suspiciousCount,
+          blockedCount: result.blockedCount,
+        },
+      });
+      return result;
+    },
+    { asType: "guardrail" },
+  );
+}
+
+function protectRetrievedChunksUntraced(
+  chunks: RetrievedChunk[],
+): ProtectedChunksResult {
   let suspiciousCount = 0;
   let blockedCount = 0;
 
   return {
     chunks: chunks.map((chunk) => {
-      const combinedScan = scanPromptInjection(`${chunk.sectionTitle}\n${chunk.content}\n${chunk.context}`);
+      const combinedScan = scanPromptInjection(
+        `${chunk.sectionTitle}\n${chunk.content}\n${chunk.context}`,
+      );
       if (combinedScan.suspicious) {
         suspiciousCount += 1;
       }
@@ -173,8 +262,14 @@ export function protectRetrievedChunks(chunks: RetrievedChunk[]): ProtectedChunk
         blockedCount += 1;
       }
 
-      const sanitizedContent = sanitizePromptPayload(chunk.content, `document chunk ${chunk.chunkId}`);
-      const sanitizedContext = sanitizePromptPayload(chunk.context, `document context ${chunk.chunkId}`);
+      const sanitizedContent = sanitizePromptPayload(
+        chunk.content,
+        `document chunk ${chunk.chunkId}`,
+      );
+      const sanitizedContext = sanitizePromptPayload(
+        chunk.context,
+        `document context ${chunk.chunkId}`,
+      );
       return {
         ...chunk,
         content: sanitizedContent,
@@ -186,13 +281,17 @@ export function protectRetrievedChunks(chunks: RetrievedChunk[]): ProtectedChunk
   };
 }
 
-export function protectWebSources(webSources: WebSource[]): ProtectedWebSourcesResult {
+export function protectWebSources(
+  webSources: WebSource[],
+): ProtectedWebSourcesResult {
   let suspiciousCount = 0;
   let blockedCount = 0;
 
   return {
     webSources: webSources.map((source, index) => {
-      const combinedScan = scanPromptInjection(`${source.title}\n${source.snippet}`);
+      const combinedScan = scanPromptInjection(
+        `${source.title}\n${source.snippet}`,
+      );
       if (combinedScan.suspicious) {
         suspiciousCount += 1;
       }
@@ -202,8 +301,14 @@ export function protectWebSources(webSources: WebSource[]): ProtectedWebSourcesR
 
       return {
         ...source,
-        title: sanitizePromptPayload(source.title, `web source title ${index + 1}`),
-        snippet: sanitizePromptPayload(source.snippet, `web source snippet ${index + 1}`),
+        title: sanitizePromptPayload(
+          source.title,
+          `web source title ${index + 1}`,
+        ),
+        snippet: sanitizePromptPayload(
+          source.snippet,
+          `web source snippet ${index + 1}`,
+        ),
       };
     }),
     suspiciousCount,
@@ -215,7 +320,9 @@ export function shouldBlockUserPrompt(value: string): boolean {
   return scanPromptInjection(value).blocked;
 }
 
-export function buildPromptInjectionRefusal(language: SupportedLanguage): string {
+export function buildPromptInjectionRefusal(
+  language: SupportedLanguage,
+): string {
   return REFUSAL_BY_LANGUAGE[language];
 }
 

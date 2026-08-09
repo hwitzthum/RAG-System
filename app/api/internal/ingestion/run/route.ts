@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
 import { runIngestionTrigger } from "@/lib/ingestion/runtime/trigger";
+import { flushTracing } from "@/lib/observability/langfuse";
 import { getClientIp } from "@/lib/security/request";
 import { extractBearerTokenString } from "@/lib/security/token";
 
@@ -11,6 +12,10 @@ export const maxDuration = 120;
 // CSRF protection is not applicable — this endpoint does not use cookie-based auth.
 async function executeRun(request: NextRequest) {
   const ipAddress = getClientIp(request);
+
+  // This cron path runs the same ingestion pipeline as the worker, but in a
+  // serverless function that freezes as soon as it responds.
+  after(flushTracing);
   const result = await runIngestionTrigger({
     cronSecret: env.CRON_SECRET,
     bearerToken: extractBearerTokenString(request),

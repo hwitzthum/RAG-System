@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
 import { assertRequiredIngestionRpcsAvailable } from "@/lib/ingestion/runtime/contract";
+import {
+  startNodeTracing,
+  stopNodeTracing,
+} from "@/lib/observability/langfuse-node";
 import { runIngestionWorker } from "@/lib/ingestion/runtime/worker-loop";
 import { resolveIngestionRuntimeSettings } from "@/lib/ingestion/runtime/types";
 
@@ -35,6 +39,10 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv);
   const settings = resolveIngestionRuntimeSettings();
 
+  // Must precede any pipeline work: observations created before the provider
+  // is registered are dropped, not buffered.
+  startNodeTracing();
+
   console.info("ingestion_worker_starting", {
     workerName: settings.workerName,
     pollIntervalSeconds: settings.workerPollIntervalSeconds,
@@ -57,8 +65,12 @@ async function main(): Promise<void> {
   console.info("ingestion_worker_stopped", metrics);
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error("ingestion_worker_fatal", { message });
-  process.exit(1);
-});
+main()
+  .catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("ingestion_worker_fatal", { message });
+    process.exitCode = 1;
+  })
+  // Runs on both paths: a crashed run is exactly the one whose trace is worth
+  // keeping, and process.exit() here would discard the buffered spans.
+  .finally(stopNodeTracing);

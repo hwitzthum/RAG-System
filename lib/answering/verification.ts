@@ -1,3 +1,7 @@
+import {
+  startActiveObservation,
+  updateActiveObservation,
+} from "@langfuse/tracing";
 import { env } from "@/lib/config/env";
 import { getRuntimeSecrets } from "@/lib/runtime/secrets";
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
@@ -66,6 +70,38 @@ export async function verifyCitedStatements(input: {
   answer: string;
   chunks: RetrievedChunk[];
 }): Promise<CitationVerification> {
+  return startActiveObservation(
+    "verify-citations",
+    async (observation) => {
+      observation.update({ input: input.answer });
+
+      const verification = await verifyCitedStatementsUntraced(input);
+
+      // Typed as a generation rather than an evaluator on purpose: this is a
+      // billed model call, and only generations carry model/usage/cost in
+      // Langfuse. `unverified` distinguishes "the verifier failed" from "the
+      // verifier ran and found nothing unsupported" — the two look identical
+      // in the counts alone.
+      observation.update({
+        output: verification,
+        metadata: {
+          unsupportedShare:
+            verification.checkedCount > 0
+              ? verification.unsupportedCount / verification.checkedCount
+              : null,
+        },
+      });
+
+      return verification;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function verifyCitedStatementsUntraced(input: {
+  answer: string;
+  chunks: RetrievedChunk[];
+}): Promise<CitationVerification> {
   const apiKey = getRuntimeSecrets().openAiApiKey ?? env.OPENAI_API_KEY;
   if (!apiKey) {
     return { ...UNVERIFIED };
@@ -131,8 +167,28 @@ export async function verifyCitedStatements(input: {
 
     const payload = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
       error?: { message?: string };
     };
+
+    // The verifier runs on its own model, separate from the answer model, so
+    // its cost has to be recorded here rather than by the shared provider.
+    updateActiveObservation(
+      {
+        model: env.RAG_CITATION_VERIFIER_MODEL,
+        modelParameters: { temperature: 0, max_tokens: 300 },
+        ...(payload.usage
+          ? {
+              usageDetails: {
+                input: payload.usage.prompt_tokens ?? 0,
+                output: payload.usage.completion_tokens ?? 0,
+              },
+            }
+          : {}),
+      },
+      { asType: "generation" },
+    );
+
     if (!response.ok) {
       throw new Error(
         payload.error?.message ?? `verifier_http_${response.status}`,
