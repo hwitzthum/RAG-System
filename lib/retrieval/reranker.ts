@@ -1,7 +1,9 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { extractQueryTokens } from "@/lib/retrieval/query";
 
 type RerankInput = {
@@ -114,6 +116,34 @@ function clampUnitInterval(value: number): number {
  * caller slices to topK after those stages.
  */
 export function rerankCandidates(input: RerankInput): RetrievedChunk[] {
+  return startActiveObservation(
+    "rerank-candidates",
+    (observation) => {
+      observation.update({
+        input: {
+          query: input.normalizedQuery,
+          poolSize: input.poolSize,
+          ...summarizeChunks(input.candidates),
+        },
+      });
+
+      const reranked = rerankCandidatesUntraced(input);
+
+      // scoreScale is load-bearing downstream: it decides which threshold the
+      // evidence-sufficiency gate applies, and heuristic scores are not
+      // comparable with cross-encoder ones.
+      observation.update({
+        output: summarizeChunks(reranked),
+        metadata: { scoreScale: reranked[0]?.scoreScale ?? null },
+      });
+
+      return reranked;
+    },
+    { asType: "span" },
+  );
+}
+
+function rerankCandidatesUntraced(input: RerankInput): RetrievedChunk[] {
   const poolSize = Math.max(1, input.poolSize);
   const tokens = extractQueryTokens(input.normalizedQuery);
 

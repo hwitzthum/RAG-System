@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import { env } from "@/lib/config/env";
 import type { SupportedLanguage } from "@/lib/contracts/retrieval";
@@ -40,10 +41,44 @@ export async function decomposeQuery(
   language: SupportedLanguage = "EN",
   overrides: Partial<DecompositionDependencies> = {},
 ): Promise<string[]> {
+  // Short queries never reach the model, so opening an observation here would
+  // put an empty generation on most traces.
   if (originalQuery.trim().split(/\s+/).length < MIN_DECOMPOSABLE_WORDS) {
     return [];
   }
 
+  return startActiveObservation(
+    "decompose-query",
+    async (observation) => {
+      observation.update({
+        input: [{ role: "user", content: originalQuery }],
+        metadata: { language },
+      });
+
+      const subQueries = await decomposeQueryUntraced(
+        originalQuery,
+        language,
+        overrides,
+      );
+
+      // An empty array is the model's "single topic" verdict, which is the
+      // expected outcome for most queries — not an error.
+      observation.update({
+        output: subQueries,
+        metadata: { applied: subQueries.length > 0 },
+      });
+
+      return subQueries;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function decomposeQueryUntraced(
+  originalQuery: string,
+  language: SupportedLanguage,
+  overrides: Partial<DecompositionDependencies>,
+): Promise<string[]> {
   const maxSubQueries = env.RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES;
   const generateAnswer =
     overrides.generateAnswer ?? getDefaultProviders().llm.generateAnswer;

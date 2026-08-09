@@ -1,7 +1,9 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type RetrievalChunkRow = {
@@ -200,6 +202,28 @@ function selectRepresentativeRows(
 export async function searchKeywordCandidates(
   input: SearchKeywordCandidatesInput,
 ): Promise<RetrievedChunk[]> {
+  return startActiveObservation(
+    "search-keyword",
+    async (observation) => {
+      observation.update({
+        input: {
+          query: input.normalizedQuery,
+          tokens: input.tokens,
+          limit: input.limit,
+          documentIds: input.documentIds ?? null,
+        },
+      });
+      const candidates = await searchKeywordCandidatesUntraced(input);
+      observation.update({ output: summarizeChunks(candidates) });
+      return candidates;
+    },
+    { asType: "retriever" },
+  );
+}
+
+async function searchKeywordCandidatesUntraced(
+  input: SearchKeywordCandidatesInput,
+): Promise<RetrievedChunk[]> {
   if (input.tokens.length === 0) {
     return [];
   }
@@ -258,6 +282,29 @@ export async function searchKeywordCandidates(
  * costs a small nudge rather than most of the index.
  */
 export async function searchVectorCandidates(
+  input: SearchVectorCandidatesInput,
+): Promise<RetrievedChunk[]> {
+  return startActiveObservation(
+    "search-vector",
+    async (observation) => {
+      // The query embedding is thousands of floats and carries no meaning to a
+      // reader; its dimensionality is the part that can actually be wrong.
+      observation.update({
+        input: {
+          embeddingDimensions: input.queryEmbedding.length,
+          limit: input.limit,
+          documentIds: input.documentIds ?? null,
+        },
+      });
+      const candidates = await searchVectorCandidatesUntraced(input);
+      observation.update({ output: summarizeChunks(candidates) });
+      return candidates;
+    },
+    { asType: "retriever" },
+  );
+}
+
+async function searchVectorCandidatesUntraced(
   input: SearchVectorCandidatesInput,
 ): Promise<RetrievedChunk[]> {
   const supabase = getSupabaseAdminClient();

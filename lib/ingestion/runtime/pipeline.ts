@@ -1,3 +1,4 @@
+import { propagateAttributes, startActiveObservation } from "@langfuse/tracing";
 import {
   chunkSections,
   countTokens,
@@ -255,7 +256,49 @@ export class IngestionPipeline {
       });
   }
 
+  /**
+   * One Langfuse trace per job. A job is the natural unit of work here: it
+   * extracts, chunks, contextualises, and embeds a single document, and it can
+   * resume across invocations — so `resumed` and the chunk counts are what
+   * make a partial run readable rather than looking like a failure.
+   */
   async processJob(job: IngestionJob): Promise<ProcessJobResult> {
+    return propagateAttributes(
+      {
+        traceName: "ingest-document",
+        sessionId: job.documentId,
+        tags: ["ingestion"],
+        metadata: { jobId: job.id, documentId: job.documentId },
+      },
+      async () =>
+        startActiveObservation(
+          "ingest-document",
+          async (observation) => {
+            observation.update({
+              input: {
+                documentId: job.documentId,
+                resumed: Boolean(job.currentStage),
+                stage: job.currentStage ?? null,
+              },
+            });
+
+            const result = await this.processJobUntraced(job);
+
+            observation.update({
+              output: result,
+              metadata: { status: result.status },
+            });
+
+            return result;
+          },
+          { asType: "chain" },
+        ),
+    );
+  }
+
+  private async processJobUntraced(
+    job: IngestionJob,
+  ): Promise<ProcessJobResult> {
     const pipelineStart = Date.now();
     const elapsed = () =>
       `${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`;

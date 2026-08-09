@@ -1,9 +1,11 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   RetrievedChunk,
   RetrievalTrace,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import {
   pruneRetrievalCache,
@@ -114,6 +116,43 @@ function normalizeDocumentScope(documentIds: string[] | undefined): string[] {
 }
 
 export async function retrieveRankedCandidates(
+  input: RetrieveRankedCandidatesInput,
+  overrides: Partial<RetrievalServiceDependencies> = {},
+): Promise<RetrieveRankedCandidatesResult> {
+  return startActiveObservation(
+    "retrieve-candidates",
+    async (observation) => {
+      observation.update({
+        input: {
+          query: input.query,
+          topK: input.topK,
+          languageHint: input.languageHint ?? null,
+          documentIds: input.documentIds ?? null,
+        },
+      });
+
+      const result = await retrieveRankedCandidatesUntraced(input, overrides);
+
+      observation.update({
+        output: summarizeChunks(result.chunks),
+        // A cache hit skips every child stage, so an otherwise empty subtree
+        // is expected rather than a sign of a broken pipeline.
+        metadata: {
+          cacheHit: result.trace.cacheHit,
+          language: result.trace.language,
+          candidateCounts: result.trace.candidateCounts,
+          retrievalVersion: result.trace.retrievalVersion,
+          configFingerprint: result.trace.configFingerprint,
+        },
+      });
+
+      return result;
+    },
+    { asType: "span" },
+  );
+}
+
+async function retrieveRankedCandidatesUntraced(
   input: RetrieveRankedCandidatesInput,
   overrides: Partial<RetrievalServiceDependencies> = {},
 ): Promise<RetrieveRankedCandidatesResult> {

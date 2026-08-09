@@ -1,6 +1,8 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 import { CohereClient } from "cohere-ai";
 import { env } from "@/lib/config/env";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { getRuntimeSecrets } from "@/lib/runtime/secrets";
 
 export type CrossEncoderInput = {
@@ -65,6 +67,40 @@ export async function crossEncoderRerank(
     return [];
   }
 
+  return startActiveObservation(
+    "rerank-cross-encoder",
+    async (observation) => {
+      observation.update({
+        input: { query: input.query, ...summarizeChunks(input.chunks) },
+        metadata: {
+          model: input.model,
+          includeContext: env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
+          poolCap: CROSS_ENCODER_POOL_CAP,
+        },
+      });
+
+      const reranked = await crossEncoderRerankUntraced(input);
+
+      // This stage fails soft — no key, a timeout, or an API error all return
+      // the input order untouched. Without this flag a silent fallback is
+      // indistinguishable in the trace from a rerank that changed nothing.
+      observation.update({
+        output: summarizeChunks(reranked),
+        metadata: {
+          applied: reranked !== input.chunks,
+          scoreScale: reranked[0]?.scoreScale ?? null,
+        },
+      });
+
+      return reranked;
+    },
+    { asType: "tool" },
+  );
+}
+
+async function crossEncoderRerankUntraced(
+  input: CrossEncoderInput,
+): Promise<RetrievedChunk[]> {
   const runtimeCohereApiKey = getRuntimeSecrets().cohereApiKey;
   const apiKey = runtimeCohereApiKey ?? env.COHERE_API_KEY;
 

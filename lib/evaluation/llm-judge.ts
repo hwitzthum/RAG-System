@@ -1,4 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  startActiveObservation,
+  updateActiveObservation,
+} from "@langfuse/tracing";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 import { formatEvidenceChunk } from "@/lib/answering/prompts";
@@ -185,6 +189,18 @@ async function judgeViaAnthropic(
     messages: [{ role: "user", content: buildJudgeUserPrompt(input) }],
   });
 
+  updateActiveObservation(
+    {
+      model: env.RAG_EVAL_JUDGE_MODEL,
+      modelParameters: { max_tokens: JUDGE_MAX_OUTPUT_TOKENS },
+      usageDetails: {
+        input: message.usage.input_tokens,
+        output: message.usage.output_tokens,
+      },
+    },
+    { asType: "generation" },
+  );
+
   if (message.stop_reason === "refusal") {
     throw new Error("judge_refused");
   }
@@ -234,8 +250,29 @@ async function judgeViaOpenAi(
 
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
     error?: { message?: string };
   };
+
+  updateActiveObservation(
+    {
+      model: env.RAG_EVAL_JUDGE_MODEL,
+      modelParameters: {
+        temperature: 0,
+        max_tokens: JUDGE_MAX_OUTPUT_TOKENS,
+      },
+      ...(payload.usage
+        ? {
+            usageDetails: {
+              input: payload.usage.prompt_tokens ?? 0,
+              output: payload.usage.completion_tokens ?? 0,
+            },
+          }
+        : {}),
+    },
+    { asType: "generation" },
+  );
+
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `judge_http_${response.status}`);
   }
@@ -260,6 +297,29 @@ async function judgeViaOpenAi(
  * that refuses answerable questions cannot look flawless.
  */
 export async function judgeQueryResult(
+  input: JudgeQueryInput,
+): Promise<QueryJudgeMetrics> {
+  return startActiveObservation(
+    "judge-answer",
+    async (observation) => {
+      observation.update({
+        input: [{ role: "user", content: buildJudgeUserPrompt(input) }],
+      });
+
+      const metrics = await judgeQueryResultUntraced(input);
+
+      // A failed judge returns UNJUDGED rather than throwing, so the benchmark
+      // completes. Without the trace this degradation is invisible, and an
+      // UNJUDGED record silently weakens whatever gate reads these metrics.
+      observation.update({ output: metrics });
+
+      return metrics;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function judgeQueryResultUntraced(
   input: JudgeQueryInput,
 ): Promise<QueryJudgeMetrics> {
   let raw: JudgeRawResponse;

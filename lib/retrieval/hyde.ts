@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import { env } from "@/lib/config/env";
 import type { SupportedLanguage } from "@/lib/contracts/retrieval";
 import { getDefaultProviders } from "@/lib/providers/defaults";
@@ -5,6 +6,33 @@ import { getDefaultProviders } from "@/lib/providers/defaults";
 const HYDE_TIMEOUT_MS = 4000;
 
 export async function generateHypotheticalDocument(input: {
+  query: string;
+  language: SupportedLanguage;
+}): Promise<string | null> {
+  return startActiveObservation(
+    "generate-hypothetical-document",
+    async (observation) => {
+      observation.update({
+        input: [{ role: "user", content: input.query }],
+        metadata: { language: input.language },
+      });
+
+      const hypothesis = await generateHypotheticalDocumentUntraced(input);
+
+      // null covers both the timeout and an empty generation; either way the
+      // router falls back to retrieving on the literal query.
+      observation.update({
+        output: hypothesis,
+        metadata: { applied: hypothesis !== null },
+      });
+
+      return hypothesis;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function generateHypotheticalDocumentUntraced(input: {
   query: string;
   language: SupportedLanguage;
 }): Promise<string | null> {
@@ -19,7 +47,10 @@ export async function generateHypotheticalDocument(input: {
 
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("HyDE generation timeout")), HYDE_TIMEOUT_MS);
+    timer = setTimeout(
+      () => reject(new Error("HyDE generation timeout")),
+      HYDE_TIMEOUT_MS,
+    );
   });
 
   try {

@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import { env } from "@/lib/config/env";
 import type { SupportedLanguage } from "@/lib/contracts/retrieval";
@@ -7,6 +8,39 @@ const MULTI_QUERY_TIMEOUT_MS = 4000;
 export async function generateQueryVariations(
   originalQuery: string,
   language: SupportedLanguage = "EN",
+): Promise<string[]> {
+  return startActiveObservation(
+    "generate-query-variations",
+    async (observation) => {
+      observation.update({
+        input: [{ role: "user", content: originalQuery }],
+        metadata: {
+          language,
+          requestedVariations: env.RAG_MULTI_QUERY_VARIATIONS,
+        },
+      });
+
+      const variations = await generateQueryVariationsUntraced(
+        originalQuery,
+        language,
+      );
+
+      // Every failure path here degrades to `[originalQuery]`, so a
+      // single-element result is the signal that expansion did not happen.
+      observation.update({
+        output: variations,
+        metadata: { applied: variations.length > 1 },
+      });
+
+      return variations;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function generateQueryVariationsUntraced(
+  originalQuery: string,
+  language: SupportedLanguage,
 ): Promise<string[]> {
   const variationCount = env.RAG_MULTI_QUERY_VARIATIONS;
 

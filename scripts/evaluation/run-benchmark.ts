@@ -2,11 +2,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { propagateAttributes, startActiveObservation } from "@langfuse/tracing";
 import type {
   Citation,
   RetrievedChunk,
   SupportedLanguage,
 } from "../../lib/contracts/retrieval";
+import {
+  startNodeTracing,
+  stopNodeTracing,
+} from "../../lib/observability/langfuse-node";
 import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
 import {
   computeAnswerMetrics,
@@ -33,6 +38,8 @@ type RunnerArgs = {
   datasetPath: string;
   reportsDir: string;
   runsDir: string;
+  /** Groups this run's per-record traces into one Langfuse session. */
+  runId: string;
   mode: RunnerMode;
   topK: number;
   sampleSize: number | null;
@@ -153,6 +160,7 @@ function parseArgs(argv: string[]): RunnerArgs {
     datasetPath: "evaluation/evaluation_queries.generated.json",
     reportsDir: "evaluation/reports",
     runsDir: "evaluation/runs",
+    runId: `benchmark-${new Date().toISOString()}`,
     mode: "live",
     topK: 8,
     sampleSize: null,
@@ -943,7 +951,49 @@ function deriveScoreScaleComposition(
   return scales.has("cross_encoder") ? "cross_encoder" : "heuristic";
 }
 
+/**
+ * One trace per golden-set record, so a benchmark run reads in Langfuse as a
+ * set of comparable traces rather than a single opaque span. `sessionId` is
+ * the run id, which groups a whole run in the Sessions view.
+ */
 async function evaluateQuery(
+  args: RunnerArgs,
+  query: EvaluationQueryRecord,
+): Promise<QueryBenchmarkResult> {
+  return propagateAttributes(
+    {
+      traceName: "benchmark-query",
+      sessionId: args.runId,
+      tags: ["benchmark", args.mode, query.language],
+      metadata: {
+        queryId: query.id,
+        questionType: query.question_type,
+      },
+    },
+    async () =>
+      startActiveObservation(
+        "benchmark-query",
+        async (observation) => {
+          observation.update({
+            input: query.question,
+            metadata: { topK: args.topK, expansion: args.expansion },
+          });
+          const result = await evaluateQueryUntraced(args, query);
+          observation.update({
+            output: {
+              retrieval: result.retrieval,
+              answer: result.answer,
+              judge: result.judge,
+            },
+          });
+          return result;
+        },
+        { asType: "chain" },
+      ),
+  );
+}
+
+async function evaluateQueryUntraced(
   args: RunnerArgs,
   query: EvaluationQueryRecord,
 ): Promise<QueryBenchmarkResult> {
@@ -1126,6 +1176,11 @@ async function assertJudgePreflight(): Promise<void> {
 
 async function run(): Promise<void> {
   const args = parseArgs(process.argv);
+
+  // Before any query runs: observations created ahead of provider
+  // registration are dropped, not buffered.
+  startNodeTracing();
+
   const resolvedDatasetPath = path.resolve(args.datasetPath);
 
   if (!fs.existsSync(resolvedDatasetPath)) {
@@ -1283,12 +1338,18 @@ async function run(): Promise<void> {
   console.log(`Gate status: ${thresholdEvaluation.passed ? "PASS" : "FAIL"}`);
 
   if (!thresholdEvaluation.passed && args.failOnGate) {
-    process.exit(2);
+    // exitCode rather than exit(): the tracing flush in the finally below has
+    // to run, and this is already the last statement.
+    process.exitCode = 2;
   }
 }
 
-run().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Benchmark runner failed: ${message}`);
-  process.exit(1);
-});
+run()
+  .catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Benchmark runner failed: ${message}`);
+    process.exitCode = 1;
+  })
+  // Buffered spans are lost if the process exits first, and a gate failure
+  // (exit code 2) is exactly the run whose traces need inspecting.
+  .finally(stopNodeTracing);

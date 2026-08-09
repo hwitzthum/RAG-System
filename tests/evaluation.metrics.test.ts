@@ -235,9 +235,7 @@ test("multi-hop nDCG requires both golden chunks for a perfect score", () => {
 
 // ---- Summary + thresholds ---------------------------------------------------
 
-function buildResult(
-  overrides: Partial<QueryBenchmarkResult> = {},
-): QueryBenchmarkResult {
+function buildResult(): QueryBenchmarkResult {
   const record = buildRecord();
   return {
     id: record.id,

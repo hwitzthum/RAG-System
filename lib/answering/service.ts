@@ -1,9 +1,11 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import type {
   Citation,
   RetrievedChunk,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import {
   assessEvidence,
   hasSufficientEvidence,
@@ -27,15 +29,23 @@ import {
 } from "@/lib/security/output-filter";
 import {
   answerBeginsWithAbstentionToken,
-  buildGroundedAnswerUserPrompt,
+  buildGroundedAnswerVariables,
   GROUNDED_ANSWER_SYSTEM_PROMPT,
+  GROUNDED_ANSWER_USER_TEMPLATE,
   INSUFFICIENT_EVIDENCE_MESSAGE,
   INSUFFICIENT_EVIDENCE_TOKEN,
 } from "@/lib/answering/prompts";
 import {
-  buildWebAugmentedUserPrompt,
+  buildWebAugmentedVariables,
   WEB_AUGMENTED_SYSTEM_PROMPT,
+  WEB_AUGMENTED_USER_TEMPLATE,
 } from "@/lib/answering/web-augmented-prompts";
+import {
+  GROUNDED_ANSWER_PROMPT_NAME,
+  resolveAnswerPrompt,
+  WEB_AUGMENTED_PROMPT_NAME,
+  type ResolvedPrompt,
+} from "@/lib/answering/prompt-registry";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import type { LlmProvider } from "@/lib/providers/types";
 import { filterAnswerOutput } from "@/lib/security/output-filter";
@@ -220,6 +230,58 @@ async function generateAnswerText(
     maxOutputTokens: number;
     pii: PiiRedactionOptions;
     onSentence?: (sentence: string) => void;
+    /** Managed prompt behind this call; null when the fallback was used. */
+    prompt?: ResolvedPrompt["prompt"];
+  },
+): Promise<{ text: string; truncated: boolean }> {
+  return startActiveObservation(
+    "write-answer",
+    async (observation) => {
+      // Role-labelled messages so Langfuse renders a readable conversation
+      // rather than a JSON blob. This is the prompt the model actually saw,
+      // including the assembled evidence.
+      observation.update({
+        input: [
+          { role: "system", content: input.systemPrompt },
+          { role: "user", content: input.userPrompt },
+        ],
+        // Linking the managed prompt is what makes metrics comparable across
+        // prompt versions. `promptManaged: false` marks answers produced from
+        // the in-code fallback, which must not be attributed to any version.
+        ...(input.prompt ? { prompt: input.prompt } : {}),
+        metadata: {
+          language: input.language,
+          promptManaged: Boolean(input.prompt),
+          streamed: Boolean(
+            input.onSentence && llmProvider.generateAnswerStream,
+          ),
+        },
+      });
+
+      const generated = await generateAnswerTextUntraced(llmProvider, input);
+
+      // Model, token usage and TTFT are attached by the provider layer
+      // (lib/providers/defaults.ts) onto this same observation.
+      observation.update({
+        output: generated.text,
+        metadata: { truncated: generated.truncated },
+      });
+
+      return generated;
+    },
+    { asType: "generation" },
+  );
+}
+
+async function generateAnswerTextUntraced(
+  llmProvider: AnswerServiceDependencies["llmProvider"],
+  input: {
+    systemPrompt: string;
+    userPrompt: string;
+    language: SupportedLanguage;
+    maxOutputTokens: number;
+    pii: PiiRedactionOptions;
+    onSentence?: (sentence: string) => void;
   },
 ): Promise<{ text: string; truncated: boolean }> {
   const { onSentence } = input;
@@ -274,7 +336,52 @@ async function generateAnswerText(
   return generated;
 }
 
+/**
+ * Trace metadata shared by both answer paths. These fields are the ones a
+ * reviewer needs to judge a refusal at a glance: whether the evidence gate or
+ * the model itself declined, and which CRAG actions fired.
+ */
+function answerObservationMetadata(
+  result: GenerateGroundedAnswerResult,
+): Record<string, unknown> {
+  return {
+    insufficientEvidence: result.insufficientEvidence,
+    answerTruncated: result.answerTruncated,
+    evidenceAssessment: result.evidenceAssessment,
+    promptInjection: result.promptInjection,
+    outputFilter: result.outputFilter,
+    citationAttribution: result.citationAttribution,
+    citationVerification: result.citationVerification,
+    citationCount: result.citations.length,
+  };
+}
+
 export async function generateGroundedAnswer(
+  input: GenerateGroundedAnswerInput,
+  overrides: Partial<AnswerServiceDependencies> = {},
+): Promise<GenerateGroundedAnswerResult> {
+  return startActiveObservation(
+    "generate-answer",
+    async (observation) => {
+      observation.update({
+        input: { query: input.query, ...summarizeChunks(input.chunks) },
+        metadata: { mode: "grounded", language: input.language },
+      });
+
+      const result = await generateGroundedAnswerUntraced(input, overrides);
+
+      observation.update({
+        output: result.answer,
+        metadata: { mode: "grounded", ...answerObservationMetadata(result) },
+      });
+
+      return result;
+    },
+    { asType: "span" },
+  );
+}
+
+async function generateGroundedAnswerUntraced(
   input: GenerateGroundedAnswerInput,
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
@@ -392,11 +499,18 @@ export async function generateGroundedAnswer(
   );
   const attributionChunks = evidenceOrder.map((index) => rawChunks[index]!);
 
-  const prompt = buildGroundedAnswerUserPrompt({
-    query: input.query,
-    language: input.language,
-    chunks: promptChunks,
-    evidenceCaution,
+  const resolvedPrompt = await resolveAnswerPrompt({
+    name: GROUNDED_ANSWER_PROMPT_NAME,
+    fallback: [
+      { role: "system", content: GROUNDED_ANSWER_SYSTEM_PROMPT },
+      { role: "user", content: GROUNDED_ANSWER_USER_TEMPLATE },
+    ],
+    variables: buildGroundedAnswerVariables({
+      query: input.query,
+      language: input.language,
+      chunks: promptChunks,
+      evidenceCaution,
+    }),
   });
 
   // Addresses the caller's own RBAC-scoped evidence already contains are not
@@ -408,12 +522,13 @@ export async function generateGroundedAnswer(
   };
 
   const generated = await generateAnswerText(llmProvider, {
-    systemPrompt: GROUNDED_ANSWER_SYSTEM_PROMPT,
-    userPrompt: prompt,
+    systemPrompt: resolvedPrompt.systemPrompt,
+    userPrompt: resolvedPrompt.userPrompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
     pii,
     onSentence: input.onSentence,
+    prompt: resolvedPrompt.prompt,
   });
   const answer = generated.text;
 
@@ -545,6 +660,38 @@ export async function generateWebAugmentedAnswer(
   input: GenerateWebAugmentedAnswerInput,
   overrides: Partial<AnswerServiceDependencies> = {},
 ): Promise<GenerateGroundedAnswerResult> {
+  return startActiveObservation(
+    "generate-answer",
+    async (observation) => {
+      observation.update({
+        input: {
+          query: input.query,
+          ...summarizeChunks(input.chunks),
+          webSourceCount: input.webSources.length,
+        },
+        metadata: { mode: "web_augmented", language: input.language },
+      });
+
+      const result = await generateWebAugmentedAnswerUntraced(input, overrides);
+
+      observation.update({
+        output: result.answer,
+        metadata: {
+          mode: "web_augmented",
+          ...answerObservationMetadata(result),
+        },
+      });
+
+      return result;
+    },
+    { asType: "span" },
+  );
+}
+
+async function generateWebAugmentedAnswerUntraced(
+  input: GenerateWebAugmentedAnswerInput,
+  overrides: Partial<AnswerServiceDependencies> = {},
+): Promise<GenerateGroundedAnswerResult> {
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
   const verifyCitations = overrides.verifyCitations ?? verifyCitedStatements;
   const protectedChunks = protectRetrievedChunks(input.chunks);
@@ -632,11 +779,18 @@ export async function generateWebAugmentedAnswer(
   promptChunks = evidenceOrder.map((index) => promptChunks[index]!);
   attributionChunks = evidenceOrder.map((index) => attributionChunks[index]!);
 
-  const prompt = buildWebAugmentedUserPrompt({
-    query: input.query,
-    language: input.language,
-    chunks: promptChunks,
-    webSources: protectedWebSources.webSources,
+  const resolvedPrompt = await resolveAnswerPrompt({
+    name: WEB_AUGMENTED_PROMPT_NAME,
+    fallback: [
+      { role: "system", content: WEB_AUGMENTED_SYSTEM_PROMPT },
+      { role: "user", content: WEB_AUGMENTED_USER_TEMPLATE },
+    ],
+    variables: buildWebAugmentedVariables({
+      query: input.query,
+      language: input.language,
+      chunks: promptChunks,
+      webSources: protectedWebSources.webSources,
+    }),
   });
 
   // Only document evidence exempts an address. Web snippets are third-party
@@ -648,8 +802,9 @@ export async function generateWebAugmentedAnswer(
   };
 
   const generated = await generateAnswerText(llmProvider, {
-    systemPrompt: WEB_AUGMENTED_SYSTEM_PROMPT,
-    userPrompt: prompt,
+    systemPrompt: resolvedPrompt.systemPrompt,
+    userPrompt: resolvedPrompt.userPrompt,
+    prompt: resolvedPrompt.prompt,
     language: input.language,
     maxOutputTokens: input.maxOutputTokens,
     pii,

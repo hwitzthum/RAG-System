@@ -1,9 +1,11 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import { env } from "@/lib/config/env";
 import type {
   RetrievedChunk,
   RetrievalTrace,
   SupportedLanguage,
 } from "@/lib/contracts/retrieval";
+import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { getDefaultProviders } from "@/lib/providers/defaults";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
@@ -163,7 +165,49 @@ function summarizeCandidateCounts(
   };
 }
 
+/**
+ * Wraps the routing decision itself. The branch retrievals, expansion LLM
+ * calls, and merge rerank nest underneath automatically through OpenTelemetry
+ * context, so this observation is where a reviewer sees *which* strategy ran
+ * and what the branches cost, without having to read the sub-tree.
+ */
 export async function retrieveRankedCandidatesWithRouting(
+  input: RetrieveWithRoutingInput,
+  overrides: Partial<RoutedRetrievalDependencies> = {},
+): Promise<RoutedRetrievalResult> {
+  return startActiveObservation(
+    "route-query",
+    async (observation) => {
+      observation.update({
+        input: {
+          query: input.query,
+          topK: input.topK,
+          enableQueryExpansion: Boolean(input.enableQueryExpansion),
+          documentIds: input.documentIds ?? null,
+        },
+      });
+
+      const result = await retrieveRankedCandidatesWithRoutingUntraced(
+        input,
+        overrides,
+      );
+
+      observation.update({
+        output: summarizeChunks(result.chunks),
+        metadata: {
+          queryExpansion: result.queryExpansion,
+          queryDecomposition: result.queryDecomposition,
+          cacheHit: result.trace.cacheHit,
+        },
+      });
+
+      return result;
+    },
+    { asType: "chain" },
+  );
+}
+
+async function retrieveRankedCandidatesWithRoutingUntraced(
   input: RetrieveWithRoutingInput,
   overrides: Partial<RoutedRetrievalDependencies> = {},
 ): Promise<RoutedRetrievalResult> {
