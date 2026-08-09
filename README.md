@@ -577,6 +577,48 @@ revert dashboard edits. It is not a deploy step.
   the in-code templates, on unsubstituted `{{variables}}` (the usual result of
   renaming one in the UI), and on a missing abstention token.
 
+### Benchmark runs as Langfuse datasets
+
+The golden set is mirrored into Langfuse Datasets so benchmark runs can be
+compared against each other and any metric can be opened as the retrieval that
+produced it.
+
+```bash
+npm run obs:dataset:sync   # mirror evaluation/evaluation_queries.generated.json
+npm run eval:benchmark     # each live run publishes a dataset run + scores
+```
+
+| Local                                      | Langfuse                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `evaluation_queries.generated.json`        | Dataset `golden-set-<fingerprint>`                                                       |
+| One golden-set record                      | DatasetItem (`input` = question, `expectedOutput` = expected chunks/pages/answer points) |
+| One benchmark run (`runId`)                | DatasetRun                                                                               |
+| One `benchmark-query` trace                | DatasetRunItem linking item ↔ trace                                                      |
+| `recallAt5`, `ndcgAt10`, `faithfulness`, … | Scores on that trace                                                                     |
+
+**The JSON golden set remains the source of truth**, and the release gate stays
+local: `evaluateThresholds` reads the run artifact, not Langfuse, so no network
+dependency can decide whether a release passes. Langfuse stores and compares;
+the metrics themselves are still computed in `lib/evaluation/`.
+
+Three deliberate behaviours worth knowing:
+
+- **The corpus fingerprint is in the dataset _name_**, not its metadata. Dataset
+  items upsert on their id, and the golden set is regenerated whenever the
+  corpus is re-chunked — at which point `expected_chunk_ids` point at chunks
+  that no longer exist. Keying the name on the fingerprint means a re-chunk
+  creates a _new_ dataset rather than silently rewriting the items earlier runs
+  were scored against.
+- **Dry runs never publish.** They execute no retrieval and no model, so their
+  numbers are fixtures; recording them as a dataset run would corrupt the
+  comparison history.
+- **Unmeasured metrics are omitted, not zeroed.** A null `verifiedCitationRate`
+  means the verifier did not run; publishing it as `0` is indistinguishable from
+  total failure once it lands in a cross-run average.
+
+Publishing failures are logged and never change the gate verdict — the gate is
+computed from the local artifact regardless.
+
 > Whitespace is load-bearing: the templates are assembled with the same
 > `join("\n\n")` structure the prompts have always used, and the optional
 > `evidence_caution` block carries its own trailing separator. This keeps
