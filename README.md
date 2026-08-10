@@ -2213,7 +2213,7 @@ All variables are validated at startup via Zod. Missing required variables throw
 | --------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------ |
 | `RAG_QUERY_EMBEDDING_MODEL`       | No       | `text-embedding-3-large` | OpenAI embedding model used at query time                                      |
 | `RAG_LLM_MODEL`                   | No       | `gpt-4o-mini`            | Chat model used for answer synthesis                                           |
-| `RAG_LLM_MAX_OUTPUT_TOKENS`       | No       | `700`                    | Maximum tokens in the LLM response                                             |
+| `RAG_LLM_MAX_OUTPUT_TOKENS`       | No       | `2000`                   | Maximum tokens in the LLM response                                             |
 | `RAG_DEFAULT_TOP_K`               | No       | `8`                      | Number of chunks to retrieve before reranking                                  |
 | `RAG_RRF_K`                       | No       | `60`                     | RRF dampening constant                                                         |
 | `RAG_RERANK_POOL_SIZE`            | No       | `100`                    | Minimum candidate pool size before reranking                                   |
@@ -3243,27 +3243,27 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 | Method   | Path                          | Auth   | CSRF | Rate Limit            | Description                                  |
 | -------- | ----------------------------- | ------ | ---- | --------------------- | -------------------------------------------- |
-| `GET`    | `/api/health`                 | No     | No   | —                     | Health check with config summary             |
+| `GET`    | `/api/health`                 | No     | No   | 60/1 min per IP       | Health check with config summary             |
 | `POST`   | `/api/auth/login`             | No     | No   | 20/5 min per IP+email | Rate-limited server-side login               |
 | `POST`   | `/api/auth/signup`            | No     | No   | 3/hour per IP+email   | Rate-limited signup with role assignment     |
-| `POST`   | `/api/auth/session`           | No     | Yes  | —                     | Create session cookie from access token      |
+| `POST`   | `/api/auth/session`           | No     | Yes  | 20/5 min per IP       | Create session cookie from access token      |
 | `GET`    | `/api/auth/session`           | Cookie | No   | —                     | Return current session user                  |
 | `DELETE` | `/api/auth/session`           | Cookie | No   | —                     | Logout and clear session cookie              |
 | `POST`   | `/api/query`                  | Yes    | Yes  | 30/1 min per user     | RAG query; response streamed as SSE          |
-| `GET`    | `/api/query-history`          | Yes    | No   | —                     | List past queries for the current user       |
-| `DELETE` | `/api/query-history/:id`      | Yes    | Yes  | —                     | Delete a single query history entry          |
+| `GET`    | `/api/query-history`          | Yes    | No   | 120/15 min per user   | List past queries for the current user       |
+| `DELETE` | `/api/query-history/:id`      | Yes    | Yes  | 60/15 min per user    | Delete a single query history entry          |
 | `POST`   | `/api/upload`                 | Yes    | Yes  | 20/15 min per user    | Upload and enqueue a single PDF              |
-| `GET`    | `/api/upload/:documentId`     | Yes    | No   | —                     | Poll ingestion job status                    |
+| `GET`    | `/api/upload/:documentId`     | Yes    | No   | 120/15 min per user   | Poll ingestion job status                    |
 | `POST`   | `/api/upload/batch`           | Yes    | Yes  | 10/15 min per user    | Batch upload up to 10 PDFs                   |
 | `POST`   | `/api/reports`                | Yes    | Yes  | 10/15 min per user    | Generate DOCX or PDF report for a query turn |
 | `GET`    | `/api/byok/openai`            | Yes    | No   | —                     | Check whether an OpenAI BYOK key is stored   |
 | `PUT`    | `/api/byok/openai`            | Yes    | Yes  | 10/15 min per user    | Encrypt and store an OpenAI API key          |
 | `DELETE` | `/api/byok/openai`            | Yes    | Yes  | 10/15 min per user    | Remove stored OpenAI API key                 |
-| `GET`    | `/api/documents`              | Yes    | No   | —                     | List all accessible documents                |
+| `GET`    | `/api/documents`              | Yes    | No   | 120/15 min per user   | List all accessible documents                |
 | `DELETE` | `/api/documents/:id`          | Admin  | Yes  | —                     | Delete a document and its chunks             |
-| `GET`    | `/api/admin/users`            | Admin  | No   | —                     | List all users with roles                    |
-| `PATCH`  | `/api/admin/users/:id`        | Admin  | Yes  | —                     | Update a user's role                         |
-| `GET`    | `/api/admin/runtime-status`   | Admin  | No   | —                     | Ingestion worker health and queue depth      |
+| `GET`    | `/api/admin/users`            | Admin  | No   | 60/15 min per user    | List all users with roles                    |
+| `PATCH`  | `/api/admin/users/:id`        | Admin  | Yes  | 30/15 min per user    | Update a user's role                         |
+| `GET`    | `/api/admin/runtime-status`   | Admin  | No   | 60/15 min per user    | Ingestion worker health and queue depth      |
 | `POST`   | `/api/internal/ingestion/run` | CRON   | No   | —                     | Trigger the ingestion worker (cron use only) |
 
 > BYOK routes follow the same shape for `cohere` and `anthropic` providers — substitute the provider name in the path.
