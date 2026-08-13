@@ -562,16 +562,18 @@ export async function POST(request: NextRequest) {
               const topK = requestBody.topK ?? env.RAG_DEFAULT_TOP_K;
 
               try {
+                const retrievalDocumentIds =
+                  scopedDocumentIds && scopedDocumentIds.length > 0
+                    ? scopedDocumentIds
+                    : undefined;
+                const retrievalCacheNamespace = `user:${authResult.user.id}::docs:${retrievalDocumentIds ? retrievalDocumentIds.join(",") : "all"}`;
                 const retrievalResult =
                   await retrieveRankedCandidatesWithRouting({
                     query: requestBody.query,
                     topK,
                     languageHint: requestBody.languageHint,
-                    documentIds:
-                      scopedDocumentIds && scopedDocumentIds.length > 0
-                        ? scopedDocumentIds
-                        : undefined,
-                    cacheNamespace: `user:${authResult.user.id}::docs:${scopedDocumentIds && scopedDocumentIds.length > 0 ? scopedDocumentIds.join(",") : "all"}`,
+                    documentIds: retrievalDocumentIds,
+                    cacheNamespace: retrievalCacheNamespace,
                     enableQueryExpansion: requestBody.enableQueryExpansion,
                   });
 
@@ -868,9 +870,19 @@ export async function POST(request: NextRequest) {
                               },
                               // The corrective pass is wired only when its flag is
                               // on, so the disabled configuration cannot even reach
-                              // the second retrieval path.
+                              // the second retrieval path. It must reuse the same
+                              // document scope/cache namespace as the primary
+                              // retrieval pass above — otherwise it searches the
+                              // entire corpus regardless of the caller's access.
                               env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
-                                ? { correctiveRetrieve }
+                                ? {
+                                    correctiveRetrieve: (query, language) =>
+                                      correctiveRetrieve(query, language, {
+                                        documentIds: retrievalDocumentIds,
+                                        cacheNamespace:
+                                          retrievalCacheNamespace,
+                                      }),
+                                  }
                                 : {},
                             );
                       const latencyMs = Date.now() - startedAt;

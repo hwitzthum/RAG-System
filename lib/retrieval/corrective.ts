@@ -33,21 +33,34 @@ export function mergeCandidatePools(
   );
 }
 
+export type CorrectiveRetrieveScope = {
+  /** Same caller-scoped document allowlist used by the primary retrieval pass. */
+  documentIds?: string[];
+  cacheNamespace?: string;
+};
+
 /**
  * Second retrieval pass for the CRAG loop's ambiguous band: rephrase the
  * query, retrieve for the original plus each variation, and merge. Each
  * branch disables multi-query expansion — the variations ARE the branches,
  * and expanding them again would cost branches x variations embedding calls.
+ *
+ * `scope` must carry the same `documentIds`/`cacheNamespace` the caller used
+ * for the primary retrieval pass — this pass hits the same unscoped
+ * `match_document_chunks`/`search_document_chunks_keyword` RPCs, so omitting
+ * it would search the entire corpus regardless of the caller's document
+ * access, not just their originally-requested scope.
  */
 export async function correctiveRetrieve(
   query: string,
   language: SupportedLanguage,
+  scope: CorrectiveRetrieveScope = {},
 ): Promise<RetrievedChunk[]> {
   return startActiveObservation(
     "corrective-retrieve",
     async (observation) => {
       observation.update({ input: { query, language } });
-      const chunks = await correctiveRetrieveUntraced(query, language);
+      const chunks = await correctiveRetrieveUntraced(query, language, scope);
       observation.update({ output: summarizeChunks(chunks) });
       return chunks;
     },
@@ -58,6 +71,7 @@ export async function correctiveRetrieve(
 async function correctiveRetrieveUntraced(
   query: string,
   language: SupportedLanguage,
+  { documentIds, cacheNamespace }: CorrectiveRetrieveScope,
 ): Promise<RetrievedChunk[]> {
   // generateQueryVariations returns [original, ...variations] and degrades
   // to [original] on timeout or unparseable output.
@@ -70,6 +84,8 @@ async function correctiveRetrieveUntraced(
         topK: env.RAG_DEFAULT_TOP_K,
         languageHint: language,
         disableMultiQuery: true,
+        documentIds,
+        cacheNamespace,
       }),
     ),
   );
