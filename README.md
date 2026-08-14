@@ -1898,7 +1898,7 @@ Visit **http://localhost:3001** and create an account.
 
 **Steps:**
 
-1. Batch upload all 10 PDFs at once (10 MB limit per file)
+1. Batch upload all 10 PDFs at once (50 MB limit per file)
 2. Query: _"What is the annual cost, payment schedule, and renewal term?"_
 3. The system cites each answer with the vendor name and page, so copy-paste is easy
 4. Optional: Query each vendor individually (scope to one document) for precise extraction
