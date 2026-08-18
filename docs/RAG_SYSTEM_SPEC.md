@@ -69,12 +69,12 @@ Purpose: upload PDF and enqueue ingestion.
 Request:
 
 - multipart file (`.pdf`)
-- optional metadata: `title`, `tags[]`, `language_hint`
+- optional metadata: `title`, `language_hint`
 
 Response:
 
-- `document_id`
-- `ingestion_job_id`
+- `documentId`
+- `ingestionJobId`
 - `status` (`queued`)
 
 ### `POST /api/query` (`reader`, `admin`)
@@ -84,9 +84,9 @@ Purpose: retrieve grounded answer with citations.
 Request JSON:
 
 - `query` (required)
-- `conversation_id` (optional)
-- `language_hint` (optional)
-- `top_k` (optional, default controlled by server)
+- `conversationId` (optional)
+- `languageHint` (optional)
+- `topK` (optional, default controlled by server)
 
 Response:
 
@@ -94,7 +94,7 @@ Response:
 - final event includes:
 - `answer`
 - `citations[]`
-- `retrieval_meta` (`cache_hit`, `latency_ms`, selected chunk ids)
+- `retrievalMeta` (`cacheHit`, `latencyMs`, selected chunk ids)
 
 ### `GET /api/query-history` (`reader`, `admin`)
 
