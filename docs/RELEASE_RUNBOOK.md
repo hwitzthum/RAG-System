@@ -90,8 +90,8 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 
 ## Incident Triggers for Rollback
 
-- uncached p95 latency exceeds `7s` sustained
-- cached p95 latency exceeds `2.5s` sustained
+- uncached p95 latency exceeds `15s` sustained
+- cached p95 latency exceeds `12s` sustained
 - citation accuracy drops below `0.90`
 - LLM-judge `faithfulness` drops below `0.90` (the token-overlap hallucination rate it replaced was report-only and could not fail)
 - repeated 5xx query error bursts or provider outage

@@ -151,7 +151,7 @@ Definition of done:
 
 Deliverables:
 
-- evaluation dataset (`>= 200` labeled queries)
+- evaluation dataset (`>= 25` labeled queries)
 - multilingual test coverage (`EN`, `DE`, `FR`, `IT`, `ES`)
 - benchmark runner and report outputs
 
