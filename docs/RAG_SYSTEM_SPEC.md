@@ -239,8 +239,8 @@ Track:
 
 Targets:
 
-- uncached query p95 latency: `< 7s`
-- cached query p95 latency: `< 2.5s`
+- uncached query p95 latency: `< 15s`
+- cached query p95 latency: `< 12s`
 - concurrent users: `>= 50`
 
 ## Non-Functional Requirements
