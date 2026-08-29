@@ -8,6 +8,7 @@ import type {
   RuntimeLogger,
 } from "@/lib/ingestion/runtime/types";
 import { inflateRawSync, inflateSync } from "node:zlib";
+import { ocrPages, type OcrFallback } from "./ocr";
 
 // Upper bound on the decompressed size of a single /FlateDecode stream when
 // the pdfjs-dist parser fails (or returns empty text) and we fall back to
@@ -494,9 +495,51 @@ async function extractPagesWithPdfJs(
   }
 }
 
+/**
+ * Pages that need OCR: no text layer at all. A page with any text keeps its
+ * pdfjs extraction even when it also carries images.
+ */
+function pagesWithoutText(pages: ExtractedPage[]): number[] {
+  return pages
+    .filter((page) => page.text.trim().length === 0)
+    .map((page) => page.pageNumber);
+}
+
+async function applyOcrFallback(
+  pdfBytes: Uint8Array,
+  pages: ExtractedPage[],
+  ocr: OcrFallback,
+  logger: RuntimeLogger,
+): Promise<ExtractedPage[]> {
+  const targets = pagesWithoutText(pages);
+  if (targets.length === 0) {
+    return pages;
+  }
+  const transcribed = await ocrPages({
+    pdfBytes,
+    pageNumbers: targets,
+    transcribePage: ocr.transcribePage,
+    logger,
+  });
+  let recovered = 0;
+  const merged = pages.map((page) => {
+    const text = transcribed.get(page.pageNumber);
+    if (text === undefined || text.trim().length === 0) {
+      return page;
+    }
+    recovered += 1;
+    return { ...page, text, method: "ocr" as const };
+  });
+  logger.info("ocr_fallback_applied", {
+    attempted: targets.length,
+    recovered,
+  });
+  return merged;
+}
+
 export async function extractPages(
   pdfBytes: Uint8Array,
-  enableOcrFallback: boolean,
+  ocr: OcrFallback | null,
   logger: RuntimeLogger,
 ): Promise<ExtractedPage[]> {
   /*
@@ -513,7 +556,13 @@ export async function extractPages(
    * same process, on every attempt from a fresh one. Cause unidentified —
    * likely resource state inside pdfjs. A single retry is cheap next to
    * silently indexing a document with no page provenance.
+   *
+   * A parse that succeeds but yields pages without text is a different case:
+   * the file is scanned or image-only. Those pages go to OCR (when enabled),
+   * which keeps page numbers because it works page by page — the byte scrape
+   * is reached only when the file cannot be parsed at all.
    */
+  let parsedButEmpty: ExtractedPage[] | null = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
       const pages = await extractPagesWithPdfJs(
@@ -526,9 +575,16 @@ export async function extractPages(
             pageCount: pages.length,
           });
         }
-        return pages.map((page) => ({ ...page, method: "pdfjs" as const }));
+        const extracted = pages.map((page) => ({
+          ...page,
+          method: "pdfjs" as const,
+        }));
+        return ocr
+          ? applyOcrFallback(pdfBytes, extracted, ocr, logger)
+          : extracted;
       }
 
+      parsedButEmpty = pages;
       logger.warn("pdfjs_extraction_empty_result", {
         attempt,
         pageCount: pages.length,
@@ -537,6 +593,27 @@ export async function extractPages(
       const message =
         error instanceof Error ? error.message : "unknown_pdfjs_error";
       logger.warn("pdfjs_extraction_failed", { attempt, message });
+    }
+  }
+
+  if (parsedButEmpty && parsedButEmpty.length > 0) {
+    if (ocr) {
+      const recovered = await applyOcrFallback(
+        pdfBytes,
+        parsedButEmpty.map((page) => ({ ...page, method: "pdfjs" as const })),
+        ocr,
+        logger,
+      );
+      if (recovered.some((page) => page.text.trim().length > 0)) {
+        return recovered;
+      }
+      logger.error("ocr_fallback_recovered_no_text", {
+        pageCount: parsedButEmpty.length,
+      });
+    } else {
+      logger.warn("ocr_fallback_disabled_for_textless_pdf", {
+        pageCount: parsedButEmpty.length,
+      });
     }
   }
 
@@ -558,10 +635,6 @@ export async function extractPages(
         method: "byte_scrape",
       },
     ];
-  }
-
-  if (enableOcrFallback) {
-    logger.warn("ocr_fallback_backend_unavailable", { pageNumber: 1 });
   }
 
   return [

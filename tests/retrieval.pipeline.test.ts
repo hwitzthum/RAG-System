@@ -268,7 +268,7 @@ test("EmbeddingProvider refuses to run without an API key instead of writing fak
   );
 });
 
-test("buildCrossEncoderDocument matches the historical shape with context off", async () => {
+test("buildCrossEncoderDocument scores section title plus content, never the context paragraph", async () => {
   ensureRetrievalTestEnv();
   const { buildCrossEncoderDocument } = await import(
     "../lib/retrieval/cross-encoder"
@@ -276,38 +276,11 @@ test("buildCrossEncoderDocument matches the historical shape with context off", 
 
   const chunk = buildChunk({});
   assert.equal(
-    buildCrossEncoderDocument(chunk, false),
+    buildCrossEncoderDocument(chunk),
     `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
   );
-  // Missing context degrades to the historical shape even when the flag is on.
-  assert.equal(
-    buildCrossEncoderDocument(buildChunk({ context: "" }), true),
-    `${chunk.sectionTitle}\n${chunk.content}`.slice(0, 4096),
+  assert.ok(
+    buildCrossEncoderDocument(buildChunk({ content: "x".repeat(10_000) }))
+      .length <= 4096,
   );
-});
-
-test("buildCrossEncoderDocument places context between title and content", async () => {
-  ensureRetrievalTestEnv();
-  const { buildCrossEncoderDocument } = await import(
-    "../lib/retrieval/cross-encoder"
-  );
-
-  const chunk = buildChunk({});
-  assert.equal(
-    buildCrossEncoderDocument(chunk, true),
-    `${chunk.sectionTitle}\n${chunk.context}\n${chunk.content}`,
-  );
-});
-
-test("buildCrossEncoderDocument never truncates context away under a huge content body", async () => {
-  ensureRetrievalTestEnv();
-  const { buildCrossEncoderDocument } = await import(
-    "../lib/retrieval/cross-encoder"
-  );
-
-  const chunk = buildChunk({ content: "x".repeat(10_000) });
-  const document = buildCrossEncoderDocument(chunk, true);
-
-  assert.ok(document.length <= 4096);
-  assert.ok(document.startsWith(`${chunk.sectionTitle}\n${chunk.context}\n`));
 });

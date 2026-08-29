@@ -67,7 +67,6 @@ export type QueryResponseMeta = {
     applied: boolean;
     strategy: "standard" | "query_expansion";
     variationCount: number;
-    hydeUsed: boolean;
     branchCount: number;
   };
   retrievalTrace?: RetrievalTrace;

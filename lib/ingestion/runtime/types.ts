@@ -26,7 +26,7 @@ export type DocumentRecord = {
   ingestionVersion: number;
 };
 
-export type ExtractionMethod = "pdfjs" | "byte_scrape";
+export type ExtractionMethod = "pdfjs" | "ocr" | "byte_scrape";
 
 export type ExtractedPage = {
   pageNumber: number;
@@ -111,6 +111,8 @@ export type IngestionRuntimeSettings = {
   anthropicApiKey: string | null;
   embeddingDimensions: number | null;
   ocrFallbackEnabled: boolean;
+  /** Vision model that transcribes pages without a text layer. */
+  ocrModel: string;
   lockTimeoutSeconds: number;
   chunksPerRun: number;
   chunkInsertBatchSize: number;
@@ -197,6 +199,7 @@ export function resolveIngestionRuntimeSettings(
       process.env.WORKER_OCR_FALLBACK_ENABLED,
       true,
     ),
+    ocrModel: process.env.WORKER_OCR_MODEL?.trim() || "gpt-4o-mini",
     lockTimeoutSeconds: parseIntegerEnv(
       process.env.WORKER_LOCK_TIMEOUT_SECONDS,
       parseIntegerEnv(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 120),

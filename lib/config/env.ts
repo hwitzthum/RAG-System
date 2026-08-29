@@ -131,13 +131,6 @@ const envSchema = z.object({
     .min(0)
     .max(1)
     .default(0.5),
-  // Ambiguous-band second retrieval pass over query variations. Off by
-  // default: it adds embedding + rerank cost per ambiguous query and is
-  // gated on its own A/B.
-  RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED: z.preprocess(
-    (val) => val === "true" || val === "1" || val === true,
-    z.boolean().default(false),
-  ),
   // -------------------------------------------------------------------------
   RAG_DEFAULT_TOP_K: z.coerce.number().int().positive().default(8),
   RAG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
@@ -156,20 +149,6 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(3000),
-  // Include `chunk.context` in the document text the cross-encoder scores.
-  // Context is embedded, in the tsvector, and shown to the answerer and judge,
-  // but was historically absent from the rerank input — leaving the CE without
-  // the document-level disambiguation that separates near-duplicate siblings.
-  // Default off pending the Wave 4 A/B (arm 2).
-  RAG_CROSS_ENCODER_INCLUDE_CONTEXT: z.preprocess(
-    (val) => val === "true" || val === "1" || val === true,
-    z.boolean().default(false),
-  ),
-  // HyDE runs only inside the user-requested "Broaden search" expansion path.
-  RAG_HYDE_ENABLED: z.preprocess(
-    (val) => !(val === "false" || val === "0" || val === false),
-    z.boolean().default(true),
-  ),
   // Minimum number of web sources required before a web-augmented answer may
   // proceed without sufficient local document evidence. A single stray web hit
   // must not bypass the evidence gate.
@@ -194,19 +173,6 @@ const envSchema = z.object({
     (val) => !(val === "false" || val === "0" || val === false),
     z.boolean().default(true),
   ),
-  // Guarded pattern (`!(falsy strings)`) rather than the truthy-check used by
-  // the default-false flags: a truthy-check maps `undefined` to `false` before
-  // `.default(true)` can apply, silently disabling a default-on feature when
-  // the env var is unset.
-  RAG_CONTEXTUAL_GROUPING_ENABLED: z.preprocess(
-    (val) => !(val === "false" || val === "0" || val === false),
-    z.boolean().default(true),
-  ),
-  // Per-adjacent-neighbour ordering boost applied by contextual grouping, on
-  // top of the cross-encoder score. 0.05 is the historical constant; at CE
-  // rank gaps of 0.01–0.05 it can leapfrog a genuine relevance preference, so
-  // Wave 4 sweeps it downward (arm 3). Do not re-tune without an nDCG@10 A/B.
-  RAG_ADJACENCY_BOOST: z.coerce.number().nonnegative().default(0.05),
   // Soft cap on chunks per document in the final topK (0 = disabled). Reserved
   // slots are filled only by cross-encoder-scored chunks from other documents
   // at or above RAG_DIVERSITY_RELEVANCE_FLOOR; with no qualifier the cap
@@ -234,16 +200,13 @@ const envSchema = z.object({
   LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
   LANGFUSE_BASE_URL: z.string().url().optional(),
   LANGFUSE_TRACING_ENVIRONMENT: z.string().min(1).optional(),
-  RAG_MULTI_QUERY_ENABLED: z.preprocess(
-    (val) => val === "true" || val === "1" || val === true,
-    z.boolean().default(false),
-  ),
+  // Variations generated for the user-requested "Broaden search" expansion
+  // path; each retrieves as its own weighted branch.
   RAG_MULTI_QUERY_VARIATIONS: z.coerce.number().int().positive().default(3),
   // Splits a multi-topic query into per-topic sub-queries, each retrieved and
-  // cross-encoder-reranked independently, then merged on absolute relevance
-  // (Wave 5). Router-level branch composition like RAG_HYDE_ENABLED:
-  // deliberately absent from the retrieval config fingerprint — see
-  // lib/retrieval/trace.ts. Default off pending the Wave 5 A/B.
+  // cross-encoder-reranked independently, then merged with weighted RRF
+  // (Wave 5). Router-level branch composition, so deliberately absent from
+  // the retrieval config fingerprint — see lib/retrieval/trace.ts.
   RAG_QUERY_DECOMPOSITION_ENABLED: z.preprocess(
     (val) => val === "true" || val === "1" || val === true,
     z.boolean().default(false),
@@ -313,8 +276,6 @@ const parsed = envSchema.safeParse(
       process.env.RAG_CRAG_REFLECTION_MIN_CHECKED,
     RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE:
       process.env.RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE,
-    RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED:
-      process.env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED,
     RAG_DEFAULT_TOP_K: process.env.RAG_DEFAULT_TOP_K,
     RAG_CACHE_TTL_SECONDS: process.env.RAG_CACHE_TTL_SECONDS,
     RAG_MAX_UPLOAD_BYTES: process.env.RAG_MAX_UPLOAD_BYTES,
@@ -322,9 +283,6 @@ const parsed = envSchema.safeParse(
     RAG_CROSS_ENCODER_ENABLED: process.env.RAG_CROSS_ENCODER_ENABLED,
     RAG_CROSS_ENCODER_MODEL: process.env.RAG_CROSS_ENCODER_MODEL,
     RAG_CROSS_ENCODER_TIMEOUT_MS: process.env.RAG_CROSS_ENCODER_TIMEOUT_MS,
-    RAG_CROSS_ENCODER_INCLUDE_CONTEXT:
-      process.env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
-    RAG_HYDE_ENABLED: process.env.RAG_HYDE_ENABLED,
     RAG_WEB_MIN_SOURCES: process.env.RAG_WEB_MIN_SOURCES,
     RAG_EVAL_JUDGE_MODEL: process.env.RAG_EVAL_JUDGE_MODEL,
     RAG_CITATION_VERIFIER_MODEL: process.env.RAG_CITATION_VERIFIER_MODEL,
@@ -332,9 +290,6 @@ const parsed = envSchema.safeParse(
     RAG_EVIDENCE_PLACEMENT: process.env.RAG_EVIDENCE_PLACEMENT,
     RAG_CITATION_VERIFICATION_ENABLED:
       process.env.RAG_CITATION_VERIFICATION_ENABLED,
-    RAG_CONTEXTUAL_GROUPING_ENABLED:
-      process.env.RAG_CONTEXTUAL_GROUPING_ENABLED,
-    RAG_ADJACENCY_BOOST: process.env.RAG_ADJACENCY_BOOST,
     RAG_MAX_CHUNKS_PER_DOCUMENT: process.env.RAG_MAX_CHUNKS_PER_DOCUMENT,
     RAG_DIVERSITY_RELEVANCE_FLOOR: process.env.RAG_DIVERSITY_RELEVANCE_FLOOR,
     RAG_WEB_SEARCH_ENABLED: process.env.RAG_WEB_SEARCH_ENABLED,
@@ -348,7 +303,6 @@ const parsed = envSchema.safeParse(
     LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL || undefined,
     LANGFUSE_TRACING_ENVIRONMENT:
       process.env.LANGFUSE_TRACING_ENVIRONMENT || undefined,
-    RAG_MULTI_QUERY_ENABLED: process.env.RAG_MULTI_QUERY_ENABLED,
     RAG_MULTI_QUERY_VARIATIONS: process.env.RAG_MULTI_QUERY_VARIATIONS,
     RAG_QUERY_DECOMPOSITION_ENABLED:
       process.env.RAG_QUERY_DECOMPOSITION_ENABLED,

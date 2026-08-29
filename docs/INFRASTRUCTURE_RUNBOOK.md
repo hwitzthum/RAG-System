@@ -53,6 +53,16 @@ Local queue draining remains available through the TypeScript worker:
 - disable Vercel cron job for `/api/internal/ingestion/run`
 - run `npm run ingestion:worker`
 
+Measured ingestion throughput (`npm run ingestion:throughput`, reads
+`ingestion_jobs.processing_duration_ms` for completed jobs — end-to-end wall
+time, not a per-batch projection): on 2026-08-29 the local worker ingested a
+442-chunk monograph in 741 s (35.8 chunks/min) and 1,700 chunks across 25 jobs
+at 36.1 chunks/min aggregate. Jobs run at ~70-78 chunks/min when the context
+generator's primary provider answers, and ~26-30 chunks/min when every batch
+first fails a Claude call (exhausted Anthropic balance) before falling back to
+OpenAI — check `claude_context_failed_trying_openai` in the worker log before
+reading a slow run as a regression.
+
 ## 3. Link/Create Supabase Project
 
 ```bash

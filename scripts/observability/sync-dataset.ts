@@ -3,7 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { LangfuseClient } from "@langfuse/client";
 import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
-import { datasetNameForFingerprint } from "../../lib/evaluation/langfuse-dataset";
+import {
+  datasetItemIdFor,
+  datasetNameForFingerprint,
+} from "../../lib/evaluation/langfuse-dataset";
 
 /**
  * Mirrors the local golden set into Langfuse Datasets.
@@ -76,9 +79,10 @@ async function main(): Promise<void> {
   for (const record of validated.records) {
     await langfuse.dataset.createItem({
       datasetName: name,
-      // The record id is the item id, so re-syncing updates in place rather
-      // than duplicating. Ids are stable within a corpus fingerprint.
-      id: record.id,
+      // Fingerprint-scoped so re-syncing updates in place within THIS golden
+      // set, while a re-chunk (same record ids, new fingerprint) creates new
+      // items instead of moving the old set's — see datasetItemIdFor.
+      id: datasetItemIdFor(fingerprint, record.id),
       input: { question: record.question },
       expectedOutput: {
         expected_chunk_ids: record.expected_chunk_ids,

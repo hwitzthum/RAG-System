@@ -6,7 +6,9 @@
  * Three slices:
  *   - single_hop: for a sample of chunks across every ready document, an LLM
  *     drafts a question (in the chunk's language) plus acceptable answer
- *     points grounded in the actual chunk text.
+ *     points grounded in the actual chunk text. Each question is verified to
+ *     be unanswerable from the chunk's adjacent chunks, so the single labelled
+ *     chunk is genuinely the one relevant passage.
  *   - multi_hop: for pairs of chunks from DIFFERENT documents in the same
  *     language, a question that requires synthesizing both excerpts.
  *   - unanswerable: questions about topics provably absent from the corpus —
@@ -60,22 +62,56 @@ type UnanswerableCandidate = {
 };
 
 const MIN_CHUNK_CHARS = 200;
-const MAX_SAMPLES_PER_DOC = 10;
+/**
+ * One question per ~4 substantive chunks, capped at 40 per document. Sized
+ * so a corpus of a few short documents plus one monograph yields enough
+ * answerable queries per language (~50-70) that a single query flipping rank
+ * moves nDCG@10 by ~0.015 rather than ~0.04.
+ */
+const MAX_SAMPLES_PER_DOC = 40;
 const MIN_SAMPLES_PER_DOC = 3;
-const MULTI_HOP_PAIRS_PER_LANGUAGE = 4;
+const SAMPLE_CHUNK_DIVISOR = 4;
+const MULTI_HOP_PAIRS_PER_LANGUAGE = 8;
+/**
+ * Long documents open with front matter (series lists, imprint, contents,
+ * preface) and close with notes, bibliography and index. Those chunks are
+ * trivially distinctive — nothing else in the document repeats an ISBN — so
+ * without this bound replacement sampling drifts toward them, and the golden
+ * set ends up asking about the publisher instead of the argument.
+ */
+const LONG_DOCUMENT_CHUNKS = 60;
+const MATTER_EDGE_SHARE = 0.05;
+const MATTER_SECTION_PATTERN =
+  /^(contents|table of contents|preface|acknowledg|copyright|imprint|impressum|inhalt|inhaltsverzeichnis|vorwort|danksagung|series|bibliograph|literatur|references|index|notes|endnotes|abbreviations|abkürzungen|list of (figures|tables)|page \d+$)/i;
 const UNANSWERABLE_TARGET = 15;
 const LLM_TIMEOUT_MS = 30_000;
 const CONCURRENCY = 5;
+/** Drafts per chunk before it is skipped: parse failures and rejected drafts both count. */
+const GENERATION_ATTEMPTS = 3;
 
 const GENERATOR_SYSTEM_PROMPT = [
   "You write evaluation questions for a retrieval-augmented QA system.",
   "Given a document excerpt, produce ONE question a real user would plausibly ask that this excerpt answers, plus the key facts a correct answer must contain.",
   "Rules:",
   "- Write the question AND the answer points in the SAME language as the excerpt.",
-  "- The question must be answerable from the excerpt alone, and must NOT quote the excerpt's phrasing verbatim — phrase it the way a user who has not read the document would.",
+  "- The question must be answerable from the target excerpt alone, and must NOT quote the excerpt's phrasing verbatim — phrase it the way a user who has not read the document would.",
+  "- The question must be specific to the target excerpt: anchor it in a concrete claim, entity, example, number or step that the excerpt states. Never ask a broad topic question (\"How does X view Y?\") that any passage on the same subject could answer.",
+  "- When adjacent excerpts are supplied, the question must NOT be answerable from them: choose facts that only the target excerpt states.",
   "- Provide 3 to 5 answer points. Each is one short factual sentence taken from the excerpt's content (facts, names, numbers, steps). Cover ALL the central facts of the excerpt, not just the first one.",
   "- Never invent facts that are not in the excerpt.",
   'Return ONLY a JSON object: {"question": string, "acceptable_answer_points": string[]}.',
+].join("\n");
+
+const DISTINCTIVENESS_VERIFIER_PROMPT = [
+  "You check whether a document excerpt answers a question, for a retrieval evaluation.",
+  "Return true when a reader with ONLY this excerpt could give a substantially correct answer, even an incomplete one. Return false when the excerpt merely mentions the question's topic or supplies background without answering it.",
+  'Return ONLY a JSON object: {"answerable": boolean}.',
+].join("\n");
+
+const PAIR_RELATEDNESS_PROMPT = [
+  "You judge whether two document excerpts share a substantive connection for a retrieval evaluation.",
+  "Return true only when a natural question exists that a real user might ask and that genuinely needs facts from BOTH excerpts — a shared subject, entity, process or claim, not merely the same broad domain. Excerpts from unrelated fields (e.g. ancient philosophy and an HR survey) are false even when a strained comparison could be phrased.",
+  'Return ONLY a JSON object: {"related": boolean}.',
 ].join("\n");
 
 const MULTI_HOP_SYSTEM_PROMPT = [
@@ -116,6 +152,27 @@ function parseArgs(argv: string[]): { outPath: string; reviewPath: string } {
     }
   }
   return { outPath, reviewPath };
+}
+
+/**
+ * Drops front and back matter from a long document's single-hop pool: the
+ * outer MATTER_EDGE_SHARE of chunks by index, plus any chunk whose section
+ * title names a matter section. Short documents are left whole — a
+ * three-page process description has no matter to speak of.
+ */
+function excludeFrontAndBackMatter(chunks: ChunkRow[]): ChunkRow[] {
+  if (chunks.length < LONG_DOCUMENT_CHUNKS) {
+    return chunks;
+  }
+  const maxIndex = Math.max(...chunks.map((chunk) => chunk.chunk_index));
+  const edge = Math.ceil(maxIndex * MATTER_EDGE_SHARE);
+  const kept = chunks.filter(
+    (chunk) =>
+      chunk.chunk_index > edge &&
+      chunk.chunk_index < maxIndex - edge &&
+      !MATTER_SECTION_PATTERN.test((chunk.section_title ?? "").trim()),
+  );
+  return kept.length >= MIN_SAMPLES_PER_DOC ? kept : chunks;
 }
 
 /** Evenly spaced sample so questions span the whole document, not just its head. */
@@ -179,21 +236,72 @@ function parseAnswerPoints(raw: unknown): string[] {
     : [];
 }
 
+/**
+ * True when the neighbour alone gives a substantially correct answer — a
+ * partial answer counts, because the cross-encoder ranks a partial twin above
+ * the target just as readily. A neighbour that merely mentions the topic must
+ * not veto a question, or long single-topic documents would yield nothing.
+ */
+async function excerptAnswersQuestion(
+  question: string,
+  excerpt: string,
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
+  const parsed = (await callGenerator(
+    DISTINCTIVENESS_VERIFIER_PROMPT,
+    `Question: ${question}\n\nExcerpt:\n${excerpt.slice(0, 2_500)}`,
+    apiKey,
+    model,
+    50,
+  )) as { answerable?: unknown };
+  return parsed.answerable === true;
+}
+
+/**
+ * Drafts a question for `chunk` that its adjacent chunks cannot answer.
+ *
+ * `neighbours` are the chunks immediately before and after the target in the
+ * same document. They share the chunker's overlap window with it and, in a
+ * long single-topic document, usually continue the same argument — so a
+ * question drafted from the target alone is routinely answered just as well
+ * by a neighbour. The golden set labels exactly one chunk relevant, and the
+ * cross-encoder ranks such twins within ~0.01 of each other, so which one lands
+ * at rank 1 is a coin toss the metric reads as a retrieval miss. Each draft is
+ * therefore verified against every neighbour and redrafted (with the rejected
+ * question fed back) until none of them can answer it, or the chunk is
+ * skipped.
+ */
 async function generateQuestionForChunk(
   chunk: ChunkRow,
+  neighbours: ChunkRow[],
   documentTitle: string,
   apiKey: string,
   model: string,
 ): Promise<GeneratedQuestion | null> {
   const excerpt = chunk.content.slice(0, 2_500);
-  const userPrompt = [
+  const basePrompt = [
     `Document title: ${documentTitle}`,
     `Section: ${chunk.section_title ?? "(none)"}`,
     `Language: ${chunk.language}`,
-    `Excerpt:\n${excerpt}`,
+    `Target excerpt:\n${excerpt}`,
+    ...neighbours.map(
+      (neighbour) =>
+        `Adjacent excerpt (${neighbour.chunk_index < chunk.chunk_index ? "before" : "after"} the target; the question must NOT be answerable from it):\n${neighbour.content.slice(0, 1_500)}`,
+    ),
   ].join("\n\n");
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const rejected: string[] = [];
+  let lastFailure = "generator_output_incomplete";
+
+  for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
+    const userPrompt =
+      rejected.length === 0
+        ? basePrompt
+        : `${basePrompt}\n\nRejected earlier drafts — each was answerable from an adjacent excerpt. Ask about a different fact that only the target excerpt states:\n${rejected.map((question) => `- ${question}`).join("\n")}`;
+
+    let question = "";
+    let points: string[] = [];
     try {
       const parsed = (await callGenerator(
         GENERATOR_SYSTEM_PROMPT,
@@ -202,25 +310,51 @@ async function generateQuestionForChunk(
         model,
         500,
       )) as Partial<GeneratedQuestion>;
-
-      const question =
+      question =
         typeof parsed.question === "string" ? parsed.question.trim() : "";
-      const points = parseAnswerPoints(parsed.acceptable_answer_points);
-
-      if (question.length >= 10 && points.length >= 3) {
-        return { question, acceptable_answer_points: points.slice(0, 5) };
-      }
-      throw new Error("generator_output_incomplete");
+      points = parseAnswerPoints(parsed.acceptable_answer_points);
     } catch (error) {
-      if (attempt === 1) {
-        console.warn(
-          `Skipping chunk ${chunk.id}: ${error instanceof Error ? error.message : "unknown_error"}`,
-        );
-        return null;
-      }
+      lastFailure = error instanceof Error ? error.message : "unknown_error";
+      continue;
     }
+
+    if (question.length < 10 || points.length < 3) {
+      lastFailure = "generator_output_incomplete";
+      continue;
+    }
+
+    const verdicts = await Promise.all(
+      neighbours.map((neighbour) =>
+        excerptAnswersQuestion(question, neighbour.content, apiKey, model),
+      ),
+    );
+    if (verdicts.some(Boolean)) {
+      rejected.push(question);
+      lastFailure = "not_distinctive_from_adjacent_chunks";
+      continue;
+    }
+
+    return { question, acceptable_answer_points: points.slice(0, 5) };
   }
+
+  console.warn(`Skipping chunk ${chunk.id}: ${lastFailure}`);
   return null;
+}
+
+async function excerptsAreRelated(
+  first: ChunkRow,
+  second: ChunkRow,
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
+  const parsed = (await callGenerator(
+    PAIR_RELATEDNESS_PROMPT,
+    `Excerpt A:\n${first.content.slice(0, 1_500)}\n\nExcerpt B:\n${second.content.slice(0, 1_500)}`,
+    apiKey,
+    model,
+    50,
+  )) as { related?: unknown };
+  return parsed.related === true;
 }
 
 async function generateMultiHopQuestion(
@@ -257,10 +391,23 @@ async function generateMultiHopQuestion(
         typeof parsed.question === "string" ? parsed.question.trim() : "";
       const points = parseAnswerPoints(parsed.acceptable_answer_points);
 
-      if (question.length >= 10 && points.length >= 3) {
-        return { question, acceptable_answer_points: points.slice(0, 5) };
+      if (question.length < 10 || points.length < 3) {
+        throw new Error("generator_output_incomplete");
       }
-      throw new Error("generator_output_incomplete");
+
+      // The model rarely uses its `feasible: false` escape and will happily
+      // bridge unrelated excerpts; the pair was pre-checked for relatedness,
+      // and the draft must still need both halves — one excerpt answering it
+      // alone makes it a single-hop question with a spurious second label.
+      const [firstAlone, secondAlone] = await Promise.all([
+        excerptAnswersQuestion(question, first.chunk.content, apiKey, model),
+        excerptAnswersQuestion(question, second.chunk.content, apiKey, model),
+      ]);
+      if (firstAlone || secondAlone) {
+        throw new Error("multi_hop_answerable_from_one_excerpt");
+      }
+
+      return { question, acceptable_answer_points: points.slice(0, 5) };
     } catch (error) {
       if (attempt === 1) {
         console.warn(
@@ -407,24 +554,56 @@ async function run(): Promise<void> {
     }
     substantiveByDocument.set(document.id, substantive);
     documentTitles.set(document.id, document.title ?? "(untitled)");
+    // Neighbours come from the full chunk list: a short neighbour still shares
+    // the overlap window with the target.
+    const chunksByIndex = new Map(
+      (chunks ?? []).map((row) => [row.chunk_index, row] as const),
+    );
+    const neighboursOf = (target: ChunkRow): ChunkRow[] =>
+      [
+        chunksByIndex.get(target.chunk_index - 1),
+        chunksByIndex.get(target.chunk_index + 1),
+      ].filter((row): row is ChunkRow => row !== undefined);
 
     const sampleCount = Math.min(
       MAX_SAMPLES_PER_DOC,
-      Math.max(MIN_SAMPLES_PER_DOC, Math.ceil(substantive.length / 6)),
+      Math.max(
+        MIN_SAMPLES_PER_DOC,
+        Math.ceil(substantive.length / SAMPLE_CHUNK_DIVISOR),
+      ),
     );
-    const sampled = sampleEvenly(substantive, sampleCount);
     const documentTitle = document.title ?? "(untitled)";
 
     console.log(
-      `Generating ${sampled.length} single-hop questions for "${documentTitle}" (${substantive.length} chunks)...`,
+      `Generating ${sampleCount} single-hop questions for "${documentTitle}" (${substantive.length} chunks)...`,
     );
 
+    // A chunk whose every draft is answerable from a neighbour is skipped,
+    // so the quota is filled by drawing replacements from the chunks not yet
+    // tried — each round evenly spread over what remains, so the questions
+    // keep spanning the whole document instead of clustering where the first
+    // pass happened to succeed.
     const reviewRows: string[] = [];
-    for (let start = 0; start < sampled.length; start += CONCURRENCY) {
-      const batch = sampled.slice(start, start + CONCURRENCY);
+    let remaining = excludeFrontAndBackMatter(substantive);
+    let accepted = 0;
+    let attempted = 0;
+    while (accepted < sampleCount && remaining.length > 0) {
+      const batch = sampleEvenly(
+        remaining,
+        Math.min(CONCURRENCY, sampleCount - accepted),
+      );
+      const drawn = new Set(batch);
+      remaining = remaining.filter((chunk) => !drawn.has(chunk));
+      attempted += batch.length;
       const generated = await Promise.all(
         batch.map((chunk) =>
-          generateQuestionForChunk(chunk, documentTitle, apiKey, model),
+          generateQuestionForChunk(
+            chunk,
+            neighboursOf(chunk),
+            documentTitle,
+            apiKey,
+            model,
+          ),
         ),
       );
 
@@ -434,6 +613,7 @@ async function run(): Promise<void> {
         if (!output) {
           continue;
         }
+        accepted += 1;
 
         records.push({
           id: `${chunk.language.toLowerCase()}-${document.id.slice(0, 8)}-${chunk.chunk_index}`,
@@ -453,6 +633,7 @@ async function run(): Promise<void> {
             ``,
             `- **Question (${chunk.language})**: ${output.question}`,
             `- **Expected**: chunk \`${chunk.id}\`, page ${chunk.page_number}, section "${chunk.section_title ?? ""}"`,
+            `- **Distinctiveness**: verified unanswerable from ${neighboursOf(chunk).length} adjacent chunk(s)`,
             `- **Answer points**:`,
             ...output.acceptable_answer_points.map((point) => `  - ${point}`),
             `- **Source excerpt**: ${chunk.content.slice(0, 300).replace(/\s+/g, " ")}...`,
@@ -461,6 +642,14 @@ async function run(): Promise<void> {
         );
       }
     }
+    if (accepted < sampleCount) {
+      console.warn(
+        `Only ${accepted}/${sampleCount} distinctive questions for "${documentTitle}" after trying every substantive chunk.`,
+      );
+    }
+    console.log(
+      `  accepted ${accepted} of ${attempted} attempted chunks for "${documentTitle}"`,
+    );
 
     reviewSections.push(
       `## ${documentTitle} (\`${document.id}\`)\n\n${reviewRows.join("\n")}`,
@@ -489,17 +678,22 @@ async function run(): Promise<void> {
     // meaningful connection, and the LLM is told to refuse those pairs
     // (feasible: false), so attempts exceed the target and the loop keeps
     // the first MULTI_HOP_PAIRS_PER_LANGUAGE that succeed.
-    const attemptCount = MULTI_HOP_PAIRS_PER_LANGUAGE * 3;
-    // Round-robin document pairs; chunks sampled from different offsets so
-    // repeated pairs of the same two documents still cover fresh content.
-    const pairs: Array<{ first: ChunkRow; second: ChunkRow }> = [];
-    for (let index = 0; index < attemptCount; index += 1) {
-      const firstDoc = documentsInLanguage[index % documentsInLanguage.length]!;
-      const secondDoc =
-        documentsInLanguage[(index + 1) % documentsInLanguage.length]!;
-      if (firstDoc.documentId === secondDoc.documentId) {
-        break;
+    const attemptCount = MULTI_HOP_PAIRS_PER_LANGUAGE * 4;
+    // Cycle through every document pair (not just neighbours in the list),
+    // sampling chunks from different offsets so repeated visits to the same
+    // pair still cover fresh content. Each candidate pair is pre-checked for
+    // a substantive connection before any question is drafted.
+    const documentPairs: Array<[number, number]> = [];
+    for (let left = 0; left < documentsInLanguage.length; left += 1) {
+      for (let right = left + 1; right < documentsInLanguage.length; right += 1) {
+        documentPairs.push([left, right]);
       }
+    }
+    const candidatePairs: Array<{ first: ChunkRow; second: ChunkRow }> = [];
+    for (let index = 0; index < attemptCount; index += 1) {
+      const [left, right] = documentPairs[index % documentPairs.length]!;
+      const firstDoc = documentsInLanguage[left]!;
+      const secondDoc = documentsInLanguage[right]!;
       const firstChunk =
         firstDoc.chunks[
           Math.floor(
@@ -514,11 +708,20 @@ async function run(): Promise<void> {
               secondDoc.chunks.length,
           )
         ]!;
-      pairs.push({ first: firstChunk, second: secondChunk });
+      candidatePairs.push({ first: firstChunk, second: secondChunk });
     }
 
+    const relatedness = await Promise.all(
+      candidatePairs.map((pair) =>
+        excerptsAreRelated(pair.first, pair.second, apiKey, model).catch(
+          () => false,
+        ),
+      ),
+    );
+    const pairs = candidatePairs.filter((_, index) => relatedness[index]);
+
     console.log(
-      `Generating ${pairs.length} multi-hop questions for ${language}...`,
+      `Generating multi-hop questions for ${language}: ${pairs.length} of ${candidatePairs.length} candidate pairs are related...`,
     );
 
     const generated = await Promise.all(

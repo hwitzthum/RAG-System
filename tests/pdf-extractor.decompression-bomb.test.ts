@@ -42,7 +42,7 @@ test("extractPages does not exhaust memory when a malicious PDF embeds a zlib de
   const bombBytes = buildDecompressionBombPdfBytes(1024 * 1024 * 1024);
 
   const startedAt = Date.now();
-  const pages = await extractPages(bombBytes, false, silentLogger);
+  const pages = await extractPages(bombBytes, null, silentLogger);
   const elapsedMs = Date.now() - startedAt;
 
   // The call must resolve (not throw, not hang) and stay fast. Before the

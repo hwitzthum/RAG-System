@@ -6,6 +6,7 @@ import {
 } from "@/lib/ingestion/runtime/chunking";
 import { ContextGenerator } from "@/lib/ingestion/runtime/context-generator";
 import { EmbeddingProvider } from "@/lib/ingestion/runtime/embedding-provider";
+import { createOpenAiTranscriber } from "@/lib/ingestion/runtime/ocr";
 import { extractPages } from "@/lib/ingestion/runtime/pdf-extractor";
 import { stripPageFurniture } from "@/lib/ingestion/runtime/page-furniture";
 import type {
@@ -394,19 +395,29 @@ export class IngestionPipeline {
         bytes: pdfBytes.length,
       });
 
-      const pages = await this.extractPagesFn(
-        pdfBytes,
-        this.settings.ocrFallbackEnabled,
-        this.logger,
-      );
-      // The extractor uses one method for the whole document (pdfjs, or the
-      // byte-scrape fallback which collapses everything to a single page).
+      // OCR needs the job's OpenAI key: a document without one keeps the
+      // text-layer-only behaviour and fails loudly below if it is scanned.
+      const ocr =
+        this.settings.ocrFallbackEnabled && jobSettings.openAiApiKey
+          ? {
+              transcribePage: createOpenAiTranscriber({
+                apiKey: jobSettings.openAiApiKey,
+                model: this.settings.ocrModel,
+              }),
+            }
+          : null;
+      const pages = await this.extractPagesFn(pdfBytes, ocr, this.logger);
+      // pdfjs and OCR can mix within one document (a scanned appendix in a
+      // native PDF); the byte-scrape fallback is always the whole document,
+      // collapsed to a single page.
       const extractionMethod = pages[0]?.method;
+      const ocrPageCount = pages.filter((page) => page.method === "ocr").length;
       this.logger.info("pipeline_step", {
         step: "pages_extracted",
         elapsed: elapsed(),
         pageCount: pages.length,
         extractionMethod: extractionMethod ?? null,
+        ocrPageCount,
       });
 
       /*
@@ -419,9 +430,9 @@ export class IngestionPipeline {
        */
       if (extractionMethod === "byte_scrape") {
         throw new Error(
-          "PDF text extraction failed: the file has no readable text layer " +
-            "(scanned or image-only PDF). Page numbers and structure cannot " +
-            "be recovered, so it was not ingested.",
+          "PDF text extraction failed: the file could not be parsed and " +
+            "OCR found no text on its pages. Page numbers and structure " +
+            "cannot be recovered, so it was not ingested.",
         );
       }
 
@@ -604,17 +615,25 @@ export class IngestionPipeline {
        * whole-document context available across the runs a large document
        * spans. Every later batch of this run reads the cache instead.
        * Failure falls back to the summary path.
+       *
+       * OCR is deliberately NOT repeated here: a scanned document would
+       * otherwise be transcribed again on every resumed batch. Its text is
+       * rebuilt from the saved chunk candidates instead, which carry the
+       * OCR output already (overlap windows duplicated, which the context
+       * prompt tolerates).
        */
       try {
         const pdfBytes = await this.repository.downloadDocument(
           document.storagePath,
         );
-        const pages = await this.extractPagesFn(
-          pdfBytes,
-          this.settings.ocrFallbackEnabled,
-          this.logger,
-        );
-        documentText = pages.map((page) => page.text).join("\n\n");
+        const pages = await this.extractPagesFn(pdfBytes, null, this.logger);
+        const extractedText = pages.map((page) => page.text).join("\n\n");
+        documentText =
+          extractedText.trim().length > 0
+            ? extractedText
+            : (progress.candidates ?? [])
+                .map((chunk) => chunk.content)
+                .join("\n\n");
         this.cachedDocumentText = {
           documentId: document.id,
           text: documentText,

@@ -131,7 +131,7 @@ This system prioritizes **correctness and trustworthiness** over speed or exhaus
 
 **Cross-Encoder Reranking** — Optional Cohere rerank-v3.5 scores every candidate chunk against your query for precision-first use cases.
 
-**Query Expansion + HyDE** — Rewrites your query into multiple sub-queries or generates a hypothetical ideal document to improve semantic match on short or ambiguous inputs.
+**Query Expansion** — Rewrites your query into multiple paraphrases that retrieve as weighted branches, improving semantic match on short or ambiguous inputs.
 
 **Query Decomposition** — Questions that blend two distinct topics ("How does X in one document relate to Y in another?") are automatically split into per-topic sub-queries, each retrieved and reranked independently, so evidence for _both_ topics reaches the answer.
 
@@ -1361,7 +1361,7 @@ If ANY gate failed:
 
 # Pattern 2: All failures about multi-document questions
 #   → Retrieval isn't pulling from multiple docs
-#   → Try: disable adjacency boost, increase top-K
+#   → Try: lower RAG_MAX_CHUNKS_PER_DOCUMENT, increase top-K
 
 # Pattern 3: All failures about synonyms (asked "cancel", doc says "terminate")
 #   → Semantic search isn't matching
@@ -2217,7 +2217,6 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `RAG_DEFAULT_TOP_K`               | No       | `8`                      | Number of chunks to retrieve before reranking                                  |
 | `RAG_RRF_K`                       | No       | `60`                     | RRF dampening constant                                                         |
 | `RAG_RERANK_POOL_SIZE`            | No       | `100`                    | Minimum candidate pool size before reranking                                   |
-| `RAG_ADJACENCY_BOOST`             | No       | `0.05`                   | Per-neighbour ordering boost applied by contextual grouping                    |
 | `RAG_MAX_CHUNKS_PER_DOCUMENT`     | No       | `0`                      | Soft cap on chunks per document in the final top-K (0 = off)                   |
 | `RAG_DIVERSITY_RELEVANCE_FLOOR`   | No       | `0.25`                   | Minimum cross-encoder relevance for a chunk to claim a reserved diversity slot |
 | `RAG_MIN_EVIDENCE_CHUNKS`         | No       | `2`                      | Minimum chunks required before generating an answer                            |
@@ -2225,7 +2224,6 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `RAG_CACHE_TTL_SECONDS`           | No       | `86400`                  | TTL for cached retrieval results (24 hours)                                    |
 | `RAG_RETRIEVAL_VERSION`           | No       | `1`                      | Increment to invalidate the entire retrieval cache                             |
 | `RAG_MAX_UPLOAD_BYTES`            | No       | `52428800`               | Maximum file size per upload (50 MB)                                           |
-| `RAG_CONTEXTUAL_GROUPING_ENABLED` | No       | `true`                   | Boost adjacent chunks from the same document section                           |
 
 ### Optional Features
 
@@ -2235,11 +2233,9 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `RAG_CROSS_ENCODER_TIMEOUT_MS`           | No       | `3000`          | Cross-encoder timeout; heuristic order on expiry                                                                                                                          |
 | `COHERE_API_KEY`                         | No       | —               | Enables cross-encoder reranking when set                                                                                                                                  |
 | `COHERE_BYOK_VAULT_KEY`                  | No       | —               | AES vault key for per-user Cohere key encryption                                                                                                                          |
-| `RAG_MULTI_QUERY_ENABLED`                | No       | `false`         | Multi-query retrieval in the standard (non-expansion) path                                                                                                                |
 | `RAG_MULTI_QUERY_VARIATIONS`             | No       | `3`             | Number of expanded query variations to generate                                                                                                                           |
 | `RAG_QUERY_DECOMPOSITION_ENABLED`        | No       | `false`         | Split multi-topic queries into per-topic sub-queries, each retrieved and reranked independently, merged by weighted rank fusion                                           |
 | `RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES` | No       | `3`             | Maximum sub-queries per decomposed query (2–4)                                                                                                                            |
-| `RAG_HYDE_ENABLED`                       | No       | `true`          | HyDE branch inside the "Broaden search" expansion path                                                                                                                    |
 | `RAG_WEB_MIN_SOURCES`                    | No       | `2`             | Web sources required to answer without local evidence                                                                                                                     |
 | `RAG_EVIDENCE_PLACEMENT`                 | No       | `ends`          | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order                                                            |
 | `RAG_CITATION_VERIFICATION_ENABLED`      | No       | `true`          | Post-answer LLM check that cited sentences are supported (annotate-only)                                                                                                  |
@@ -2302,7 +2298,6 @@ rag-query                         input = user query, output = final answer
 ├─ search-web                     Tavily, when web research is enabled
 └─ generate-answer                CRAG verdict, refusal reasons
    ├─ guard-retrieved-chunks      prompt-injection counts
-   ├─ corrective-retrieve         only when the ambiguous band fires
    ├─ write-answer                the full prompt, tokens, cost, TTFT
    ├─ verify-citations            citation check + its own model cost
    └─ filter-output               PII redaction and block reasons
@@ -2607,7 +2602,7 @@ Total time: ~5–10 minutes instead of ~40 minutes.
 - **Only PDFs work** — The system accepts only PDF files. If you have a Word document or image, convert it to PDF first
 - **Duplicate detection** — If you accidentally upload the same PDF twice, the system recognizes it and rejects the duplicate (it compares file checksums, not filenames)
 - **File size limit** — Maximum 50 MB per file. If your PDF is larger, you may need to split it into parts
-- **All text must be extractable** — If your PDF is a scanned image (a photo of a document with no text layer), the system will fail. Scanned PDFs need OCR (optical character recognition) conversion first, which most PDF tools can do
+- **Scanned PDFs are OCR'd** — A page without a text layer (a scanned or photographed document) is rendered and transcribed by a vision model during ingestion, page numbers intact; pages that do have a text layer are never OCR'd. A file that cannot be parsed at all, or whose pages contain no text even after OCR (a blank page), is rejected with an explicit error rather than ingested with page-1 citations
 
 ---
 
@@ -2933,6 +2928,12 @@ Text is extracted page-by-page using `pdfjs-dist`, with page numbers recorded al
 
 **Why this matters:** PDFs are visual, not textual — they are rendered for human eyes, not for machines to read. Page-by-page extraction preserves the document's structure. And page numbers are the only way a user can verify an answer by going back to the source. Without them, the system becomes unverifiable — the LLM can cite a fact, but the user has no way to check it.
 
+**2b. OCR for pages without a text layer**
+
+When pdfjs parses a page but finds no text — a scanned or image-only page — the worker rasterises that page and has a vision model (`WORKER_OCR_MODEL`, default `gpt-4o-mini`; `WORKER_OCR_FALLBACK_ENABLED`, default on) transcribe it in reading order. Only textless pages go to OCR, so a native PDF with a scanned appendix is handled page by page, and every page keeps its number. OCR runs once, during extraction; resumed batches rebuild the document text from the saved chunk candidates instead of transcribing again. Cost is roughly $0.005 per page at high detail. Chunks record `extraction_method = 'ocr'` so OCR'd provenance is visible.
+
+**Why this matters:** Without OCR, a scanned report is either rejected outright or — worse — byte-scraped into a single page so every citation points at page 1. Page-level OCR keeps the corpus growable without making provenance lie.
+
 **3. Chunking with Overlap**
 
 Extracted text is split into approximately 700-token chunks with roughly 120 tokens of overlap, respecting sentence boundaries. The overlap prevents answer truncation at chunk boundaries — a hard cut would render the chunk's final thought unreadable in isolation. Sentence-boundary awareness avoids mid-sentence cuts that confuse both the embedding model and the reader.
@@ -2972,7 +2973,7 @@ Query
   └─▶ (Cache Miss)
           │
           ├─▶ [Opt-in "Broaden search"] Query Expansion — base query +
-          │        LLM variations + HyDE passage as weighted retrieval branches
+          │        LLM variations as weighted retrieval branches
           │
           ├─▶ [RAG_QUERY_DECOMPOSITION_ENABLED, standard path] Query
           │        Decomposition — multi-topic queries split into per-topic
@@ -2992,10 +2993,6 @@ Query
           ├─▶ Cross-Encoder Reranking over full pool (Cohere rerank-v3.5,
           │        default on, configurable timeout, heuristic fallback)
           │
-          ├─▶ Contextual Grouping (RAG_CONTEXTUAL_GROUPING_ENABLED —
-          │        +RAG_ADJACENCY_BOOST per page-adjacent chunk; disabled
-          │        in the tuned production config)
-          │
           ├─▶ Per-Document Diversity Cap (RAG_MAX_CHUNKS_PER_DOCUMENT,
           │        0 = off)
           │
@@ -3010,13 +3007,9 @@ Query
 
 **Why this matters:** A multi-language corpus can answer cross-language queries — "What is Datenschutz?" (German) has good evidence in English documents about data protection. But the output language should match the query language so the user doesn't have to translate the answer. Detecting language upfront solves this without adding latency.
 
-**Query Expansion ("Broaden search", per-request opt-in)** — The base query, up to three LLM-generated variations (written in the query's language, 4-second timeout), and a HyDE passage each retrieve independently as weighted branches (base 1.0, variations 0.9, HyDE 0.75) that are fused with weighted RRF. Works with any scope — single document, multiple documents, or the whole corpus.
+**Query Expansion ("Broaden search", per-request opt-in)** — The base query and up to three LLM-generated variations (written in the query's language, 4-second timeout) each retrieve independently as weighted branches (base 1.0, variations 0.9) that are fused with weighted RRF. Works with any scope — single document, multiple documents, or the whole corpus.
 
 **Why this matters:** A user might ask "What's the policy?" but the actual document says "This regulation applies to…" Because the words don't match, embedding search fails. Query expansion asks the LLM to rephrase the question — "What regulation governs this?" — so the second phrasing hits the document. Multiple paraphrases cover more search angles than a single query can reach alone.
-
-**HyDE (part of expansion, `RAG_HYDE_ENABLED`)** — The LLM writes a short hypothetical answer passage that is embedded as an additional retrieval branch. The embedding of a verbose answer sits geometrically closer to relevant document chunks than the embedding of a short question, improving cosine matching for under-specified queries.
-
-**Why this matters:** A query like "What is this?" is too vague for embeddings to distinguish. But if you ask an LLM "Write a sentence answering 'What is this?'" the LLM writes something specific, like "This is a protocol for…" When you embed that specific answer, embedding search finds chunks about protocols because the hypothetical answer is semantically specific, even though the original question is not.
 
 **Query Decomposition (`RAG_QUERY_DECOMPOSITION_ENABLED`)** — In the standard (non-expansion) path, a query that blends two or more distinct topics — the shape of cross-document multi-hop questions, where a single cross-encoder pass against the blended text compresses scores and the second topic's evidence never reaches the window — is split by the LLM into 2–3 self-contained per-topic sub-queries (`RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES`). Each sub-query runs the full pipeline and is cross-encoder-reranked against its own text; the resulting windows are merged with the base query's window by weighted Reciprocal Rank Fusion over per-pool ranks (base 1.0, sub-queries 0.9 — absolute cross-encoder scores are not comparable across query texts), and the per-document cap is re-applied to the merged pool. Single-topic queries are returned unsplit and behave exactly as if the feature were off. Queries under 12 words skip the LLM call, decomposition results are memoized per query, and any LLM failure degrades silently to normal retrieval.
 
@@ -3037,10 +3030,6 @@ Query
 **Cross-Encoder Reranking (`RAG_CROSS_ENCODER_ENABLED`, default on)** — Cohere `rerank-v3.5` reads the query and every pool candidate together, re-ordering the entire pool — not just the final top-K — so a relevant chunk ranked anywhere in the pool can still reach the final set. `RAG_CROSS_ENCODER_TIMEOUT_MS` (default 3000) bounds latency; on timeout, error, or a missing Cohere key the heuristic order stands.
 
 **Why this matters:** A cross-encoder is a neural model trained to directly score "how relevant is this chunk to this query?" without converting either to embeddings. It can consider the full text of both query and chunk, catching nuances that embeddings miss. But it is expensive — it scores every candidate in the pool, not just the top-K. That is why it runs last: by then the pool has been filtered to ~100 candidates, not 10,000. For expensive queries, the cross-encoder often moves the 8th-ranked chunk to rank 3 because it actually matches the question better than the top-K candidates that won the initial ranking race.
-
-**Contextual Grouping (`RAG_CONTEXTUAL_GROUPING_ENABLED`)** — Chunks page-adjacent to another retrieved chunk from the same document receive a `RAG_ADJACENCY_BOOST` (default +0.05) ordering boost per neighbour. Runs before the top-K slice so adjacency can pull a borderline chunk into the final set; it never touches the gate's `relevanceScore`. The tuned production configuration disables it: the boost was measured net-negative for ranking quality in both languages because it concentrates the final window into one document — the opposite of what cross-document questions need.
-
-**Why this matters:** If the retriever found chunk 3 of a document, chunk 2 and chunk 4 are spatially close and likely related — fetching them together saves the LLM from reconstructing context. But in practice, this boost concentrates the window into one document, which hurts cross-document questions that need evidence from multiple sources. Production disabled this and saw gains; it is left as a tuning knob for single-document workflows.
 
 **Per-Document Diversity Cap (`RAG_MAX_CHUNKS_PER_DOCUMENT`, 0 = off)** — A soft cap on how many chunks a single document may occupy in the final top-K. Reserved slots are filled only by cross-encoder-scored chunks from other documents at or above `RAG_DIVERSITY_RELEVANCE_FLOOR`; when no other document qualifies, the cap backfills and degrades to a no-op, so legitimately single-document queries are unaffected. The tuned production configuration sets the cap to 5, which measurably improved cross-document multi-hop retrieval.
 
@@ -3086,7 +3075,7 @@ Retrieval and answer quality are measured against a golden dataset with a live b
 
 | Command                       | What it does                                                                                                                                                                                                                                                                              |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run eval:dataset:corpus` | Generates a golden dataset from the **real corpus**: an LLM drafts user-style questions and expected answer points from sampled chunks of every ready document. Writes `evaluation/evaluation_queries.generated.json` plus a human review sheet (`evaluation/reports/dataset-review.md`). |
+| `npm run eval:dataset:corpus` | Generates a golden dataset from the **real corpus**: an LLM drafts user-style questions and expected answer points from sampled chunks of every ready document; each single-hop question is verified to be unanswerable from the chunk's adjacent (overlapping) chunks and redrafted or replaced otherwise, so the one labelled chunk is genuinely the relevant passage; long documents skip front/back matter; multi-hop pairs must pass a relatedness check and need both excerpts. Writes `evaluation/evaluation_queries.generated.json` plus a human review sheet (`evaluation/reports/dataset-review.md`). |
 | `npm run eval:benchmark`      | Full live benchmark with LLM-judge metrics. Flags: `--dataset <path>`, `--expansion` (exercise "Broaden search"), `--no-judge`, `--sample N`, `--no-fail-on-gate`.                                                                                                                        |
 | `npm run eval:smoke`          | Live benchmark over the first 25 queries, non-gating.                                                                                                                                                                                                                                     |
 | `npm run eval:benchmark:dry`  | Harness self-test with fabricated results — validates the pipeline, not the system.                                                                                                                                                                                                       |

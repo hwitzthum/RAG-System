@@ -25,6 +25,26 @@ corpus by `npm run eval:dataset:corpus`. The file is an envelope
 refuses to run when the live corpus no longer matches the fingerprint, so a
 re-ingest requires regenerating the dataset.
 
+Single-hop records label exactly one chunk as relevant, so the generator
+verifies every drafted question against the chunk's adjacent chunks (which
+share the chunker's overlap window and usually continue the same argument) and
+redrafts it until none of them can answer it. Without that check, long
+single-topic documents produce twin chunks the cross-encoder ranks within
+~0.01 of each other, and nDCG@10 reads a coin toss between them as a miss.
+When a chunk's drafts all fail the check it is skipped and a replacement is
+drawn from the chunks not yet tried, evenly spread over what remains, so each
+document still meets its quota (one question per ~4 substantive chunks, 3 to
+40 per document). Long documents (60+ chunks) exclude their outer 5% of
+chunks and any matter section (contents, preface, bibliography, index, …),
+which are trivially distinctive and would otherwise dominate replacements.
+
+Multi-hop candidates are drawn from every document pair in a language and
+pass two checks before they count: a relatedness judgement on the two
+excerpts (a strained bridge between unrelated fields is rejected), and a
+"neither excerpt alone answers it" check on the drafted question. A corpus
+whose documents share no subject legitimately yields zero multi-hop records —
+that is a fact about the corpus, not a generator failure.
+
 Minimum dataset size (sized to the real corpus and its languages):
 
 - 25 labeled queries total

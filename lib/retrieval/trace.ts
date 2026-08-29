@@ -22,9 +22,9 @@ const CACHE_KEY_SCHEMA_VERSION = 2;
  * ranking flag kept serving the previous configuration's chunks for a day and
  * every A/B read as a no-op.
  *
- * `RAG_HYDE_ENABLED` is deliberately absent: HyDE adds a retrieval *branch* in
- * the router, each of which already caches under its own namespace, and does
- * not change what any single branch returns.
+ * `RAG_MULTI_QUERY_VARIATIONS` is deliberately absent: expansion adds
+ * retrieval *branches* in the router, each of which already caches under its
+ * own namespace, and does not change what any single branch returns.
  *
  * `RAG_QUERY_DECOMPOSITION_*` is deliberately absent for the same reason:
  * decomposition composes router branches (sub-queries cache under their own
@@ -36,20 +36,12 @@ const CACHE_KEY_SCHEMA_VERSION = 2;
 export type RetrievalConfig = {
   crossEncoderEnabled: boolean;
   crossEncoderModel: string;
-  /** Changes the document text the cross-encoder scores. */
-  crossEncoderIncludeContext: boolean;
   rerankPoolSize: number;
   rrfK: number;
-  contextualGroupingEnabled: boolean;
-  /** Changes the ordering the grouping stage produces. */
-  adjacencyBoost: number;
   /** Changes final topK membership (soft per-document cap; 0 = off). */
   maxChunksPerDocument: number;
   /** Qualification floor for diversity promotion. */
   diversityRelevanceFloor: number;
-  multiQueryEnabled: boolean;
-  /** Changes the merged vector candidate set within a single cache key. */
-  multiQueryVariations: number;
   queryEmbeddingModel: string;
   queryEmbeddingDimensions: number;
 };
@@ -67,15 +59,10 @@ export function computeRetrievalConfigFingerprint(
       [
         `ce:${config.crossEncoderEnabled}`,
         `cem:${config.crossEncoderModel}`,
-        `cectx:${config.crossEncoderIncludeContext}`,
         `pool:${config.rerankPoolSize}`,
         `rrfk:${config.rrfK}`,
-        `group:${config.contextualGroupingEnabled}`,
-        `adjb:${config.adjacencyBoost}`,
         `maxdoc:${config.maxChunksPerDocument}`,
         `divfloor:${config.diversityRelevanceFloor}`,
-        `mq:${config.multiQueryEnabled}`,
-        `mqv:${config.multiQueryVariations}`,
         `emb:${config.queryEmbeddingModel}`,
         `dim:${config.queryEmbeddingDimensions}`,
       ].join("|"),

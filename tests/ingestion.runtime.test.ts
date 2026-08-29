@@ -351,7 +351,7 @@ test("extractPages falls back to operator extraction when robust parser cannot p
   const warnings: string[] = [];
   const pages = await extractPages(
     new TextEncoder().encode("BT (Hello World) Tj ET BT (Second line) Tj ET"),
-    false,
+    null,
     {
       info: () => undefined,
       warn: (message) => {
@@ -369,7 +369,7 @@ test("extractPages falls back to operator extraction when robust parser cannot p
 test("extractPages fallback parses TJ arrays with literal operands", async () => {
   const pages = await extractPages(
     new TextEncoder().encode("BT [(Von der Praxis) 120 (zum System)] TJ ET"),
-    false,
+    null,
     {
       info: () => undefined,
       warn: () => undefined,
@@ -1017,7 +1017,7 @@ test("IngestionPipeline refuses a document that only byte-scrape could read", as
 
   await assert.rejects(
     () => pipeline.processJob(job),
-    /no readable text layer/,
+    /OCR found no text/,
   );
   assert.deepEqual(repository.insertedChunkBatches, []);
 });

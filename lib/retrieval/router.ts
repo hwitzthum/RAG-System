@@ -7,27 +7,25 @@ import type {
 } from "@/lib/contracts/retrieval";
 import { summarizeChunks } from "@/lib/observability/trace-payloads";
 import { getDefaultProviders } from "@/lib/providers/defaults";
+import { resolveRelevance } from "@/lib/answering/policy";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 import {
+  rankCandidatePool,
   retrieveRankedCandidates,
+  type RerankCandidatesFn,
   type RetrieveRankedCandidatesInput,
   type RetrieveRankedCandidatesResult,
 } from "@/lib/retrieval/service";
-import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
-import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { applyDocumentDiversity } from "@/lib/retrieval/diversity";
 import { normalizeQuery } from "@/lib/retrieval/query";
-import { generateHypotheticalDocument } from "@/lib/retrieval/hyde";
 import { decomposeQueryMemoized } from "@/lib/retrieval/decomposition";
-import { mergeCandidatePools } from "@/lib/retrieval/corrective";
 
 type QueryExpansionTrace = {
   requested: boolean;
   applied: boolean;
   strategy: "standard" | "query_expansion";
   variationCount: number;
-  hydeUsed: boolean;
   branchCount: number;
 };
 
@@ -51,20 +49,11 @@ type RoutedRetrievalDependencies = {
     query: string,
     language: SupportedLanguage,
   ) => Promise<string[]>;
-  generateHyde: (input: {
-    query: string;
-    language: SupportedLanguage;
-  }) => Promise<string | null>;
   decomposeQuery: (
     query: string,
     language: SupportedLanguage,
   ) => Promise<string[]>;
-  rerankCandidates: (input: {
-    normalizedQuery: string;
-    candidates: RetrievedChunk[];
-    poolSize: number;
-    language?: SupportedLanguage;
-  }) => Promise<RetrievedChunk[]>;
+  rerankCandidates: RerankCandidatesFn;
 };
 
 type RetrieveWithRoutingInput = RetrieveRankedCandidatesInput & {
@@ -72,7 +61,7 @@ type RetrieveWithRoutingInput = RetrieveRankedCandidatesInput & {
 };
 
 type Branch = {
-  kind: "base" | "variation" | "hyde";
+  kind: "base" | "variation";
   weight: number;
   query: string;
 };
@@ -82,7 +71,6 @@ function getDefaultDependencies(): RoutedRetrievalDependencies {
   return {
     retrieveBase: retrieveRankedCandidates,
     generateVariations: generateQueryVariations,
-    generateHyde: generateHypotheticalDocument,
     decomposeQuery: decomposeQueryMemoized,
     rerankCandidates: providers.reranker.rerank,
   };
@@ -107,6 +95,30 @@ function buildBranchCacheNamespace(
   }
 
   return `${cacheNamespace}::${suffix}`;
+}
+
+/**
+ * Merge candidate pools from several retrieval branches: dedupe by chunkId
+ * keeping the entry with the best absolute relevance, sorted by that
+ * relevance descending. Deliberately NOT fuseBranchCandidates — no rank
+ * fusion, no pool trimming — so each chunk keeps honest cross-encoder scores
+ * for the evidence gate and diversity promotion.
+ */
+export function mergeCandidatePools(
+  pools: RetrievedChunk[][],
+): RetrievedChunk[] {
+  const byChunkId = new Map<string, RetrievedChunk>();
+  for (const pool of pools) {
+    for (const chunk of pool) {
+      const existing = byChunkId.get(chunk.chunkId);
+      if (!existing || resolveRelevance(chunk) > resolveRelevance(existing)) {
+        byChunkId.set(chunk.chunkId, chunk);
+      }
+    }
+  }
+  return [...byChunkId.values()].sort(
+    (a, b) => resolveRelevance(b) - resolveRelevance(a),
+  );
 }
 
 function fuseBranchCandidates(
@@ -228,7 +240,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
       languageHint: input.languageHint,
       documentIds: scopedDocumentIds,
       cacheNamespace: input.cacheNamespace,
-      disableMultiQuery: input.disableMultiQuery,
     });
 
     const standardExpansionTrace: QueryExpansionTrace = {
@@ -236,7 +247,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
       applied: false,
       strategy: "standard",
       variationCount: 0,
-      hydeUsed: false,
       branchCount: 1,
     };
 
@@ -273,10 +283,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
                     input.cacheNamespace,
                     "decomp",
                   ),
-                  // The sub-queries ARE the branches; expanding each again
-                  // would multiply embedding calls (same reason as the
-                  // expansion path below).
-                  disableMultiQuery: true,
                 })
                 .catch(() => null),
             ),
@@ -385,12 +391,7 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
     Math.min(env.RAG_RERANK_POOL_SIZE, Math.max(input.topK * 2, 8)),
   );
 
-  const [queries, hydePassage] = await Promise.all([
-    deps.generateVariations(normalizedQuery, language),
-    env.RAG_HYDE_ENABLED
-      ? deps.generateHyde({ query: normalizedQuery, language })
-      : Promise.resolve(null),
-  ]);
+  const queries = await deps.generateVariations(normalizedQuery, language);
 
   const uniqueVariations = [
     ...new Set(
@@ -407,13 +408,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
     })),
   ];
 
-  if (
-    hydePassage &&
-    hydePassage.trim().toLowerCase() !== normalizedQuery.toLowerCase()
-  ) {
-    branches.push({ kind: "hyde", weight: 0.75, query: hydePassage });
-  }
-
   const branchResults = await Promise.all(
     branches.map(async (branch, index) => ({
       branch,
@@ -426,10 +420,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
           input.cacheNamespace,
           `${branch.kind}-${index}`,
         ),
-        // This branch is already a query variation. Without this the service
-        // would expand it again, turning N branches into N x variations
-        // embedding calls per request.
-        disableMultiQuery: true,
       }),
     })),
   );
@@ -438,42 +428,14 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
     0,
     Math.max(env.RAG_RERANK_POOL_SIZE, input.topK * 4),
   );
-  // Same stage order as the core service: heuristic rerank scores the full
-  // fused pool, the cross-encoder re-orders that full pool, grouping applies
-  // its adjacency boost, and only then is the list cut to topK.
-  let orderedCandidates = await deps.rerankCandidates({
+  // Same ranking chain as the core service, over the fused pool.
+  const orderedCandidates = await rankCandidatePool({
     normalizedQuery,
     candidates: fusedCandidates,
-    poolSize: env.RAG_RERANK_POOL_SIZE,
+    topK: input.topK,
     language,
+    rerankCandidates: deps.rerankCandidates,
   });
-
-  if (env.RAG_CROSS_ENCODER_ENABLED) {
-    try {
-      orderedCandidates = await crossEncoderRerank({
-        query: normalizedQuery,
-        chunks: orderedCandidates,
-        model: env.RAG_CROSS_ENCODER_MODEL,
-      });
-    } catch {
-      // Fall back to reranker order if cross-encoder fails.
-    }
-  }
-
-  if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    orderedCandidates = applyContextualGrouping(
-      orderedCandidates,
-      env.RAG_ADJACENCY_BOOST,
-    );
-  }
-
-  if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
-    orderedCandidates = applyDocumentDiversity(orderedCandidates, {
-      topK: input.topK,
-      maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
-      relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
-    });
-  }
 
   const rerankedCandidates = orderedCandidates.slice(0, input.topK);
 
@@ -501,7 +463,6 @@ async function retrieveRankedCandidatesWithRoutingUntraced(
       applied: true,
       strategy: "query_expansion",
       variationCount: uniqueVariations.length,
-      hydeUsed: branches.some((branch) => branch.kind === "hyde"),
       branchCount: branches.length,
     },
     // Expansion already broadens the query; the two mechanisms stay
