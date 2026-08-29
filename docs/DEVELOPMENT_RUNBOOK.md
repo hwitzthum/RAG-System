@@ -9,7 +9,7 @@ Local setup and validation runbook for Phase 1 to Phase 12 implementation.
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 22+ and npm
 
 ## Web Service Setup
 

@@ -65,7 +65,8 @@ All ingestion, retrieval, and evaluation flows must support the same language se
 - `app/`: Next.js UI and API routes.
 - `lib/`: retrieval, cache, provider abstraction, shared app logic.
 - `scripts/ingestion/`: Node-based ingestion worker entrypoints.
-- `database/`: SQL migrations, indexes, RLS policies.
+- `supabase/migrations/`: SQL migrations, indexes, RLS policies.
+- `database/`: migration index and bootstrap notes (documentation only, no SQL).
 - `evaluation/`: evaluation datasets, benchmark runners, reports.
 - `prompts/`: system prompts and templates.
 - `docs/`: architecture, plan, evaluation, and operational documentation.

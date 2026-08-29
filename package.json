@@ -2,6 +2,9 @@
   "name": "rag-system",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "concurrently --names \"next,worker\" --prefix-colors \"blue,green\" \"next dev -p 3001\" \"npm run dev:worker\"",
     "dev:next": "next dev -p 3001",

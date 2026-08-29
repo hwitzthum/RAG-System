@@ -195,8 +195,8 @@ function run() {
     );
   }
 
-  if (env.CRON_SECRET && env.CRON_SECRET.length < 16) {
-    invalid.push("CRON_SECRET must be at least 16 characters");
+  if (env.CRON_SECRET && env.CRON_SECRET.length < 32) {
+    invalid.push("CRON_SECRET must be at least 32 characters");
   }
 
   if (

@@ -1781,7 +1781,7 @@ This workflow ensures quality is measured, not assumed; problems are caught earl
 
 ### Prerequisites
 
-- **Node.js 18+** (LTS recommended)
+- **Node.js 22+** (CI runs Node 24)
 - A **[Supabase](https://supabase.com)** project (free tier works for development)
 - An **[OpenAI API key](https://platform.openai.com/api-keys)** with access to `text-embedding-3-large` and your chosen chat model
 
@@ -2201,8 +2201,8 @@ All variables are validated at startup via Zod. Missing required variables throw
 | Variable                   | Required      | Default | Description                                                                     |
 | -------------------------- | ------------- | ------- | ------------------------------------------------------------------------------- |
 | `ADMIN_EMAIL`              | No            | —       | Email address auto-promoted to `admin` on first signup                          |
-| `SUPABASE_JWT_SECRET`      | Yes\*         | —       | Validates Supabase-issued JWTs server-side. Provide this **or** `AUTH_JWKS_URL` |
-| `AUTH_JWKS_URL`            | Yes\*         | —       | JWKS endpoint for JWT validation. Alternative to `SUPABASE_JWT_SECRET`          |
+| `SUPABASE_JWT_SECRET`      | No            | —       | HS256 verification secret. When unset, JWTs are verified via `AUTH_JWKS_URL`    |
+| `AUTH_JWKS_URL`            | No            | derived | JWKS endpoint for JWT verification. Defaults to `<SUPABASE_URL>/auth/v1/keys`   |
 | `OPENAI_BYOK_VAULT_KEY`    | Prod required | —       | 32-byte base64 AES key for encrypting user-supplied API keys at rest            |
 | `CRON_SECRET`              | Prod required | —       | Bearer token that authorises the `/api/internal/ingestion/run` endpoint         |
 | `AUTH_DEV_INSECURE_BYPASS` | No            | `false` | Skip auth checks in development — **must be `false` in production**             |
