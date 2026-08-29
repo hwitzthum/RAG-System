@@ -40,6 +40,7 @@ const ENTITY_HEAD_NOUNS = new Set([
   "conference",
   "consortium",
   "council",
+  "forum",
   "foundation",
   "framework",
   "index",
@@ -211,15 +212,24 @@ export function extractClaimedEntities(question: string): string[] {
  * to find names that appear nowhere at all.
  */
 export function entityProbeTerms(entity: string): string[] {
-  return entity
-    .split(/\s+/)
-    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ""))
-    .filter(
-      (word) =>
-        word.length >= 3 &&
-        !ENTITY_INFIX_WORDS.has(word.toLowerCase()) &&
-        !/^\d{4}$/.test(word),
-    );
+  return (
+    entity
+      /*
+       * Split on internal punctuation rather than deleting it. German
+       * gender-inclusive forms write "Practitioner:in", and stripping the
+       * colon fuses it into "Practitionerin" — a token that appears nowhere,
+       * so a credential the corpus really documents probed as absent and the
+       * question would have been refused. Splitting yields "Practitioner",
+       * which matches.
+       */
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(
+        (word) =>
+          word.length >= 3 &&
+          !ENTITY_INFIX_WORDS.has(word.toLowerCase()) &&
+          !/^\d{4}$/.test(word),
+      )
+  );
 }
 
 export type UnsupportedPremise = {
