@@ -164,6 +164,20 @@ function hasFolio(line: string, pageNumber: number, offset: number): boolean {
  * `Taste and Smell` — or null when nothing usable is left.
  */
 function runningHeadText(line: string, pageNumber: number, offset: number | null): string | null {
+  /*
+   * Pagination, judged on the raw line before anything is removed. "Seite 2
+   * von 10" and "Page 3 of 12" pair a counter with a total, and stripping the
+   * folio leaves "Seite von" — a label that says nothing and repeats on every
+   * page. Two numbers with almost no words around them is the shape, in any
+   * language. One number is not: "Introduction 11" and "Taste and Smell 131"
+   * are chapter heads beside a folio, and they are exactly what this is for.
+   */
+  const numbers = line.match(/\d+/g) ?? [];
+  const lineWords = line.match(/\p{L}+/gu) ?? [];
+  if (numbers.length >= 2 && lineWords.length <= 2) {
+    return null;
+  }
+
   let text = line.trim();
   if (offset !== null) {
     text = text.replace(
@@ -177,9 +191,31 @@ function runningHeadText(line: string, pageNumber: number, offset: number | null
     .replace(/^[\s\-–—.·|]+|[\s\-–—.·|]+$/g, "")
     .trim();
 
-  // Two letters is the shortest thing that could name a section; anything less
-  // is leftover punctuation.
-  return /\p{L}{2,}/u.test(text) ? text : null;
+  /*
+   * What is left has to look like a name, not the residue of one. A footer
+   * reading "Seite 2 von 5" loses its folio and leaves "von 5", which is a
+   * worse section label than no label at all — it says nothing and repeats on
+   * every page. Requiring one substantial word, or two ordinary ones, keeps
+   * "Taste and Smell" and "Introduction" while rejecting "von 5" and the bare
+   * initialisms some templates put in the corner.
+   */
+  const words = text.match(/\p{L}+/gu) ?? [];
+
+  /*
+   * Pagination residue. "Seite 2 von 10" and "Page 3 of 12" lose only the
+   * folio that matches this page, so "Seite von 10" survives — a label that
+   * says nothing and repeats on every page. Whatever the language, the shape
+   * is the same: a digit still present and almost no words around it. Real
+   * headings that carry a number ("4.4 Perceiving: a 'mere Cambridge
+   * change'?") have prose around it.
+   */
+  if (/\d/.test(text) && words.length < 3) {
+    return null;
+  }
+
+  const hasSubstantialWord = words.some((word) => word.length >= 4);
+  const ordinaryWords = words.filter((word) => word.length >= 3).length;
+  return hasSubstantialWord || ordinaryWords >= 2 ? text : null;
 }
 
 export type PageFurnitureReport = {

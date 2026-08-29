@@ -141,3 +141,26 @@ test("splitPagesIntoSections bounds an unbounded heading path", () => {
     assert.equal(section.sectionTitle.length <= 182, true);
   }
 });
+
+test("a folio residue is not promoted to a section label", () => {
+  // "Seite 2 von 5" loses its folio and leaves "von 5" — a label that says
+  // nothing and would repeat on every page.
+  const pages: ExtractedPage[] = Array.from({ length: 10 }, (_, index) => ({
+    pageNumber: index + 1,
+    text: [
+      `Seite ${index + 1} von 10`,
+      `Fliesstext der Seite ${"q".repeat(index)} mit echtem Inhalt.`,
+      "Zweite Zeile mit weiterem Fliesstext zur Sache.",
+      "Dritte Zeile, damit die Seite eine Mitte hat.",
+    ].join("\n"),
+  }));
+
+  const { pages: cleaned, runningHeads } = stripPageFurniture(pages);
+
+  // The furniture still goes.
+  for (const page of cleaned) {
+    assert.equal(page.text.includes("von 10"), false);
+  }
+  // But it does not become anybody's section title.
+  assert.equal(runningHeads.size, 0);
+});
