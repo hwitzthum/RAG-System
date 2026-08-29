@@ -24,6 +24,24 @@ export function datasetNameForFingerprint(corpusFingerprint: string): string {
   return `golden-set-${corpusFingerprint.slice(0, 12)}`;
 }
 
+/**
+ * Dataset item ids are scoped by the same fingerprint, for the same reason.
+ *
+ * Record ids (`en-<doc>-<chunk_index>`) are stable across re-chunks of the
+ * same document, and Langfuse resolves item ids project-wide rather than per
+ * dataset. A run linked on the bare record id therefore attaches to whichever
+ * OLDER golden set still holds an item of that name — measured on
+ * 2026-08-29, where a run against `golden-set-34ec45e9d5b7` (never synced)
+ * silently landed 49 of 79 records in the Aug 9 dataset, whose items carry
+ * different expected chunks, and 404'd only on the ids the old set lacked.
+ */
+export function datasetItemIdFor(
+  corpusFingerprint: string,
+  recordId: string,
+): string {
+  return `${corpusFingerprint.slice(0, 12)}-${recordId}`;
+}
+
 export type BenchmarkScore = {
   name: string;
   value: number;

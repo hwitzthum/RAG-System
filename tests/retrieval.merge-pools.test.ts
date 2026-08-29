@@ -26,7 +26,7 @@ function buildChunk(overrides: Partial<RetrievedChunk>): RetrievedChunk {
 
 test("mergeCandidatePools dedupes by chunkId keeping the best relevanceScore", async () => {
   ensureRetrievalTestEnv();
-  const { mergeCandidatePools } = await import("../lib/retrieval/corrective");
+  const { mergeCandidatePools } = await import("../lib/retrieval/router");
 
   const merged = mergeCandidatePools([
     [
@@ -64,7 +64,7 @@ test("mergeCandidatePools dedupes by chunkId keeping the best relevanceScore", a
 
 test("mergeCandidatePools never shrinks the pool below a single branch", async () => {
   ensureRetrievalTestEnv();
-  const { mergeCandidatePools } = await import("../lib/retrieval/corrective");
+  const { mergeCandidatePools } = await import("../lib/retrieval/router");
 
   const branchA = [
     buildChunk({
@@ -112,7 +112,7 @@ test("mergeCandidatePools never shrinks the pool below a single branch", async (
 
 test("mergeCandidatePools sorts by resolved relevance, descending", async () => {
   ensureRetrievalTestEnv();
-  const { mergeCandidatePools } = await import("../lib/retrieval/corrective");
+  const { mergeCandidatePools } = await import("../lib/retrieval/router");
 
   const merged = mergeCandidatePools([
     [

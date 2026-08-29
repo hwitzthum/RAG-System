@@ -27,9 +27,7 @@ import {
   computeRetrievalConfigFingerprint,
 } from "@/lib/retrieval/trace";
 import { crossEncoderRerank } from "@/lib/retrieval/cross-encoder";
-import { applyContextualGrouping } from "@/lib/retrieval/contextual-grouping";
 import { applyDocumentDiversity } from "@/lib/retrieval/diversity";
-import { generateQueryVariations } from "@/lib/retrieval/multi-query";
 import { isDocumentOverviewQuery } from "@/lib/retrieval/intent";
 
 const MIN_CANDIDATE_LIMIT = 20;
@@ -38,15 +36,10 @@ const MIN_CANDIDATE_LIMIT = 20;
 export const RETRIEVAL_CONFIG_FINGERPRINT = computeRetrievalConfigFingerprint({
   crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
   crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
-  crossEncoderIncludeContext: env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
   rerankPoolSize: env.RAG_RERANK_POOL_SIZE,
   rrfK: env.RAG_RRF_K,
-  contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
-  adjacencyBoost: env.RAG_ADJACENCY_BOOST,
   maxChunksPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
   diversityRelevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
-  multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
-  multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
   queryEmbeddingModel: env.RAG_QUERY_EMBEDDING_MODEL,
   queryEmbeddingDimensions: env.RAG_QUERY_EMBEDDING_DIMENSIONS,
 });
@@ -57,18 +50,19 @@ export type RetrieveRankedCandidatesInput = {
   languageHint?: SupportedLanguage;
   documentIds?: string[];
   cacheNamespace?: string;
-  /**
-   * Set by the router when this call is already one branch of an expanded
-   * query. Without it the router's variations would each be expanded again
-   * here, costing branches x variations embedding calls per request.
-   */
-  disableMultiQuery?: boolean;
 };
 
 export type RetrieveRankedCandidatesResult = {
   chunks: RetrievedChunk[];
   trace: RetrievalTrace;
 };
+
+export type RerankCandidatesFn = (input: {
+  normalizedQuery: string;
+  candidates: RetrievedChunk[];
+  poolSize: number;
+  language?: SupportedLanguage;
+}) => Promise<RetrievedChunk[]>;
 
 export type RetrievalServiceDependencies = {
   readCache: (input: ReadRetrievalCacheInput) => Promise<{
@@ -78,12 +72,7 @@ export type RetrievalServiceDependencies = {
   writeCache: (input: WriteRetrievalCacheInput) => Promise<void>;
   pruneCache: (currentRetrievalVersion: number) => Promise<void>;
   createEmbedding: (normalizedQuery: string) => Promise<number[]>;
-  rerankCandidates: (input: {
-    normalizedQuery: string;
-    candidates: RetrievedChunk[];
-    poolSize: number;
-    language?: SupportedLanguage;
-  }) => Promise<RetrievedChunk[]>;
+  rerankCandidates: RerankCandidatesFn;
   searchVector: typeof searchVectorCandidates;
   searchKeyword: typeof searchKeywordCandidates;
   loadDocumentOverview: typeof loadDocumentOverviewCandidates;
@@ -101,6 +90,52 @@ function getDefaultDependencies(): RetrievalServiceDependencies {
     searchKeyword: searchKeywordCandidates,
     loadDocumentOverview: loadDocumentOverviewCandidates,
   };
+}
+
+/**
+ * The ranking chain every candidate pool goes through, whether it came from
+ * a single hybrid search or from the router's fused expansion branches.
+ *
+ * Stage order matters: the heuristic reranker scores the whole pool, the
+ * cross-encoder then re-orders that FULL pool (not the final topK, which would
+ * make it incapable of rescuing a relevant candidate from deeper in the pool),
+ * and document diversity re-balances the window. The caller slices to topK.
+ */
+export async function rankCandidatePool(input: {
+  normalizedQuery: string;
+  candidates: RetrievedChunk[];
+  topK: number;
+  language: SupportedLanguage;
+  rerankCandidates: RerankCandidatesFn;
+}): Promise<RetrievedChunk[]> {
+  let ordered = await input.rerankCandidates({
+    normalizedQuery: input.normalizedQuery,
+    candidates: input.candidates,
+    poolSize: env.RAG_RERANK_POOL_SIZE,
+    language: input.language,
+  });
+
+  if (env.RAG_CROSS_ENCODER_ENABLED) {
+    try {
+      ordered = await crossEncoderRerank({
+        query: input.normalizedQuery,
+        chunks: ordered,
+        model: env.RAG_CROSS_ENCODER_MODEL,
+      });
+    } catch {
+      // Fall back to the heuristic order if the cross-encoder fails.
+    }
+  }
+
+  if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
+    ordered = applyDocumentDiversity(ordered, {
+      topK: input.topK,
+      maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
+      relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
+    });
+  }
+
+  return ordered;
 }
 
 function normalizeDocumentScope(documentIds: string[] | undefined): string[] {
@@ -282,70 +317,23 @@ async function retrieveRankedCandidatesUntraced(
   );
   const tokens = extractQueryTokens(normalizedQuery);
 
-  let vectorCandidates: RetrievedChunk[];
-  let keywordCandidates: RetrievedChunk[];
+  // Neither search is language-filtered: every search already covers the
+  // whole corpus. Language is applied as a ranking signal during rerank.
+  const primaryEmbedding = await deps.createEmbedding(normalizedQuery);
 
-  // Neither search is language-filtered any more, so there is no
-  // cross-language fallback pass to run: every search already covers the whole
-  // corpus. Language is applied as a ranking signal during rerank instead.
-  if (env.RAG_MULTI_QUERY_ENABLED && !input.disableMultiQuery) {
-    const queries = await generateQueryVariations(normalizedQuery, language);
-    const embeddings = await Promise.all(
-      queries.map((q) => deps.createEmbedding(q)),
-    );
-
-    const vectorResults = await Promise.all(
-      embeddings.map((emb) =>
-        deps.searchVector({
-          queryEmbedding: emb,
-          limit: candidateLimit,
-          documentIds: scopedDocumentIds,
-        }),
-      ),
-    );
-
-    // Merge vector results, keeping the best score per chunk
-    const chunkMap = new Map<string, RetrievedChunk>();
-    for (const results of vectorResults) {
-      for (const chunk of results) {
-        const existing = chunkMap.get(chunk.chunkId);
-        if (!existing || chunk.retrievalScore > existing.retrievalScore) {
-          chunkMap.set(chunk.chunkId, chunk);
-        }
-      }
-    }
-    // Sorted, not insertion-ordered: reciprocalRankFusion derives a candidate's
-    // rank purely from its array index, so an unsorted merge would discard the
-    // best-score-per-chunk computed above and fuse on Map insertion order.
-    vectorCandidates = [...chunkMap.values()].sort(
-      (a, b) => b.retrievalScore - a.retrievalScore,
-    );
-
-    keywordCandidates = await deps.searchKeyword({
+  const [vectorCandidates, keywordCandidates] = await Promise.all([
+    deps.searchVector({
+      queryEmbedding: primaryEmbedding,
+      limit: candidateLimit,
+      documentIds: scopedDocumentIds,
+    }),
+    deps.searchKeyword({
       normalizedQuery,
       tokens,
       limit: candidateLimit,
       documentIds: scopedDocumentIds,
-    });
-  } else {
-    const primaryEmbedding = await deps.createEmbedding(normalizedQuery);
-
-    const [vc, kc] = await Promise.all([
-      deps.searchVector({
-        queryEmbedding: primaryEmbedding,
-        limit: candidateLimit,
-        documentIds: scopedDocumentIds,
-      }),
-      deps.searchKeyword({
-        normalizedQuery,
-        tokens,
-        limit: candidateLimit,
-        documentIds: scopedDocumentIds,
-      }),
-    ]);
-    vectorCandidates = vc;
-    keywordCandidates = kc;
-  }
+    }),
+  ]);
 
   const fusedCandidates = reciprocalRankFusion({
     vectorCandidates,
@@ -353,44 +341,13 @@ async function retrieveRankedCandidatesUntraced(
     rrfK: env.RAG_RRF_K,
   });
 
-  // Stage order matters: the heuristic reranker scores the whole fused pool,
-  // the cross-encoder then re-orders that FULL pool (not the final topK, which
-  // would make it incapable of rescuing a relevant candidate from deeper in
-  // the pool), contextual grouping applies its adjacency boost while
-  // borderline chunks are still in play, and only then is the list cut to topK.
-  let orderedCandidates = await deps.rerankCandidates({
+  const orderedCandidates = await rankCandidatePool({
     normalizedQuery,
     candidates: fusedCandidates,
-    poolSize: env.RAG_RERANK_POOL_SIZE,
+    topK,
     language,
+    rerankCandidates: deps.rerankCandidates,
   });
-
-  if (env.RAG_CROSS_ENCODER_ENABLED) {
-    try {
-      orderedCandidates = await crossEncoderRerank({
-        query: normalizedQuery,
-        chunks: orderedCandidates,
-        model: env.RAG_CROSS_ENCODER_MODEL,
-      });
-    } catch {
-      // Fall back to existing rerank order if cross-encoder fails.
-    }
-  }
-
-  if (env.RAG_CONTEXTUAL_GROUPING_ENABLED) {
-    orderedCandidates = applyContextualGrouping(
-      orderedCandidates,
-      env.RAG_ADJACENCY_BOOST,
-    );
-  }
-
-  if (env.RAG_MAX_CHUNKS_PER_DOCUMENT > 0) {
-    orderedCandidates = applyDocumentDiversity(orderedCandidates, {
-      topK,
-      maxPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
-      relevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
-    });
-  }
 
   const rerankedCandidates = orderedCandidates.slice(0, topK);
 

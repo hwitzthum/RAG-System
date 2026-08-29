@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   benchmarkScores,
+  datasetItemIdFor,
   datasetNameForFingerprint,
 } from "@/lib/evaluation/langfuse-dataset";
 import type { QueryBenchmarkResult } from "@/lib/evaluation/types";
@@ -67,6 +68,25 @@ test("datasetNameForFingerprint keys the dataset on the corpus fingerprint", () 
   assert.notEqual(
     datasetNameForFingerprint("7125c1245ec8aaaa"),
     datasetNameForFingerprint("ffffffffffffbbbb"),
+  );
+});
+
+test("datasetItemIdFor scopes the record id by corpus fingerprint", () => {
+  // Record ids survive a re-chunk of the same document, and Langfuse resolves
+  // item ids project-wide, so an unscoped id would attach a run to an older
+  // golden set's item instead of failing loudly.
+  const fingerprintA =
+    "34ec45e9d5b7a0fb006deccfd51c644244111c4721e082f0edd810abb2b0dec3";
+  const fingerprintB =
+    "7125c1245ec8d65dcf5f09f6904ff23fdd433f3e0dee6022eabc67bf9b629e98";
+
+  assert.equal(
+    datasetItemIdFor(fingerprintA, "en-2e51c566-5"),
+    "34ec45e9d5b7-en-2e51c566-5",
+  );
+  assert.notEqual(
+    datasetItemIdFor(fingerprintA, "en-2e51c566-5"),
+    datasetItemIdFor(fingerprintB, "en-2e51c566-5"),
   );
 });
 

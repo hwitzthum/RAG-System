@@ -36,7 +36,7 @@ test("extractPages does not hang on a PDF fallback-scan ReDoS payload (untermina
   const bombBytes = buildBackslashBombPdfBytes(200);
 
   const startedAt = Date.now();
-  const pages = await extractPages(bombBytes, false, silentLogger);
+  const pages = await extractPages(bombBytes, null, silentLogger);
   const elapsedMs = Date.now() - startedAt;
 
   assert.ok(Array.isArray(pages), "extractPages should resolve with a page array, not hang");
@@ -53,7 +53,7 @@ test("extractPages still extracts text from legitimate TJ array operators after 
   const body = 'BT [(Hello) -20 (World) (A\\(B\\)C)] TJ ET';
   const pdfBytes = Buffer.from(body, "latin1");
 
-  const pages = await extractPages(pdfBytes, false, silentLogger);
+  const pages = await extractPages(pdfBytes, null, silentLogger);
 
   assert.ok(pages.length > 0, "extractPages should return at least one page");
   const text = pages.map((page) => page.text).join(" ");

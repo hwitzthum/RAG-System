@@ -10,7 +10,6 @@ import { unsupportedPremiseMessage } from "@/lib/answering/premise";
 import {
   assessEvidence,
   hasSufficientEvidence,
-  resolveRelevance,
   selectChunkIndexesMeetingThreshold,
   type EvidenceAssessment,
   type EvidenceScaleComposition,
@@ -136,15 +135,6 @@ export type AnswerServiceDependencies = {
   llmProvider: LlmProvider;
   /** Injectable citation verifier; defaults to verifyCitedStatements. */
   verifyCitations: typeof verifyCitedStatements;
-  /**
-   * Ambiguous-band second retrieval pass. Wired by callers only when
-   * RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED, so the answering layer never
-   * imports the retrieval pipeline itself.
-   */
-  correctiveRetrieve?: (
-    query: string,
-    language: SupportedLanguage,
-  ) => Promise<RetrievedChunk[]>;
 };
 
 // Used for the early-return paths (insufficient evidence, leakage, blocked
@@ -177,28 +167,6 @@ function uniqueCitations(citations: Citation[]): Citation[] {
   }
 
   return output;
-}
-
-/**
- * Merge corrective-retrieval results into the existing pool: dedupe by
- * chunkId keeping the entry with the best absolute relevance, sorted by that
- * relevance descending so the re-assessment (and its top-3 mean) reads the
- * strongest merged evidence rather than whatever happened to sit first.
- */
-function mergeCorrectiveChunks(
-  existing: RetrievedChunk[],
-  incoming: RetrievedChunk[],
-): RetrievedChunk[] {
-  const byChunkId = new Map<string, RetrievedChunk>();
-  for (const chunk of [...existing, ...incoming]) {
-    const kept = byChunkId.get(chunk.chunkId);
-    if (!kept || resolveRelevance(chunk) > resolveRelevance(kept)) {
-      byChunkId.set(chunk.chunkId, chunk);
-    }
-  }
-  return [...byChunkId.values()].sort(
-    (a, b) => resolveRelevance(b) - resolveRelevance(a),
-  );
 }
 
 const SENTENCE_BOUNDARY_PATTERN = /^[\s\S]*?[.!?][)"'»\]]*\s+/;
@@ -397,9 +365,9 @@ async function generateGroundedAnswerUntraced(
   const llmProvider = overrides.llmProvider ?? getDefaultProviders().llm;
   const verifyCitations = overrides.verifyCitations ?? verifyCitedStatements;
 
-  let rawChunks = input.chunks;
-  let protectedChunks = protectRetrievedChunks(rawChunks);
-  let citations = uniqueCitations(buildCitations(rawChunks));
+  const rawChunks = input.chunks;
+  const protectedChunks = protectRetrievedChunks(rawChunks);
+  const citations = uniqueCitations(buildCitations(rawChunks));
 
   const loopEnabled = env.RAG_CRAG_LOOP_ENABLED;
   const actionsTaken: string[] = [];
@@ -415,7 +383,7 @@ async function generateGroundedAnswerUntraced(
         env.RAG_EVIDENCE_SUFFICIENT_TOP3_MEAN_HEURISTIC,
     });
 
-  let assessment = assess(protectedChunks.chunks);
+  const assessment = assess(protectedChunks.chunks);
   // Snapshot at return time so late-pushed actions are never lost.
   const evidenceAssessmentResult = (): NonNullable<
     GenerateGroundedAnswerResult["evidenceAssessment"]
@@ -470,27 +438,6 @@ async function generateGroundedAnswerUntraced(
   // assessment above is observability only, and everything below is
   // bit-identical to the pre-loop behavior.
   const ambiguousBand = loopEnabled && assessment.verdict === "ambiguous";
-
-  if (
-    ambiguousBand &&
-    env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED &&
-    overrides.correctiveRetrieve
-  ) {
-    const correctiveChunks = await overrides.correctiveRetrieve(
-      input.query,
-      input.language,
-    );
-    actionsTaken.push("corrective_retrieval");
-    rawChunks = mergeCorrectiveChunks(rawChunks, correctiveChunks);
-    protectedChunks = protectRetrievedChunks(rawChunks);
-    citations = uniqueCitations(buildCitations(rawChunks));
-    // Re-assess once on the merged pool; corrective retrieval never runs
-    // twice. A pool that now fails the hard gate is refused outright.
-    assessment = assess(protectedChunks.chunks);
-    if (assessment.verdict === "insufficient") {
-      return insufficientRefusal([], false);
-    }
-  }
 
   let evidenceCaution: { missingTerms: string[] } | undefined;
   if (ambiguousBand && env.RAG_CRAG_PROMPT_GUARD_ENABLED) {

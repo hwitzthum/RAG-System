@@ -10,6 +10,7 @@ import {
 import { LangfuseClient } from "@langfuse/client";
 import {
   benchmarkScores,
+  datasetItemIdFor,
   datasetNameForFingerprint,
 } from "../../lib/evaluation/langfuse-dataset";
 import type {
@@ -125,7 +126,6 @@ type LiveDependencies = {
   retrieveRankedCandidatesWithRouting: typeof import("../../lib/retrieval/router").retrieveRankedCandidatesWithRouting;
   generateGroundedAnswer: typeof import("../../lib/answering/service").generateGroundedAnswer;
   resolveUnsupportedPremise: typeof import("../../lib/answering/premise-service").resolveUnsupportedPremise;
-  correctiveRetrieve: typeof import("../../lib/retrieval/corrective").correctiveRetrieve;
   judgeQueryResult: typeof import("../../lib/evaluation/llm-judge").judgeQueryResult;
   retrievalConfigFingerprint: string;
   env: typeof import("../../lib/config/env").env;
@@ -140,7 +140,6 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
       import("../../lib/retrieval/router"),
       import("../../lib/answering/service"),
       import("../../lib/answering/premise-service"),
-      import("../../lib/retrieval/corrective"),
       import("../../lib/evaluation/llm-judge"),
       import("../../lib/config/env"),
     ]).then(
@@ -149,7 +148,6 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
         routerModule,
         answerModule,
         premiseModule,
-        correctiveModule,
         judgeModule,
         envModule,
       ]) => ({
@@ -158,7 +156,6 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
           routerModule.retrieveRankedCandidatesWithRouting,
         generateGroundedAnswer: answerModule.generateGroundedAnswer,
         resolveUnsupportedPremise: premiseModule.resolveUnsupportedPremise,
-        correctiveRetrieve: correctiveModule.correctiveRetrieve,
         judgeQueryResult: judgeModule.judgeQueryResult,
         retrievalConfigFingerprint:
           retrievalModule.RETRIEVAL_CONFIG_FINGERPRINT,
@@ -428,15 +425,9 @@ async function executeLive(
 ): Promise<QueryExecution> {
   const deps = await loadLiveDependencies();
 
-  // Mirrors the API route: the corrective pass is wired only when its flag
-  // is on, so a disabled configuration cannot reach the second retrieval.
-  const answerOverrides = deps.env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
-    ? { correctiveRetrieve: deps.correctiveRetrieve }
-    : {};
-
   const uncachedStart = Date.now();
-  // Route through the router (the production entry point) so query expansion,
-  // HyDE, and branch fusion are exercised by the benchmark. The cache bypass
+  // Route through the router (the production entry point) so query expansion
+  // and branch fusion are exercised by the benchmark. The cache bypass
   // moves into a retrieveBase override because the router itself takes no
   // cache dependencies.
   const uncachedRetrieval = await deps.retrieveRankedCandidatesWithRouting(
@@ -478,7 +469,6 @@ async function executeLive(
       maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
       unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
     },
-    answerOverrides,
   );
   const uncachedLatencyMs = Date.now() - uncachedStart;
 
@@ -501,7 +491,6 @@ async function executeLive(
       maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
       unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
     },
-    answerOverrides,
   );
   const cachedLatencyMs = Date.now() - cachedStart;
 
@@ -559,13 +548,8 @@ type RunConfig = {
   crossEncoderEnabled: boolean;
   crossEncoderModel: string;
   crossEncoderTimeoutMs: number;
-  crossEncoderIncludeContext: boolean;
-  hydeEnabled: boolean;
-  contextualGroupingEnabled: boolean;
-  adjacencyBoost: number;
   maxChunksPerDocument: number;
   diversityRelevanceFloor: number;
-  multiQueryEnabled: boolean;
   multiQueryVariations: number;
   queryDecompositionEnabled: boolean;
   queryDecompositionMaxSubQueries: number;
@@ -578,7 +562,6 @@ type RunConfig = {
   cragReflectionEnabled: boolean;
   cragReflectionMinChecked: number;
   cragReflectionMaxUnsupportedShare: number;
-  cragCorrectiveRetrievalEnabled: boolean;
   webSearchEnabled: boolean;
   webMinSources: number;
 };
@@ -620,13 +603,8 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     crossEncoderEnabled: env.RAG_CROSS_ENCODER_ENABLED,
     crossEncoderModel: env.RAG_CROSS_ENCODER_MODEL,
     crossEncoderTimeoutMs: env.RAG_CROSS_ENCODER_TIMEOUT_MS,
-    crossEncoderIncludeContext: env.RAG_CROSS_ENCODER_INCLUDE_CONTEXT,
-    hydeEnabled: env.RAG_HYDE_ENABLED,
-    contextualGroupingEnabled: env.RAG_CONTEXTUAL_GROUPING_ENABLED,
-    adjacencyBoost: env.RAG_ADJACENCY_BOOST,
     maxChunksPerDocument: env.RAG_MAX_CHUNKS_PER_DOCUMENT,
     diversityRelevanceFloor: env.RAG_DIVERSITY_RELEVANCE_FLOOR,
-    multiQueryEnabled: env.RAG_MULTI_QUERY_ENABLED,
     multiQueryVariations: env.RAG_MULTI_QUERY_VARIATIONS,
     queryDecompositionEnabled: env.RAG_QUERY_DECOMPOSITION_ENABLED,
     queryDecompositionMaxSubQueries: env.RAG_QUERY_DECOMPOSITION_MAX_SUBQUERIES,
@@ -641,7 +619,6 @@ async function buildRunConfig(args: RunnerArgs): Promise<RunConfig | null> {
     cragReflectionMinChecked: env.RAG_CRAG_REFLECTION_MIN_CHECKED,
     cragReflectionMaxUnsupportedShare:
       env.RAG_CRAG_REFLECTION_MAX_UNSUPPORTED_SHARE,
-    cragCorrectiveRetrievalEnabled: env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED,
     webSearchEnabled: env.RAG_WEB_SEARCH_ENABLED,
     webMinSources: env.RAG_WEB_MIN_SOURCES,
   };
@@ -1035,7 +1012,7 @@ async function linkDatasetRun(input: {
         corpusFingerprint: args.corpusFingerprint,
         dataset: datasetNameForFingerprint(args.corpusFingerprint),
       },
-      datasetItemId: query.id,
+      datasetItemId: datasetItemIdFor(args.corpusFingerprint, query.id),
       traceId,
     });
 

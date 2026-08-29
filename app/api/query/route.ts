@@ -22,7 +22,6 @@ import {
   markUserOpenAiApiKeyUsed,
   resolveUserOpenAiApiKey,
 } from "@/lib/providers/openai-vault";
-import { correctiveRetrieve } from "@/lib/retrieval/corrective";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { retrieveRankedCandidatesWithRouting } from "@/lib/retrieval/router";
@@ -168,7 +167,6 @@ function buildQueryStreamResponse(input: {
       applied: boolean;
       strategy: "standard" | "query_expansion";
       variationCount: number;
-      hydeUsed: boolean;
       branchCount: number;
     };
     citationAttribution: {
@@ -391,7 +389,6 @@ export async function POST(request: NextRequest) {
         applied: false,
         strategy: "standard" as const,
         variationCount: 0,
-        hydeUsed: false,
         branchCount: 1,
       },
       citationAttribution: {
@@ -446,7 +443,6 @@ export async function POST(request: NextRequest) {
         applied: false,
         strategy: "standard" as const,
         variationCount: 0,
-        hydeUsed: false,
         branchCount: 1,
       },
       citationAttribution: {
@@ -883,22 +879,6 @@ export async function POST(request: NextRequest) {
                                 onSentence: (sentence) =>
                                   emit("token", { queryId, token: sentence }),
                               },
-                              // The corrective pass is wired only when its flag is
-                              // on, so the disabled configuration cannot even reach
-                              // the second retrieval path. It must reuse the same
-                              // document scope/cache namespace as the primary
-                              // retrieval pass above — otherwise it searches the
-                              // entire corpus regardless of the caller's access.
-                              env.RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED
-                                ? {
-                                    correctiveRetrieve: (query, language) =>
-                                      correctiveRetrieve(query, language, {
-                                        documentIds: retrievalDocumentIds,
-                                        cacheNamespace:
-                                          retrievalCacheNamespace,
-                                      }),
-                                  }
-                                : {},
                             );
                       const latencyMs = Date.now() - startedAt;
 

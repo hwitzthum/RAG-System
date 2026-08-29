@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-  RetrievedChunk,
-  SupportedLanguage,
-} from "../lib/contracts/retrieval";
+import type { RetrievedChunk } from "../lib/contracts/retrieval";
 import type { CitationVerification } from "../lib/answering/verification";
 
 process.env.SUPABASE_URL ??= "https://example.supabase.co";
@@ -72,10 +69,6 @@ type AskOptions = {
   chunks: RetrievedChunk[];
   answerText?: string;
   verification?: CitationVerification;
-  correctiveRetrieve?: (
-    query: string,
-    language: SupportedLanguage,
-  ) => Promise<RetrievedChunk[]>;
   query?: string;
 };
 
@@ -108,7 +101,6 @@ async function ask(options: AskOptions) {
         },
       },
       verifyCitations: async () => options.verification ?? UNVERIFIED_STUB,
-      correctiveRetrieve: options.correctiveRetrieve,
     },
   );
 
@@ -295,61 +287,3 @@ test("(g) loop off: ambiguous behaves like sufficient, assessment still recorded
   assert.equal(loopOff.capturedPrompt, promptLoopOn);
 });
 
-test("(i) corrective retrieval runs only when enabled, and merges deduped", async () => {
-  const correctiveChunks: RetrievedChunk[] = [
-    // Duplicate of chunk-1 with a better score: dedupe must keep the best.
-    buildChunk({
-      chunkId: "chunk-1",
-      relevanceScore: 0.9,
-      scoreScale: "cross_encoder",
-    }),
-    buildChunk({
-      chunkId: "chunk-3",
-      relevanceScore: 0.8,
-      scoreScale: "cross_encoder",
-      content: "Corrective evidence on the Quantum Shield Initiative budget.",
-    }),
-  ];
-  let calls = 0;
-  const correctiveRetrieve = async () => {
-    calls += 1;
-    return correctiveChunks;
-  };
-
-  // Flag off (default): never invoked, even in the ambiguous band.
-  await withEnv({ RAG_CRAG_LOOP_ENABLED: true }, async () => {
-    await ask({ chunks: ambiguousChunks(), correctiveRetrieve });
-    assert.equal(calls, 0);
-  });
-
-  await withEnv(
-    {
-      RAG_CRAG_LOOP_ENABLED: true,
-      RAG_CRAG_CORRECTIVE_RETRIEVAL_ENABLED: true,
-    },
-    async () => {
-      const { result, capturedPrompt } = await ask({
-        chunks: ambiguousChunks(),
-        correctiveRetrieve,
-      });
-
-      assert.equal(calls, 1);
-      // The merged pool reaches the prompt: new evidence present, the
-      // duplicated chunk exactly once.
-      assert.ok(capturedPrompt.includes("Corrective evidence on the Quantum"));
-      assert.equal(
-        capturedPrompt.split(
-          "The programme funds rural broadband deployment across regions.",
-        ).length - 1,
-        1,
-      );
-      assert.ok(
-        result.evidenceAssessment?.actionsTaken.includes(
-          "corrective_retrieval",
-        ),
-      );
-      // Post-merge re-assessment reads the strengthened pool.
-      assert.equal(result.evidenceAssessment?.verdict, "sufficient");
-    },
-  );
-});
