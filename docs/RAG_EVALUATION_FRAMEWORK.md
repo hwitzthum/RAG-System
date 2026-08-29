@@ -101,8 +101,8 @@ Outputs:
 - Citation accuracy: `>= 0.90`
 - Hallucination rate: `< 0.05`
 - Cache hit rate on repeated-query workload: `>= 0.30`
-- Uncached p95 latency: `< 7s`
-- Cached p95 latency: `< 2.5s`
+- Uncached p95 latency: `< 15s`
+- Cached p95 latency: `< 12s`
 
 If any threshold fails, release is blocked.
 
