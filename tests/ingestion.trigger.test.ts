@@ -55,6 +55,7 @@ test("runIngestionTrigger runs a single worker pass and returns processed status
           completed: 1,
           failed: 0,
           deadLettered: 0,
+      yielded: 0,
           durationMs: 5,
           jobs: [],
         };
@@ -78,6 +79,7 @@ test("runIngestionTrigger runs a single worker pass and returns processed status
     body: {
       status: "processed",
       claimed: 1,
+      yielded: 0,
     },
   });
 });
@@ -103,6 +105,7 @@ test("runIngestionTrigger forwards the requested maxJobs to the worker", async (
           completed: 2,
           failed: 0,
           deadLettered: 0,
+      yielded: 0,
           durationMs: 4,
           jobs: [],
         };
@@ -126,6 +129,7 @@ test("runIngestionTrigger forwards the requested maxJobs to the worker", async (
     body: {
       status: "processed",
       claimed: 2,
+      yielded: 0,
     },
   });
 });
@@ -142,6 +146,7 @@ test("runIngestionTrigger returns idle when no jobs are claimed", async () => {
         completed: 0,
         failed: 0,
         deadLettered: 0,
+      yielded: 0,
         durationMs: 3,
         jobs: [],
       }),
@@ -158,6 +163,7 @@ test("runIngestionTrigger returns idle when no jobs are claimed", async () => {
     body: {
       status: "idle",
       claimed: 0,
+      yielded: 0,
     },
   });
 });

@@ -214,6 +214,18 @@ export class IngestionPipeline {
   private readonly repository: IngestionRuntimeRepository;
   private readonly logger: RuntimeLogger;
   private readonly extractPagesFn: ExtractPagesFn;
+  /**
+   * Extracted text of the document being processed, kept for the life of this
+   * pipeline — which is exactly one run. A document too large for one batch
+   * re-enters `processJob` once per batch, and every re-entry used to
+   * re-download and re-parse the whole PDF just to rebuild this string. On a
+   * 313-page book that measured ~0.7s of each ~11s batch, and it was paid 92
+   * times: ~130 MB re-downloaded and 313 pages re-parsed per ingestion.
+   */
+  private cachedDocumentText: {
+    documentId: string;
+    text: string;
+  } | null = null;
   private readonly contextGeneratorFactory: ContextGeneratorFactory;
   private readonly embeddingProviderFactory: EmbeddingProviderFactory;
   private readonly resolveJobSecrets: ResolveJobSecrets;
@@ -373,6 +385,7 @@ export class IngestionPipeline {
       });
 
       documentText = pages.map((page) => page.text).join("\n\n");
+      this.cachedDocumentText = { documentId: document.id, text: documentText };
 
       // One document-level summary, generated once and persisted: it is the
       // fallback whenever the document is outside the cacheable size window.
@@ -519,11 +532,20 @@ export class IngestionPipeline {
     await setStage("contextualizing");
 
     if (documentText === null) {
+      documentText =
+        this.cachedDocumentText?.documentId === document.id
+          ? this.cachedDocumentText.text
+          : null;
+    }
+
+    if (documentText === null) {
       /*
-       * A resumed run: extraction happened on an earlier invocation. Re-deriving
-       * the text costs a download and a parse — seconds, no LLM spend — and
-       * keeps the whole-document context available across the runs a large
-       * document spans. Failure falls back to the summary path.
+       * A resumed run whose extraction happened in an earlier invocation, so
+       * there is nothing cached in this process. Re-deriving the text costs a
+       * download and a parse — seconds, no LLM spend — and keeps the
+       * whole-document context available across the runs a large document
+       * spans. Every later batch of this run reads the cache instead.
+       * Failure falls back to the summary path.
        */
       try {
         const pdfBytes = await this.repository.downloadDocument(
@@ -535,6 +557,15 @@ export class IngestionPipeline {
           this.logger,
         );
         documentText = pages.map((page) => page.text).join("\n\n");
+        this.cachedDocumentText = {
+          documentId: document.id,
+          text: documentText,
+        };
+        this.logger.info("pipeline_step", {
+          step: "document_text_reextracted",
+          elapsed: elapsed(),
+          chars: documentText.length,
+        });
       } catch (error) {
         this.logger.warn("document_text_reextraction_failed", {
           documentId: document.id,

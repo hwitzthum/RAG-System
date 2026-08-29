@@ -515,6 +515,7 @@ export function chunkSections(input: {
     let emittedSectionChunk = false;
 
     while (paragraphIndex < paragraphs.length) {
+      const paragraphIndexAtPassStart = paragraphIndex;
       const chunkParagraphs = [...overlapParagraphs];
       let chunkTokenCount = chunkParagraphs.reduce(
         (sum, paragraph) => sum + countTokens(paragraph),
@@ -527,9 +528,24 @@ export function chunkSections(input: {
         const paragraphTokens = countTokens(paragraph);
 
         if (paragraphTokens > targetTokens) {
-          if (addedFreshParagraph || chunkTokenCount > 0) {
+          if (addedFreshParagraph) {
             break;
           }
+
+          /*
+           * Nothing fresh was added, so anything in the buffer is carried-over
+           * overlap — text already emitted with the previous chunk. Breaking
+           * here to "flush" it re-entered the outer loop with that same
+           * overlap and this same oversized paragraph, so `paragraphIndex`
+           * never advanced: the chunker spun, appending the overlap as a new
+           * chunk on every pass, until the worker died of heap exhaustion.
+           * Any document with a normal paragraph followed by one larger than
+           * `targetTokens` hit it. Drop the overlap and split the oversized
+           * paragraph now, mirroring the budget-overflow branch below.
+           */
+          overlapParagraphs = [];
+          chunkParagraphs.length = 0;
+          chunkTokenCount = 0;
 
           const oversizedParagraphChunks = isTableRow(
             paragraph.split("\n")[0] ?? "",
@@ -592,6 +608,15 @@ export function chunkSections(input: {
         overlapParagraphs = buildParagraphOverlap(
           chunkParagraphs,
           overlapTokens,
+        );
+      }
+
+      // Every pass must consume at least one paragraph. A pass that does not
+      // would repeat forever; failing the job with a real error beats an
+      // out-of-memory kill that strands the document mid-ingestion.
+      if (paragraphIndex === paragraphIndexAtPassStart) {
+        throw new Error(
+          `Chunking made no progress at paragraph ${paragraphIndex} of section "${section.sectionTitle}"`,
         );
       }
     }
