@@ -159,7 +159,7 @@ function evaluate(args) {
     !isPlaceholder(envValues.VERCEL_ORG_ID) &&
     !isPlaceholder(envValues.VERCEL_PROJECT_ID);
 
-  const hasCronSecret = Boolean(envValues.CRON_SECRET) && !isPlaceholder(envValues.CRON_SECRET) && envValues.CRON_SECRET.length >= 16;
+  const hasCronSecret = Boolean(envValues.CRON_SECRET) && !isPlaceholder(envValues.CRON_SECRET) && envValues.CRON_SECRET.length >= 32;
 
   const coreRequiredKeys = [
     "SUPABASE_URL",
@@ -207,7 +207,7 @@ function evaluate(args) {
       detail: `orgId=${projectIds.orgId || "missing"}, projectId=${projectIds.projectId || "missing"}`,
     },
     { name: "staging_env_vercel_ids_configured", passed: hasVercelIdsInEnv, detail: "VERCEL_ORG_ID and VERCEL_PROJECT_ID are non-placeholder" },
-    { name: "staging_env_cron_secret_valid", passed: hasCronSecret, detail: "CRON_SECRET exists and length >=16" },
+    { name: "staging_env_cron_secret_valid", passed: hasCronSecret, detail: "CRON_SECRET exists and length >=32" },
   ];
 
   const checkByName = Object.fromEntries(checks.map((check) => [check.name, check]));
@@ -254,7 +254,7 @@ function evaluate(args) {
     nextSteps.push("Populate non-placeholder core values in .env.staging and rerun readiness.");
   }
   if (!checkByName.staging_env_cron_secret_valid.passed) {
-    nextSteps.push("Set CRON_SECRET in .env.staging to a random 16+ character secret.");
+    nextSteps.push("Set CRON_SECRET in .env.staging to a random 32+ character secret.");
   }
 
   return {
