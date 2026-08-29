@@ -5,6 +5,16 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["pdfkit", "pdfjs-dist"],
+  // pdfjs reaches its worker through a specifier it builds at runtime, so
+  // output file tracing never sees it and the file was left out of the
+  // deployed function. Extraction then failed with "Setting up fake worker
+  // failed" and silently fell back to the byte scrape, which collapses a
+  // whole book onto page 1 and loses every page number a citation needs.
+  outputFileTracingIncludes: {
+    "/api/internal/ingestion/run": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
+  },
   async headers() {
     return [
       {

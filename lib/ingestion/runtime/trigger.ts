@@ -27,10 +27,23 @@ export async function runIngestionTrigger(input: {
   bearerToken: string | null;
   region: string | null | undefined;
   maxJobs?: number;
+  /**
+   * Seconds of this invocation's window the run may use before checking a
+   * still-unfinished job back into the queue. Leaves room for the in-flight
+   * batch to land, so the platform never kills the function mid-batch.
+   */
+  maxRunSeconds?: number;
   dependencies?: Partial<IngestionTriggerDependencies>;
 }): Promise<
   | { statusCode: 401; body: { error: "Unauthorized" } }
-  | { statusCode: 200; body: { status: "idle" | "processed"; claimed: number } }
+  | {
+      statusCode: 200;
+      body: {
+        status: "idle" | "processed";
+        claimed: number;
+        yielded: number;
+      };
+    }
   | { statusCode: 500; body: { error: "Failed to run ingestion batch" } }
 > {
   if (
@@ -55,6 +68,10 @@ export async function runIngestionTrigger(input: {
     workerName: `ingestion-trigger-${input.region?.trim() || "unknown"}`,
   });
   const maxJobs = Math.max(1, Math.min(50, Math.floor(input.maxJobs ?? 1)));
+  const deadlineAt =
+    input.maxRunSeconds !== undefined && input.maxRunSeconds > 0
+      ? Date.now() + input.maxRunSeconds * 1000
+      : undefined;
 
   try {
     await dependencies.assertRuntimeContract();
@@ -62,6 +79,7 @@ export async function runIngestionTrigger(input: {
       settings,
       logger: dependencies.logger,
       maxJobs,
+      deadlineAt,
     });
 
     return {
@@ -69,6 +87,7 @@ export async function runIngestionTrigger(input: {
       body: {
         status: metrics.claimed === 0 ? "idle" : "processed",
         claimed: metrics.claimed,
+        yielded: metrics.yielded,
       },
     };
   } catch (error) {

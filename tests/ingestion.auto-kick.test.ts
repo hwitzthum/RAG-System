@@ -44,6 +44,7 @@ test("scheduleIngestionAutoKick schedules a trigger run for accepted uploads", a
           completed: 3,
           failed: 0,
           deadLettered: 0,
+      yielded: 0,
           durationMs: 5,
           jobs: [],
         };

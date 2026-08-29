@@ -781,3 +781,205 @@ test("chunkSections still merges short sections within one page", () => {
   assert.equal(chunks[0]?.pageNumber, 4);
   assert.equal(chunks[0]?.sectionTitle, "Overview / Scope");
 });
+
+test("chunkSections terminates when an oversized paragraph follows a normal one", () => {
+  // Regression: the oversized-paragraph branch used to break out to "flush"
+  // a buffer holding only carried-over overlap. That re-entered the outer
+  // pass with the same overlap and the same oversized paragraph, so the
+  // paragraph index never advanced and the chunker appended the overlap
+  // forever — the worker died of heap exhaustion partway through ingestion.
+  const normalParagraph =
+    "The subject retains its potential to know throughout the change.";
+  const oversizedParagraph = Array.from(
+    { length: 60 },
+    (_, index) =>
+      `Perception is a form of alteration in the sense organ, as argument ${index} shows.`,
+  ).join(" ");
+
+  const chunks = chunkSections({
+    sections: [
+      {
+        pageNumber: 1,
+        sectionTitle: "Overview",
+        text: `${normalParagraph}\n\n${oversizedParagraph}`,
+      },
+    ],
+    language: "EN",
+    targetTokens: 40,
+    overlapTokens: 8,
+    minChars: 20,
+  });
+
+  assert.equal(chunks.length > 0, true);
+  // The overlap must not be re-emitted as a chunk of its own.
+  const contents = chunks.map((chunk) => chunk.content);
+  assert.equal(new Set(contents).size, contents.length);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.chunkIndex),
+    chunks.map((_, index) => index),
+  );
+});
+
+test("runIngestionBatch yields an unfinished job once the run is out of time", async () => {
+  // A document too large for one invocation used to run until the platform
+  // killed the function, which left the job locked with no error and spent a
+  // retry. Checking in voluntarily requeues it with its progress intact.
+  const repository = new FakeRepository();
+  repository.claimedJobs = [
+    { id: "job-big", documentId: "doc-1", status: "processing", attempt: 1 },
+  ];
+
+  let batches = 0;
+  const metrics = await runIngestionBatch({
+    repository,
+    logger: quietLogger,
+    deadlineAt: Date.now() - 1,
+    pipeline: {
+      processJob: async (): Promise<ProcessJobResult> => {
+        batches += 1;
+        return { status: "partial", chunksProcessed: 5, chunksTotal: 500 };
+      },
+    },
+  });
+
+  assert.equal(batches, 1);
+  assert.equal(metrics.yielded, 1);
+  assert.equal(metrics.completed, 0);
+  assert.equal(metrics.failed, 0);
+  assert.deepEqual(repository.yieldedJobs, ["job-big"]);
+  // Not finalized, and not counted as a failure against the retry budget.
+  assert.deepEqual(repository.completedJobs, []);
+  assert.deepEqual(repository.failedCalls, []);
+});
+
+test("runIngestionBatch keeps batching an unfinished job while time remains", async () => {
+  const repository = new FakeRepository();
+  repository.claimedJobs = [
+    { id: "job-ok", documentId: "doc-1", status: "processing", attempt: 1 },
+  ];
+
+  let batches = 0;
+  const metrics = await runIngestionBatch({
+    repository,
+    logger: quietLogger,
+    deadlineAt: Date.now() + 60_000,
+    pipeline: {
+      processJob: async (): Promise<ProcessJobResult> => {
+        batches += 1;
+        return batches < 3
+          ? { status: "partial", chunksProcessed: batches * 5, chunksTotal: 15 }
+          : {
+              status: "completed",
+              chunksProcessed: 15,
+              chunksTotal: 15,
+              documentLanguage: "EN",
+            };
+      },
+    },
+  });
+
+  assert.equal(batches, 3);
+  assert.equal(metrics.yielded, 0);
+  assert.equal(metrics.completed, 1);
+  assert.deepEqual(repository.yieldedJobs, []);
+});
+
+test("runIngestionBatch yields when the next batch is projected to overrun", async () => {
+  // The deadline is still ahead, but not by enough to fit another batch of the
+  // size just measured. Starting one anyway is how the run used to get killed
+  // mid-batch, losing that batch's work and burning a retry.
+  const repository = new FakeRepository();
+  repository.claimedJobs = [
+    { id: "job-proj", documentId: "doc-1", status: "processing", attempt: 1 },
+  ];
+
+  let batches = 0;
+  const metrics = await runIngestionBatch({
+    repository,
+    logger: quietLogger,
+    // Comfortably in the future, but shorter than 1.3x the batch below.
+    deadlineAt: Date.now() + 120,
+    pipeline: {
+      processJob: async (): Promise<ProcessJobResult> => {
+        batches += 1;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return { status: "partial", chunksProcessed: 5, chunksTotal: 500 };
+      },
+    },
+  });
+
+  assert.equal(batches, 1);
+  assert.equal(metrics.yielded, 1);
+  assert.deepEqual(repository.yieldedJobs, ["job-proj"]);
+});
+
+test("IngestionPipeline extracts the document once across a resumed run", async () => {
+  // Each batch re-entered processJob and re-parsed the whole PDF purely to
+  // rebuild the whole-document context string — ~20% of every batch on a book.
+  const repository = new FakeRepository();
+  const job: IngestionJob = {
+    id: "job-cache",
+    documentId: repository.document.id,
+    status: "processing",
+    attempt: 1,
+  };
+
+  let extractCalls = 0;
+  const pipeline = new IngestionPipeline({
+    settings: {
+      ...resolveIngestionRuntimeSettings(),
+      chunksPerRun: 1,
+      contextEnabled: false,
+      embeddingDim: 3,
+      // Small budgets so each paragraph becomes its own chunk, forcing the
+      // run to span several batches.
+      chunkTargetTokens: 20,
+      chunkOverlapTokens: 4,
+      chunkMinChars: 20,
+    },
+    repository,
+    logger: quietLogger,
+    extractPagesFn: async () => {
+      extractCalls += 1;
+      return [
+        {
+          pageNumber: 1,
+          text: [
+            "First paragraph of the document body for the run.",
+            "",
+            "Second paragraph of the document body for the run.",
+            "",
+            "Third paragraph of the document body for the run.",
+          ].join("\n"),
+          method: "pdfjs" as const,
+        },
+      ];
+    },
+    contextGenerator: {
+      enrich: async (chunks) =>
+        chunks.map((chunk) => ({ ...chunk, context: "ctx" })),
+    },
+    embeddingProvider: {
+      embedTexts: async (inputs) => inputs.map(() => [0.1, 0.2, 0.3]),
+    },
+    resolveJobSecrets: async () => ({
+      openAiApiKey: null,
+      anthropicApiKey: null,
+    }),
+  });
+
+  let batches = 1;
+  let result = await pipeline.processJob(job);
+  const firstPassExtractCalls = extractCalls;
+  while (result.status === "partial") {
+    result = await pipeline.processJob(job);
+    batches += 1;
+  }
+
+  assert.equal(result.status, "completed");
+  // The cache is only meaningful if the run actually spans several batches.
+  assert.equal(batches > 1, true);
+  assert.equal(firstPassExtractCalls, 1);
+  // Every later batch reads the cached text instead of re-parsing the PDF.
+  assert.equal(extractCalls, 1);
+});
