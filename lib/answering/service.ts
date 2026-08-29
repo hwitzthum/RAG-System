@@ -6,6 +6,7 @@ import type {
 } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
 import { summarizeChunks } from "@/lib/observability/trace-payloads";
+import { unsupportedPremiseMessage } from "@/lib/answering/premise";
 import {
   assessEvidence,
   hasSufficientEvidence,
@@ -65,6 +66,14 @@ export type GenerateGroundedAnswerInput = {
   minHeuristicRelevance: number;
   maxOutputTokens: number;
   documentScopeId?: string | null;
+  /**
+   * A name the question presupposes that appears nowhere in the caller's
+   * corpus, from `findUnsupportedPremise`. Set means refuse before generating:
+   * the evidence may be perfectly relevant to the topic, but answering would
+   * attribute it to a source that does not exist. Resolved in the route, which
+   * owns document scoping — this module stays pure over its inputs.
+   */
+  unsupportedPremiseEntity?: string | null;
   /**
    * When provided (and the LLM provider supports streaming), completed,
    * per-sentence-redacted sentences are emitted as they are generated. The
@@ -446,6 +455,13 @@ async function generateGroundedAnswerUntraced(
     evidenceAssessment: evidenceAssessmentResult(),
   });
 
+  if (input.unsupportedPremiseEntity) {
+    return {
+      ...insufficientRefusal([], false),
+      answer: unsupportedPremiseMessage(input.unsupportedPremiseEntity),
+    };
+  }
+
   if (assessment.verdict === "insufficient") {
     return insufficientRefusal([], false);
   }
@@ -735,6 +751,36 @@ async function generateWebAugmentedAnswerUntraced(
   ) {
     return {
       answer: INSUFFICIENT_EVIDENCE_MESSAGE,
+      citations: citations.slice(0, 3),
+      insufficientEvidence: true,
+      answerTruncated: false,
+      promptInjection: {
+        suspiciousChunkCount: protectedChunks.suspiciousCount,
+        blockedChunkCount: protectedChunks.blockedCount,
+        suspiciousWebSourceCount: protectedWebSources.suspiciousCount,
+        blockedWebSourceCount: protectedWebSources.blockedCount,
+        blockedUserQuery: false,
+      },
+      outputFilter: {
+        blocked: false,
+        filtered: false,
+        reasons: [],
+        redactionCount: 0,
+      },
+      citationAttribution: UNATTRIBUTED,
+      citationVerification: null,
+      evidenceAssessment,
+    };
+  }
+
+  /*
+   * The web path refuses on an unsupported premise too. Web research widens
+   * the evidence but does not make the named source exist, and leaving this
+   * out would turn "enable web research" into a way around the gate.
+   */
+  if (input.unsupportedPremiseEntity) {
+    return {
+      answer: unsupportedPremiseMessage(input.unsupportedPremiseEntity),
       citations: citations.slice(0, 3),
       insufficientEvidence: true,
       answerTruncated: false,

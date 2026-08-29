@@ -26,6 +26,7 @@ import { correctiveRetrieve } from "@/lib/retrieval/corrective";
 import { detectQueryLanguage } from "@/lib/retrieval/language";
 import { normalizeQuery } from "@/lib/retrieval/query";
 import { retrieveRankedCandidatesWithRouting } from "@/lib/retrieval/router";
+import { resolveUnsupportedPremise } from "@/lib/answering/premise-service";
 import { runWithRuntimeSecrets } from "@/lib/runtime/secrets";
 import {
   buildPromptInjectionRefusal,
@@ -577,6 +578,18 @@ export async function POST(request: NextRequest) {
                     enableQueryExpansion: requestBody.enableQueryExpansion,
                   });
 
+                /*
+                 * Existence check on any work or body the question names.
+                 * Runs here rather than in the answering service because the
+                 * probe has to be scoped to what this caller may read, and
+                 * the route is where that is known. `scopedDocumentIds` is
+                 * undefined only for a caller who may read everything.
+                 */
+                const unsupportedPremise = await resolveUnsupportedPremise({
+                  question: requestBody.query,
+                  documentIds: scopedDocumentIds ?? null,
+                });
+
                 let webSources: WebSource[] = [];
                 if (
                   requestBody.enableWebResearch &&
@@ -849,6 +862,7 @@ export async function POST(request: NextRequest) {
                                 env.RAG_MIN_HEURISTIC_RELEVANCE,
                               maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
                               documentScopeId: explicitScopeId,
+                              unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
                               webSources,
                               minWebSources: env.RAG_WEB_MIN_SOURCES,
                               onSentence: (sentence) =>
@@ -865,6 +879,7 @@ export async function POST(request: NextRequest) {
                                   env.RAG_MIN_HEURISTIC_RELEVANCE,
                                 maxOutputTokens: env.RAG_LLM_MAX_OUTPUT_TOKENS,
                                 documentScopeId: explicitScopeId,
+                                unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
                                 onSentence: (sentence) =>
                                   emit("token", { queryId, token: sentence }),
                               },

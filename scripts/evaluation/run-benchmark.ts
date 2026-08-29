@@ -124,6 +124,7 @@ type LiveDependencies = {
   retrieveRankedCandidates: typeof import("../../lib/retrieval/service").retrieveRankedCandidates;
   retrieveRankedCandidatesWithRouting: typeof import("../../lib/retrieval/router").retrieveRankedCandidatesWithRouting;
   generateGroundedAnswer: typeof import("../../lib/answering/service").generateGroundedAnswer;
+  resolveUnsupportedPremise: typeof import("../../lib/answering/premise-service").resolveUnsupportedPremise;
   correctiveRetrieve: typeof import("../../lib/retrieval/corrective").correctiveRetrieve;
   judgeQueryResult: typeof import("../../lib/evaluation/llm-judge").judgeQueryResult;
   retrievalConfigFingerprint: string;
@@ -138,6 +139,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
       import("../../lib/retrieval/service"),
       import("../../lib/retrieval/router"),
       import("../../lib/answering/service"),
+      import("../../lib/answering/premise-service"),
       import("../../lib/retrieval/corrective"),
       import("../../lib/evaluation/llm-judge"),
       import("../../lib/config/env"),
@@ -146,6 +148,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
         retrievalModule,
         routerModule,
         answerModule,
+        premiseModule,
         correctiveModule,
         judgeModule,
         envModule,
@@ -154,6 +157,7 @@ async function loadLiveDependencies(): Promise<LiveDependencies> {
         retrieveRankedCandidatesWithRouting:
           routerModule.retrieveRankedCandidatesWithRouting,
         generateGroundedAnswer: answerModule.generateGroundedAnswer,
+        resolveUnsupportedPremise: premiseModule.resolveUnsupportedPremise,
         correctiveRetrieve: correctiveModule.correctiveRetrieve,
         judgeQueryResult: judgeModule.judgeQueryResult,
         retrievalConfigFingerprint:
@@ -451,6 +455,18 @@ async function executeLive(
         }),
     },
   );
+  /*
+   * The same premise check `/api/query` runs. The benchmark calls the
+   * answering service directly, so anything wired only into the route would
+   * never be measured here — the unanswerable slice would keep scoring the
+   * ungated behaviour. Scope is null because the benchmark queries the whole
+   * corpus, exactly as its retrieval calls above do.
+   */
+  const unsupportedPremise = await deps.resolveUnsupportedPremise({
+    question: query.question,
+    documentIds: null,
+  });
+
   const uncachedAnswer = await deps.generateGroundedAnswer(
     {
       query: query.question,
@@ -460,6 +476,7 @@ async function executeLive(
       minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
       minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
       maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
+      unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
     },
     answerOverrides,
   );
@@ -482,6 +499,7 @@ async function executeLive(
       minRerankScore: deps.env.RAG_MIN_RERANK_SCORE,
       minHeuristicRelevance: deps.env.RAG_MIN_HEURISTIC_RELEVANCE,
       maxOutputTokens: deps.env.RAG_LLM_MAX_OUTPUT_TOKENS,
+      unsupportedPremiseEntity: unsupportedPremise?.entity ?? null,
     },
     answerOverrides,
   );

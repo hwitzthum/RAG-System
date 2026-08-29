@@ -371,3 +371,58 @@ export async function loadDocumentOverviewCandidates(input: {
     buildOverviewChunk(row, Math.max(0.9, 1 - index * 0.01)),
   );
 }
+
+/**
+ * Number of the caller's chunks containing every one of `terms`.
+ *
+ * Backs the premise check in the answering layer: a question naming a work or
+ * body that appears nowhere in the reader's own corpus is built on a premise
+ * the corpus cannot support, however relevant the chunks that come back are.
+ *
+ * Scoping is mandatory, not an optimisation. The admin client bypasses RLS, so
+ * an unscoped probe would let any caller confirm whether a phrase occurs in
+ * another account's private documents — a existence oracle over the whole
+ * corpus, and the same class of leak that the corrective-retrieval pass was
+ * fixed for. An empty scope means an empty library, where nothing is
+ * supported.
+ */
+export async function countChunksMatchingTerms(input: {
+  terms: string[];
+  /**
+   * Documents the caller may read, or null for a caller who may read every
+   * ready document — an admin. Null is the only unscoped form, and it is never
+   * derived from an empty list.
+   */
+  documentIds: string[] | null;
+}): Promise<number> {
+  if (input.terms.length === 0) {
+    return 0;
+  }
+  if (input.documentIds !== null && input.documentIds.length === 0) {
+    return 0;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  // `plain` maps to plainto_tsquery, which ANDs every lexeme — the whole name
+  // has to be present, not merely one common word of it.
+  const scoped = supabase
+    .from("document_chunks")
+    .select("id,documents!inner(status)", { count: "exact", head: true })
+    .eq("documents.status", "ready");
+  const filtered =
+    input.documentIds === null
+      ? scoped
+      : scoped.in("document_id", input.documentIds);
+
+  const { count, error } = await filtered.textSearch(
+    "tsv",
+    input.terms.join(" "),
+    { config: "simple", type: "plain" },
+  );
+
+  if (error) {
+    throw new Error(`Entity support probe failed: ${error.message}`);
+  }
+
+  return count ?? 0;
+}
