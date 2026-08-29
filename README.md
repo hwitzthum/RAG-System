@@ -3284,7 +3284,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## Testing
 
-### Unit Tests (345 tests)
+### Unit Tests (351 tests)
 
 ```bash
 npx tsx --test tests/*.test.ts
