@@ -7,6 +7,7 @@ import {
 import { ContextGenerator } from "@/lib/ingestion/runtime/context-generator";
 import { EmbeddingProvider } from "@/lib/ingestion/runtime/embedding-provider";
 import { extractPages } from "@/lib/ingestion/runtime/pdf-extractor";
+import { stripPageFurniture } from "@/lib/ingestion/runtime/page-furniture";
 import type {
   ChunkCandidate,
   DocumentRecord,
@@ -226,6 +227,20 @@ export class IngestionPipeline {
     documentId: string;
     text: string;
   } | null = null;
+  /**
+   * Chunk candidates for the job in flight.
+   *
+   * `loadJobProgress` reads the whole `chunk_candidates` JSONB, and it ran
+   * once per batch: ~700 KB re-fetched 93 times for a 313-page book, growing
+   * linearly with the document. The blob is written once at the end of
+   * extraction and never changes, and this run holds the job's lock, so
+   * re-reading it says nothing new. Only the processed counter advances, and
+   * that is read fresh every batch.
+   */
+  private cachedCandidates: {
+    jobId: string;
+    candidates: ChunkCandidate[];
+  } | null = null;
   private readonly contextGeneratorFactory: ContextGeneratorFactory;
   private readonly embeddingProviderFactory: EmbeddingProviderFactory;
   private readonly resolveJobSecrets: ResolveJobSecrets;
@@ -339,7 +354,17 @@ export class IngestionPipeline {
     );
 
     // Load incremental state
-    let progress: JobProgress = await this.repository.loadJobProgress(job.id);
+    const cachedCandidates =
+      this.cachedCandidates?.jobId === job.id
+        ? this.cachedCandidates.candidates
+        : null;
+    let progress: JobProgress = await this.repository.loadJobProgress(
+      job.id,
+      cachedCandidates === null,
+    );
+    if (!progress.candidates && cachedCandidates) {
+      progress = { ...progress, candidates: cachedCandidates };
+    }
 
     /*
      * Full document text, fed to the context generator so each chunk is
@@ -384,7 +409,36 @@ export class IngestionPipeline {
         extractionMethod: extractionMethod ?? null,
       });
 
-      documentText = pages.map((page) => page.text).join("\n\n");
+      /*
+       * The byte scrape is a last resort that collapses every page onto page
+       * 1. Its output used to be ingested and the document marked `ready`, so
+       * it answered queries with citations that all claimed page 1 and text
+       * pulled straight from PDF operators — wrong in a way no error surfaced
+       * and no reader could detect. A document that cannot be parsed properly
+       * is a failure, not a degraded success.
+       */
+      if (extractionMethod === "byte_scrape") {
+        throw new Error(
+          "PDF text extraction failed: the file has no readable text layer " +
+            "(scanned or image-only PDF). Page numbers and structure cannot " +
+            "be recovered, so it was not ingested.",
+        );
+      }
+
+      const furniture = stripPageFurniture(pages);
+      if (furniture.report.linesRemoved > 0) {
+        this.logger.info("pipeline_step", {
+          step: "page_furniture_stripped",
+          elapsed: elapsed(),
+          linesRemoved: furniture.report.linesRemoved,
+          folioOffset: furniture.report.folioOffset,
+          runningHeadPages: furniture.runningHeads.size,
+          patterns: furniture.report.patterns,
+        });
+      }
+      const contentPages = furniture.pages;
+
+      documentText = contentPages.map((page) => page.text).join("\n\n");
       this.cachedDocumentText = { documentId: document.id, text: documentText };
 
       // One document-level summary, generated once and persisted: it is the
@@ -416,7 +470,10 @@ export class IngestionPipeline {
       await setStage("chunking");
       // Document-level so a heading carries to its continuation on the next
       // page instead of restarting at `Page N`.
-      const sections = splitPagesIntoSections(pages);
+      const sections = splitPagesIntoSections(
+        contentPages,
+        furniture.runningHeads,
+      );
 
       if (sections.length === 0) {
         throw new Error("No extractable text found in document");
@@ -488,6 +545,7 @@ export class IngestionPipeline {
         chunksTotal: chunkCandidates.length,
         currentStage: "chunked",
       };
+      this.cachedCandidates = { jobId: job.id, candidates: chunkCandidates };
       job.currentStage = "chunked";
     }
 

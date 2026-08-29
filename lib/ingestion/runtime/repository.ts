@@ -49,7 +49,10 @@ export interface IngestionRuntimeRepository {
     chunks: ChunkCandidate[],
     total: number,
   ): Promise<void>;
-  loadJobProgress(jobId: string): Promise<JobProgress>;
+  loadJobProgress(
+    jobId: string,
+    includeCandidates?: boolean,
+  ): Promise<JobProgress>;
   updateJobStage(jobId: string, stage: string): Promise<void>;
   updateJobProgress(jobId: string, chunksProcessed: number): Promise<void>;
   yieldJob(jobId: string): Promise<void>;
@@ -362,12 +365,28 @@ export class SupabaseIngestionRuntimeRepository implements IngestionRuntimeRepos
     );
   }
 
-  async loadJobProgress(jobId: string): Promise<JobProgress> {
+  async loadJobProgress(
+    jobId: string,
+    includeCandidates = true,
+  ): Promise<JobProgress> {
+    // The candidate blob is the whole payload of this row and never changes
+    // after extraction, so a caller that already holds it asks for the
+    // counters alone.
+    const columns = includeCandidates
+      ? "chunk_candidates,chunks_total,chunks_processed,current_stage"
+      : "chunks_total,chunks_processed,current_stage";
+    // The column list is chosen at runtime, so supabase-js cannot infer the
+    // row shape here.
     const { data, error } = await this.supabase
       .from("ingestion_jobs")
-      .select("chunk_candidates,chunks_total,chunks_processed,current_stage")
+      .select(columns)
       .eq("id", jobId)
-      .single();
+      .single<{
+        chunk_candidates?: unknown;
+        chunks_total: number;
+        chunks_processed: number;
+        current_stage: string | null;
+      }>();
 
     if (error) {
       throw new Error(`Failed to load job progress: ${error.message}`);

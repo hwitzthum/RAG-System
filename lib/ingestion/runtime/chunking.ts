@@ -61,6 +61,37 @@ function headingDepth(line: string): number {
   return HEADING_UPPERCASE.test(line) ? 1 : 2;
 }
 
+/** Deepest levels of the heading path kept in a section title. */
+const MAX_BREADCRUMB_DEPTH = 3;
+/** Hard ceiling on a section title, in characters. */
+const MAX_BREADCRUMB_CHARS = 180;
+
+/**
+ * Renders the heading path as a section title, keeping only the levels nearest
+ * the content and bounding the result.
+ *
+ * `sectionTitle` is embedded into the chunk vector, indexed into the keyword
+ * tsvector, and sent to the answering model as an attribute on every evidence
+ * chunk, so an unbounded one is charged three times over. A book's front
+ * matter produced a 1,547-character title — an entire series listing — which
+ * swamped the content it was supposed to label.
+ */
+function boundBreadcrumb(stack: string[]): string {
+  const deduped: string[] = [];
+  for (const entry of stack.slice(-MAX_BREADCRUMB_DEPTH)) {
+    if (deduped[deduped.length - 1] !== entry) {
+      deduped.push(entry);
+    }
+  }
+
+  const rendered = deduped.join(" / ");
+  if (rendered.length <= MAX_BREADCRUMB_CHARS) {
+    return rendered;
+  }
+  // Trim from the front: the level nearest the content is the informative one.
+  return `… ${rendered.slice(rendered.length - MAX_BREADCRUMB_CHARS)}`;
+}
+
 /**
  * Splits a whole document into sections, carrying the heading path across page
  * boundaries.
@@ -71,7 +102,15 @@ function headingDepth(line: string): number {
  * every chunk its ancestry, and item 2.1 puts that string into the embedded
  * vector, where the heading has never appeared.
  */
-export function splitPagesIntoSections(pages: ExtractedPage[]): Section[] {
+export function splitPagesIntoSections(
+  pages: ExtractedPage[],
+  /**
+   * Running head per page number, from `stripPageFurniture`. Where a page has
+   * one it replaces the root of the heading path, because the page says which
+   * chapter it belongs to and a carried-over stack only guesses.
+   */
+  runningHeads?: Map<number, string>,
+): Section[] {
   const sections: Section[] = [];
   // Heading path by depth, persisting across pages.
   let stack: string[] = [];
@@ -81,9 +120,23 @@ export function splitPagesIntoSections(pages: ExtractedPage[]): Section[] {
       continue;
     }
 
+    /*
+     * A depth-1 heading persists until another depth-1 heading replaces it,
+     * and `headingDepth` reads any all-caps line as depth 1. A book's title
+     * page ("DAVID CHARLES") therefore outranked every chapter — which is
+     * title case, so depth 2 — and led the breadcrumb of all 313 pages. The
+     * running head is re-stated on each page, so it cannot go stale that way.
+     */
+    const runningHead = runningHeads?.get(page.pageNumber);
+    if (runningHead) {
+      stack = [runningHead];
+    }
+
     const lines = page.text.split(/\r?\n/).map((line) => line.trim());
     const breadcrumb = () =>
-      stack.length > 0 ? stack.join(" / ") : `Page ${page.pageNumber}`;
+      stack.length > 0
+        ? boundBreadcrumb(stack)
+        : `Page ${page.pageNumber}`;
 
     let currentTitle = breadcrumb();
     let currentContent: string[] = [];
@@ -286,7 +339,10 @@ function mergeSectionTitles(titles: string[]): string {
   const deduped = titles.filter(
     (title, index) => titles.indexOf(title) === index,
   );
-  return deduped.join(" / ");
+  // Merging is where an unbounded title actually got built: each source
+  // section contributed its own path, so a handful of front-matter sections
+  // concatenated into 1,547 characters.
+  return boundBreadcrumb(deduped);
 }
 
 function mergeAdjacentSections(

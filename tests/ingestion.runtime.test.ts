@@ -308,7 +308,12 @@ class FakeRepository implements IngestionRuntimeRepository {
     this.savedChunksTotal = total;
   }
 
-  async loadJobProgress(): Promise<JobProgress> {
+  async loadJobProgress(
+    _jobId?: string,
+    _includeCandidates = true,
+  ): Promise<JobProgress> {
+    void _jobId;
+    void _includeCandidates;
     return {
       candidates: this.savedCandidates,
       chunksProcessed: this.currentChunksProcessed,
@@ -982,4 +987,104 @@ test("IngestionPipeline extracts the document once across a resumed run", async 
   assert.equal(firstPassExtractCalls, 1);
   // Every later batch reads the cached text instead of re-parsing the PDF.
   assert.equal(extractCalls, 1);
+});
+
+test("IngestionPipeline refuses a document that only byte-scrape could read", async () => {
+  // The scrape collapses every page onto page 1. Ingesting it marked the
+  // document `ready`, so it answered queries with citations that all claimed
+  // page 1 — wrong in a way nothing surfaced.
+  const repository = new FakeRepository();
+  const job: IngestionJob = {
+    id: "job-scrape",
+    documentId: repository.document.id,
+    status: "processing",
+    attempt: 1,
+  };
+
+  const pipeline = new IngestionPipeline({
+    settings: { ...resolveIngestionRuntimeSettings(), contextEnabled: false },
+    repository,
+    logger: quietLogger,
+    extractPagesFn: async () => [
+      { pageNumber: 1, text: "Recovered operator text.", method: "byte_scrape" as const },
+    ],
+    contextGenerator: {
+      enrich: async (chunks) => chunks.map((chunk) => ({ ...chunk, context: "ctx" })),
+    },
+    embeddingProvider: { embedTexts: async (inputs) => inputs.map(() => [0.1]) },
+    resolveJobSecrets: async () => ({ openAiApiKey: null, anthropicApiKey: null }),
+  });
+
+  await assert.rejects(
+    () => pipeline.processJob(job),
+    /no readable text layer/,
+  );
+  assert.deepEqual(repository.insertedChunkBatches, []);
+});
+
+test("IngestionPipeline reads the candidate blob once across a resumed run", async () => {
+  // loadJobProgress returns the whole chunk_candidates JSONB — ~700 KB for a
+  // 313-page book, and it was re-read once per batch.
+  const repository = new FakeRepository();
+  const job: IngestionJob = {
+    id: "job-blob",
+    documentId: repository.document.id,
+    status: "processing",
+    attempt: 1,
+  };
+
+  const candidateFetches: boolean[] = [];
+  const baseLoad = repository.loadJobProgress.bind(repository);
+  repository.loadJobProgress = async (jobId?: string, includeCandidates = true) => {
+    candidateFetches.push(includeCandidates);
+    const progress = await baseLoad(jobId as string);
+    return includeCandidates ? progress : { ...progress, candidates: null };
+  };
+
+  const pipeline = new IngestionPipeline({
+    settings: {
+      ...resolveIngestionRuntimeSettings(),
+      chunksPerRun: 1,
+      contextEnabled: false,
+      embeddingDim: 3,
+      chunkTargetTokens: 20,
+      chunkOverlapTokens: 4,
+      chunkMinChars: 20,
+    },
+    repository,
+    logger: quietLogger,
+    extractPagesFn: async () => [
+      {
+        pageNumber: 1,
+        text: [
+          "First paragraph of the document body for the run.",
+          "",
+          "Second paragraph of the document body for the run.",
+          "",
+          "Third paragraph of the document body for the run.",
+        ].join("\n"),
+        method: "pdfjs" as const,
+      },
+    ],
+    contextGenerator: {
+      enrich: async (chunks) => chunks.map((chunk) => ({ ...chunk, context: "ctx" })),
+    },
+    embeddingProvider: { embedTexts: async (inputs) => inputs.map(() => [0.1, 0.2, 0.3]) },
+    resolveJobSecrets: async () => ({ openAiApiKey: null, anthropicApiKey: null }),
+  });
+
+  let result = await pipeline.processJob(job);
+  let batches = 1;
+  while (result.status === "partial") {
+    result = await pipeline.processJob(job);
+    batches += 1;
+  }
+
+  assert.equal(result.status, "completed");
+  assert.equal(batches > 1, true);
+  // Only the first pass, which had nothing cached, asked for the blob.
+  assert.deepEqual(
+    candidateFetches.filter((included) => included).length,
+    1,
+  );
 });
