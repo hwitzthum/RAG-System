@@ -32,6 +32,22 @@ name: Supabase Deploy Credential Check
 # /api/health issues a real SELECT 1 and reports "degraded" on failure; its
 # backend /health does not touch the database at all.
 #
+# Sharing the project also means Rezeptmeister can break this check without
+# touching this repository. Anything it applies through a migration tool — the
+# Supabase MCP `apply_migration`, `supabase db push`, `drizzle-kit migrate` —
+# writes a row into the shared `supabase_migrations.schema_migrations`, and a
+# version with no file in supabase/migrations/ aborts `db push` here. That is
+# what happened on 2026-08-30 with `20260830103343 recipe_cook_logs`. When this
+# job fails with "Remote migration versions not found in local migrations
+# directory", check whether the version belongs to Rezeptmeister before
+# assuming a lost migration of ours; if it does, drop the history row with
+#
+#   supabase migration repair --status reverted <version>
+#
+# (the row is bookkeeping only — it does not drop their table) and fix the
+# process on their side: Rezeptmeister's production DDL is documented to go in
+# through the SQL editor or psql precisely so it leaves this table alone.
+#
 # Note: GitHub disables scheduled workflows after 60 days without repository
 # activity. If this stops reporting entirely, re-enable it in the Actions tab
 # rather than assuming it is passing.
