@@ -5,7 +5,18 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/**"
+  # The remote history table is shared with Rezeptmeister, which sits in the same
+  # `public` schema of the same project. A migration it applies through a
+  # migration tool leaves a version here that has no file in supabase/migrations/,
+  # and `db push` refuses to run until that row is gone. Dispatching with
+  # `repair_reverted` set drops exactly that row (the table it created stays) and
+  # then pushes as usual; leaving it empty is a plain push.
   workflow_dispatch:
+    inputs:
+      repair_reverted:
+        description: "Remote migration version to drop from the history table before pushing (leave empty for a normal push)"
+        required: false
+        default: ""
 
 concurrency:
   group: supabase-migrations
@@ -30,6 +41,17 @@ jobs:
 
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Drop stale remote migration version
+        if: inputs.repair_reverted != ''
+        env:
+          REPAIR_VERSION: ${{ inputs.repair_reverted }}
+        run: |
+          if [[ ! "$REPAIR_VERSION" =~ ^[0-9]{12,14}$ ]]; then
+            echo "::error::repair_reverted must be a migration version (12-14 digits), got '$REPAIR_VERSION'"
+            exit 1
+          fi
+          supabase migration repair --status reverted "$REPAIR_VERSION"
 
       - name: Apply pending migrations
         run: supabase db push
