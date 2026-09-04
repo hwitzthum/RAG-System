@@ -2253,7 +2253,7 @@ All variables are validated at startup via Zod. Missing required variables throw
 | Variable                                | Required | Default  | Description                                                                                       |
 | --------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No       | —        | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
-| `INGESTION_BATCH_SIZE`                  | No       | `50`     | Chunks processed per ingestion worker batch                                                       |
+| `INGESTION_BATCH_SIZE`                  | No       | `1`      | Chunks processed per ingestion worker batch                                                       |
 | `INGESTION_LOCK_TIMEOUT_SECONDS`        | No       | `900`    | Distributed lock timeout for ingestion jobs                                                       |
 | `LANGFUSE_PUBLIC_KEY`                   | No       | —        | Langfuse project public key. Tracing is disabled entirely unless both keys are set.               |
 | `LANGFUSE_SECRET_KEY`                   | No       | —        | Langfuse project secret key                                                                       |
