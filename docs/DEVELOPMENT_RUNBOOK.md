@@ -138,7 +138,6 @@ Note:
 ## Phase 1 Definition of Done Checklist
 
 - Next.js App Router scaffold in TypeScript
-- Python worker scaffold exists (fallback path, deprecated for production)
 - Shared contracts exist in `lib/contracts`
 - Environment schema validation exists in `lib/config/env.ts`
 - Local runbook exists and is executable
