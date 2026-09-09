@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { resolveIngestionEnv } from "@/lib/config/ingestion-env";
 import { countEffectiveDocumentsByStatus } from "@/lib/ingestion/runtime/effective-documents";
 import { collectMeasuredProcessingDurations, computeP95 } from "@/lib/ingestion/runtime/soak-metrics";
 
@@ -73,7 +74,14 @@ function parseArgs(argv: string[]): ScriptArgs {
     windowHours: 24,
     minCompletedJobs: 25,
     minReadyDocuments: 25,
-    lockTimeoutSeconds: parsePositiveInt(process.env.INGESTION_LOCK_TIMEOUT_SECONDS, 900),
+    // The stuck-job gate below measures jobs against the lock the worker
+    // actually holds, so it has to resolve the same chain the worker does
+    // (WORKER_LOCK_TIMEOUT_SECONDS, then INGESTION_LOCK_TIMEOUT_SECONDS).
+    // Reading INGESTION_LOCK_TIMEOUT_SECONDS alone with a private default of
+    // 900 ignored the worker-specific override entirely and, with neither
+    // variable set, checked against 900 seconds while the lock expired after
+    // 120 — so a job abandoned between those two points passed the gate.
+    lockTimeoutSeconds: resolveIngestionEnv().lockTimeoutSeconds,
     maxP95CompletionMs: 900_000,
     maxDeadLetterGrowth: 0,
     maxDuplicateWriteErrors: 0,
