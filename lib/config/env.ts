@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sharedEnvFields } from "@/lib/config/env-fields";
 import { normalizeEnvValues } from "@/lib/config/normalize-env";
 
 const envSchema = z.object({
@@ -6,15 +7,11 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
-  // The ingestion worker resolves these itself in lib/ingestion/runtime/types.ts,
-  // which is the authority on their defaults. Keep the values here in step so the
-  // schema does not advertise a batch size or lock timeout the worker never uses.
-  INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(1),
-  INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(120),
+  // Shared with the ingestion worker, which cannot import this module; see
+  // lib/config/env-fields.ts for why they are declared there rather than here.
+  INGESTION_BATCH_SIZE: sharedEnvFields.INGESTION_BATCH_SIZE,
+  INGESTION_LOCK_TIMEOUT_SECONDS:
+    sharedEnvFields.INGESTION_LOCK_TIMEOUT_SECONDS,
   // CRON_SECRET must be at least 32 chars to provide adequate entropy.
   CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_URL: z.string().url(),
@@ -41,10 +38,7 @@ const envSchema = z.object({
   OPENAI_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
   COHERE_BYOK_VAULT_KEY: z.string().min(1).optional(),
   COHERE_BYOK_VAULT_KEY_VERSION: z.coerce.number().int().positive().default(1),
-  RAG_QUERY_EMBEDDING_MODEL: z
-    .string()
-    .min(1)
-    .default("text-embedding-3-large"),
+  RAG_QUERY_EMBEDDING_MODEL: sharedEnvFields.RAG_QUERY_EMBEDDING_MODEL,
   RAG_RETRIEVAL_VERSION: z.coerce.number().int().positive().default(1),
   RAG_RRF_K: z.coerce.number().int().positive().default(60),
   // Also sets retrieval depth: candidateLimit at lib/retrieval/service.ts is
@@ -53,7 +47,7 @@ const envSchema = z.object({
   // a 20/40/60/100 sweep on 2026-08-05 (see RAG_QUALITY_IMPROVEMENT_PLAN 1.2);
   // 100 is also CROSS_ENCODER_POOL_CAP, so going higher needs that raised too.
   RAG_RERANK_POOL_SIZE: z.coerce.number().int().positive().default(100),
-  RAG_LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  RAG_LLM_MODEL: sharedEnvFields.RAG_LLM_MODEL,
   RAG_LLM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(2_000),
   // Output PII redaction mode.
   //   off           — no PII redaction at all
@@ -138,7 +132,7 @@ const envSchema = z.object({
   RAG_DEFAULT_TOP_K: z.coerce.number().int().positive().default(8),
   RAG_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
   RAG_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
-  RAG_STORAGE_BUCKET: z.string().min(1).default("documents"),
+  RAG_STORAGE_BUCKET: sharedEnvFields.RAG_STORAGE_BUCKET,
   // Default on: the cross-encoder is the primary relevance stage and degrades
   // cleanly to the heuristic order when no Cohere key is configured or the
   // call fails/times out.
