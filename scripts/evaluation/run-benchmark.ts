@@ -1290,12 +1290,10 @@ async function run(): Promise<void> {
   const rawDataset = JSON.parse(
     fs.readFileSync(resolvedDatasetPath, "utf8"),
   ) as unknown;
-  // Floors sized to a corpus-derived golden set (the corpus's real languages),
-  // not the old 200-record synthetic fixture, which is gone.
-  const validated = validateEvaluationDataset(rawDataset, {
-    minTotalQueries: 25,
-    minPerLanguage: 5,
-  });
+  // Floors come from lib/evaluation/dataset.ts, sized to a corpus-derived
+  // golden set (the corpus's real languages) rather than the old 200-record
+  // synthetic fixture, which is gone.
+  const validated = validateEvaluationDataset(rawDataset);
   // Resolved from the golden set actually loaded, not from configuration, so a
   // run can only ever be linked to the dataset it was measured against.
   args.corpusFingerprint = validated.corpusFingerprint;

@@ -903,11 +903,9 @@ async function run(): Promise<void> {
     records,
   };
 
-  // Fails loudly if the generated set is too small or unbalanced.
-  const validation = validateEvaluationDataset(envelope, {
-    minTotalQueries: 25,
-    minPerLanguage: 5,
-  });
+  // Fails loudly if the generated set is too small or unbalanced, against the
+  // floors lib/evaluation/dataset.ts owns.
+  const validation = validateEvaluationDataset(envelope);
 
   const outPath = path.resolve(args.outPath);
   const reviewPath = path.resolve(args.reviewPath);

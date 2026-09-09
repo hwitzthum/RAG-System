@@ -47,12 +47,10 @@ async function main(): Promise<void> {
   }
 
   const raw = JSON.parse(fs.readFileSync(resolved, "utf8")) as unknown;
-  // Validated with the same floors the benchmark uses, so a golden set that
-  // could not gate a release can never be published as one either.
-  const validated = validateEvaluationDataset(raw, {
-    minTotalQueries: 25,
-    minPerLanguage: 5,
-  });
+  // Validated with the floors lib/evaluation/dataset.ts owns — the same ones
+  // the benchmark applies, so a golden set that could not gate a release can
+  // never be published as one either.
+  const validated = validateEvaluationDataset(raw);
 
   // Guaranteed present by the schema — the golden set cannot validate without
   // a fingerprint, which is what makes the dataset name meaningful.

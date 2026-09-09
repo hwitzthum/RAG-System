@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/config/env";
 import type { AdminRuntimeStatusResponse } from "@/lib/contracts/api";
 import { REQUIRED_INGESTION_RPCS } from "@/lib/ingestion/runtime/contract";
+import { DEFAULT_INGESTION_HEALTH_THRESHOLDS } from "@/lib/ingestion/runtime/health-view";
 import { REQUIRED_RETRIEVAL_CACHE_RPCS } from "@/lib/retrieval/cache-contract";
 import type { Database, DocumentStatus } from "@/lib/supabase/database.types";
 
@@ -93,9 +94,9 @@ export async function getAdminRuntimeStatus(
 ): Promise<AdminRuntimeStatusResponse> {
   const nowMs = input?.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const noProgressMinutes = input?.noProgressMinutes ?? 15;
-  const staleProcessingMinutes = input?.staleProcessingMinutes ?? 20;
-  const heartbeatLagMinutes = input?.heartbeatLagMinutes ?? 5;
+  const noProgressMinutes = input?.noProgressMinutes ?? DEFAULT_INGESTION_HEALTH_THRESHOLDS.noProgressMinutes;
+  const staleProcessingMinutes = input?.staleProcessingMinutes ?? DEFAULT_INGESTION_HEALTH_THRESHOLDS.staleProcessingMinutes;
+  const heartbeatLagMinutes = input?.heartbeatLagMinutes ?? DEFAULT_INGESTION_HEALTH_THRESHOLDS.heartbeatLagMinutes;
 
   const [
     ingestionContractResult,
