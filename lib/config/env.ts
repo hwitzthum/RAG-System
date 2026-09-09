@@ -6,12 +6,15 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default("RAG System"),
-  INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+  // The ingestion worker resolves these itself in lib/ingestion/runtime/types.ts,
+  // which is the authority on their defaults. Keep the values here in step so the
+  // schema does not advertise a batch size or lock timeout the worker never uses.
+  INGESTION_BATCH_SIZE: z.coerce.number().int().positive().default(1),
   INGESTION_LOCK_TIMEOUT_SECONDS: z.coerce
     .number()
     .int()
     .positive()
-    .default(900),
+    .default(120),
   // CRON_SECRET must be at least 32 chars to provide adequate entropy.
   CRON_SECRET: z.string().min(32).optional(),
   SUPABASE_URL: z.string().url(),
