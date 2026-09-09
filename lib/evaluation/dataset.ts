@@ -76,12 +76,29 @@ function emptyLanguageCounts(): Record<SupportedLanguage, number> {
   };
 }
 
+/**
+ * The floors a golden set must clear to be usable as a release gate.
+ *
+ * Exported because every caller needs the same numbers: the benchmark that
+ * gates a release, the generator that writes a candidate set, and the sync
+ * that publishes one. Each used to repeat the literals, so the promise that
+ * a set which cannot gate a release can never be published as one held only
+ * for as long as four separate copies happened to agree.
+ */
+export const DEFAULT_DATASET_VALIDATION_FLOORS: DatasetValidationOptions = {
+  minTotalQueries: 25,
+  minPerLanguage: 5,
+};
+
 export function validateEvaluationDataset(
   rawDataset: unknown,
   options: Partial<DatasetValidationOptions> = {},
 ): DatasetValidationResult {
-  const minTotalQueries = options.minTotalQueries ?? 25;
-  const minPerLanguage = options.minPerLanguage ?? 5;
+  const minTotalQueries =
+    options.minTotalQueries ??
+    DEFAULT_DATASET_VALIDATION_FLOORS.minTotalQueries;
+  const minPerLanguage =
+    options.minPerLanguage ?? DEFAULT_DATASET_VALIDATION_FLOORS.minPerLanguage;
 
   const parsed = evaluationDatasetSchema.safeParse(rawDataset);
   if (!parsed.success) {

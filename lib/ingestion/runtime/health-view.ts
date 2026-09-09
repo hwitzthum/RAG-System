@@ -10,6 +10,30 @@ type ProcessingJobHealthRow = Pick<
   "locked_at" | "locked_by" | "updated_at" | "current_stage"
 >;
 
+export type IngestionHealthThresholds = {
+  /** A locked job older than this counts as stale rather than merely slow. */
+  staleProcessingMinutes: number;
+  /** A job whose row has not been touched within this window is not heartbeating. */
+  heartbeatLagMinutes: number;
+  /** Window in which a non-empty queue must show some completed work. */
+  noProgressMinutes: number;
+};
+
+/**
+ * The windows that decide whether ingestion is healthy.
+ *
+ * Both readers of this judgement need the same numbers — the admin runtime
+ * status panel, which passes them to get_admin_runtime_snapshot, and the
+ * check-ingestion-health release gate, which applies them here. They each
+ * carried a private copy, so the panel and the gate agreed only by
+ * coincidence and would have diverged the moment either was tuned.
+ */
+export const DEFAULT_INGESTION_HEALTH_THRESHOLDS: IngestionHealthThresholds = {
+  staleProcessingMinutes: 20,
+  heartbeatLagMinutes: 5,
+  noProgressMinutes: 15,
+};
+
 export type ProcessingHeartbeatSummary = {
   staleProcessingCount: number;
   processingWithoutLockCount: number;

@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   countProcessingDocumentMismatches,
   countReadyDocumentsWithoutChunks,
+  DEFAULT_INGESTION_HEALTH_THRESHOLDS,
   summarizeProcessingHeartbeat,
 } from "@/lib/ingestion/runtime/health-view";
 
@@ -63,9 +64,9 @@ function parseArgs(argv: string[]): ScriptArgs {
   const args: ScriptArgs = {
     mode: "live",
     queueThreshold: 25,
-    staleProcessingMinutes: 20,
-    heartbeatLagMinutes: 5,
-    noProgressMinutes: 15,
+    staleProcessingMinutes: DEFAULT_INGESTION_HEALTH_THRESHOLDS.staleProcessingMinutes,
+    heartbeatLagMinutes: DEFAULT_INGESTION_HEALTH_THRESHOLDS.heartbeatLagMinutes,
+    noProgressMinutes: DEFAULT_INGESTION_HEALTH_THRESHOLDS.noProgressMinutes,
     noFailOnGate: false,
   };
 

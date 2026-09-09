@@ -2,7 +2,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
+import {
+  DEFAULT_DATASET_VALIDATION_FLOORS,
+  validateEvaluationDataset,
+} from "../../lib/evaluation/dataset";
 
 function parseArgs(argv: string[]): {
   datasetPath: string;
@@ -10,8 +13,8 @@ function parseArgs(argv: string[]): {
   minPerLanguage: number;
 } {
   let datasetPath = "evaluation/evaluation_queries.generated.json";
-  let minTotal = 25;
-  let minPerLanguage = 5;
+  let minTotal = DEFAULT_DATASET_VALIDATION_FLOORS.minTotalQueries;
+  let minPerLanguage = DEFAULT_DATASET_VALIDATION_FLOORS.minPerLanguage;
 
   for (let index = 2; index < argv.length; index += 1) {
     const token = argv[index];
