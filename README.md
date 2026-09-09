@@ -2248,13 +2248,39 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `ANTHROPIC_API_KEY`                      | No       | —               | Enables Anthropic Claude as an alternative LLM backend                                                                                                                    |
 | `ANTHROPIC_BYOK_VAULT_KEY`               | No       | —               | AES vault key for per-user Anthropic key encryption                                                                                                                       |
 
+### Ingestion Worker
+
+Read by `lib/config/ingestion-env.ts`, which the worker resolves on every batch. A value that is not a positive integer, or a flag that is not `true`/`1`/`false`/`0`, stops the worker with an error naming the variable rather than falling back to the default.
+
+| Variable                         | Required | Default                          | Description                                                                                                  |
+| -------------------------------- | -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `WORKER_NAME`                    | No       | `rag-ingestion-worker`           | Identifies the worker in claim records and logs                                                              |
+| `WORKER_POLL_INTERVAL_SECONDS`   | No       | `5`                              | Idle wait before polling the queue again                                                                     |
+| `INGESTION_BATCH_SIZE`           | No       | `1`                              | Jobs claimed per batch                                                                                       |
+| `WORKER_MAX_RETRIES`             | No       | `3`                              | Attempts before a job is dead-lettered                                                                       |
+| `INGESTION_LOCK_TIMEOUT_SECONDS` | No       | `120`                            | Distributed lock timeout for claimed jobs                                                                    |
+| `WORKER_LOCK_TIMEOUT_SECONDS`    | No       | `INGESTION_LOCK_TIMEOUT_SECONDS` | Worker-specific override of the lock timeout                                                                 |
+| `WORKER_CHUNK_TARGET_TOKENS`     | No       | `700`                            | Target chunk size. Must exceed the overlap, or settings resolution throws.                                   |
+| `WORKER_CHUNK_OVERLAP_TOKENS`    | No       | `120`                            | Token overlap between neighbouring chunks                                                                    |
+| `WORKER_CHUNK_MIN_CHARS`         | No       | `120`                            | Shortest chunk kept                                                                                          |
+| `WORKER_CHUNKS_PER_RUN`          | No       | `5`                              | Chunks contextualised and embedded per job slice before checkpointing                                        |
+| `WORKER_CHUNK_INSERT_BATCH_SIZE` | No       | `100`                            | Rows per chunk insert                                                                                        |
+| `WORKER_CONTEXT_ENABLED`         | No       | `true`                           | Whether chunks get an LLM-written context prefix                                                             |
+| `WORKER_CONTEXT_MODEL`           | No       | `RAG_LLM_MODEL`                  | Model that writes the context prefix                                                                         |
+| `WORKER_CONTEXT_MAX_CHARS`       | No       | `280`                            | Cap on the generated context prefix                                                                          |
+| `WORKER_EMBEDDING_MODEL`         | No       | `RAG_QUERY_EMBEDDING_MODEL`      | Indexing embedding model. Defaults to the query model because embeddings from two models are not comparable. |
+| `WORKER_EMBEDDING_DIM`           | No       | `1024`                           | Expected embedding width; a mismatch fails the chunk                                                         |
+| `WORKER_EMBEDDING_DIMENSIONS`    | No       | `1024`                           | Dimension count requested from the embedding API                                                             |
+| `WORKER_EMBEDDING_BATCH_SIZE`    | No       | `32`                             | Chunks per embedding request                                                                                 |
+| `WORKER_OPENAI_TIMEOUT_SECONDS`  | No       | `40`                             | Per-request timeout for worker OpenAI calls                                                                  |
+| `WORKER_OCR_FALLBACK_ENABLED`    | No       | `true`                           | Transcribe pages that have no text layer                                                                     |
+| `WORKER_OCR_MODEL`               | No       | `gpt-4o-mini`                    | Vision model used for OCR. Independent of `RAG_LLM_MODEL`.                                                   |
+
 ### Observability
 
 | Variable                                | Required | Default  | Description                                                                                       |
 | --------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `OBSERVABILITY_METRICS_SINK_AUTH_TOKEN` | No       | —        | Bearer token for the metrics sink endpoint. Omit to reject all requests to the endpoint with 401. |
-| `INGESTION_BATCH_SIZE`                  | No       | `1`      | Chunks processed per ingestion worker batch                                                       |
-| `INGESTION_LOCK_TIMEOUT_SECONDS`        | No       | `120`    | Distributed lock timeout for ingestion jobs                                                       |
 | `LANGFUSE_PUBLIC_KEY`                   | No       | —        | Langfuse project public key. Tracing is disabled entirely unless both keys are set.               |
 | `LANGFUSE_SECRET_KEY`                   | No       | —        | Langfuse project secret key                                                                       |
 | `LANGFUSE_BASE_URL`                     | No       | EU cloud | `https://cloud.langfuse.com` (EU), `https://us.cloud.langfuse.com` (US), or a self-hosted URL     |
