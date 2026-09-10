@@ -406,7 +406,12 @@ export class IngestionPipeline {
               }),
             }
           : null;
-      const pages = await this.extractPagesFn(pdfBytes, ocr, this.logger);
+      const pages = await this.extractPagesFn(
+        pdfBytes,
+        ocr,
+        this.logger,
+        this.settings.maxPdfPages,
+      );
       // pdfjs and OCR can mix within one document (a scanned appendix in a
       // native PDF); the byte-scrape fallback is always the whole document,
       // collapsed to a single page.
@@ -626,7 +631,12 @@ export class IngestionPipeline {
         const pdfBytes = await this.repository.downloadDocument(
           document.storagePath,
         );
-        const pages = await this.extractPagesFn(pdfBytes, null, this.logger);
+        const pages = await this.extractPagesFn(
+          pdfBytes,
+          null,
+          this.logger,
+          this.settings.maxPdfPages,
+        );
         const extractedText = pages.map((page) => page.text).join("\n\n");
         documentText =
           extractedText.trim().length > 0

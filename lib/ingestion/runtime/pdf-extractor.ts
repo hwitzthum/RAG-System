@@ -24,6 +24,38 @@ import { ocrPages, type OcrFallback } from "./ocr";
 // decompressed) while keeping worst-case memory use per stream small.
 const MAX_INFLATED_STREAM_BYTES = 25 * 1024 * 1024;
 
+// Fallback used by any caller that does not pass an explicit limit (tests,
+// scripts). Production ingestion always passes
+// IngestionRuntimeSettings.maxPdfPages (WORKER_MAX_PDF_PAGES) explicitly.
+export const DEFAULT_MAX_PDF_PAGES = 1000;
+
+/**
+ * Thrown when a PDF's page count exceeds the configured ceiling, checked
+ * immediately after pdfjs reports `numPages` and before any per-page work —
+ * text extraction or OCR — runs on a single one of them.
+ *
+ * RAG_MAX_UPLOAD_BYTES bounds the *compressed* upload, but a PDF with mostly
+ * blank or image-only pages can pack an enormous page count into a few MB.
+ * Every page pdfjs finds no text on is routed to OCR — a paid vision-model
+ * call per page — so an unbounded page count turns a small upload into an
+ * unbounded number of billed API calls. This is a permanent, not a
+ * transient, failure: retrying will not change the page count, so callers
+ * should surface it directly rather than feeding it through the pdfjs
+ * retry/byte-scrape fallback path.
+ */
+export class PdfPageLimitExceededError extends Error {
+  constructor(
+    public readonly pageCount: number,
+    public readonly maxPages: number,
+  ) {
+    super(
+      `PDF has ${pageCount} pages, exceeding the maximum of ${maxPages}. ` +
+        "The document was not ingested.",
+    );
+    this.name = "PdfPageLimitExceededError";
+  }
+}
+
 type PdfJsTextItem = {
   str?: string;
   transform?: number[];
@@ -457,6 +489,7 @@ function assemblePageText(items: PdfJsTextItem[]): AssembledPage {
 async function extractPagesWithPdfJs(
   pdfBytes: Uint8Array,
   logger: RuntimeLogger,
+  maxPages: number,
 ): Promise<ExtractedPage[]> {
   await ensurePdfJsNodePolyfills(logger);
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -474,6 +507,15 @@ async function extractPagesWithPdfJs(
 
   try {
     const document = await loadingTask.promise;
+
+    // Checked before touching a single page: a page-by-page loop over tens
+    // of thousands of near-empty pages is itself expensive, and every one
+    // pdfjs finds no text on would otherwise be queued for a paid OCR call
+    // below.
+    if (document.numPages > maxPages) {
+      throw new PdfPageLimitExceededError(document.numPages, maxPages);
+    }
+
     const pages: ExtractedPage[] = [];
 
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
@@ -541,6 +583,7 @@ export async function extractPages(
   pdfBytes: Uint8Array,
   ocr: OcrFallback | null,
   logger: RuntimeLogger,
+  maxPages: number = DEFAULT_MAX_PDF_PAGES,
 ): Promise<ExtractedPage[]> {
   /*
    * pdfjs is retried once before giving up on it.
@@ -568,6 +611,7 @@ export async function extractPages(
       const pages = await extractPagesWithPdfJs(
         new Uint8Array(pdfBytes),
         logger,
+        maxPages,
       );
       if (pages.some((page) => page.text.trim().length > 0)) {
         if (attempt > 1) {
@@ -590,6 +634,18 @@ export async function extractPages(
         pageCount: pages.length,
       });
     } catch (error) {
+      // A page-count overage is permanent, not a transient pdfjs hiccup:
+      // retrying won't change the page count, and falling through to the
+      // byte-scrape path below would still mean parsing the whole oversized
+      // document. Surface it immediately instead.
+      if (error instanceof PdfPageLimitExceededError) {
+        logger.error("pdf_page_limit_exceeded", {
+          pageCount: error.pageCount,
+          maxPages: error.maxPages,
+        });
+        throw error;
+      }
+
       const message =
         error instanceof Error ? error.message : "unknown_pdfjs_error";
       logger.warn("pdfjs_extraction_failed", { attempt, message });

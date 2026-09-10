@@ -2275,6 +2275,7 @@ Read by `lib/config/ingestion-env.ts`, which the worker resolves on every batch.
 | `WORKER_OPENAI_TIMEOUT_SECONDS`  | No       | `40`                             | Per-request timeout for worker OpenAI calls                                                                  |
 | `WORKER_OCR_FALLBACK_ENABLED`    | No       | `true`                           | Transcribe pages that have no text layer                                                                     |
 | `WORKER_OCR_MODEL`               | No       | `gpt-4o-mini`                    | Vision model used for OCR. Independent of `RAG_LLM_MODEL`.                                                   |
+| `WORKER_MAX_PDF_PAGES`           | No       | `1000`                           | Hard cap on a single PDF's page count, checked before extraction or OCR. Bounds worst-case OCR spend on a crafted many-page upload. |
 
 ### Observability
 
@@ -2956,7 +2957,7 @@ Text is extracted page-by-page using `pdfjs-dist`, with page numbers recorded al
 
 **2b. OCR for pages without a text layer**
 
-When pdfjs parses a page but finds no text — a scanned or image-only page — the worker rasterises that page and has a vision model (`WORKER_OCR_MODEL`, default `gpt-4o-mini`; `WORKER_OCR_FALLBACK_ENABLED`, default on) transcribe it in reading order. Only textless pages go to OCR, so a native PDF with a scanned appendix is handled page by page, and every page keeps its number. OCR runs once, during extraction; resumed batches rebuild the document text from the saved chunk candidates instead of transcribing again. Cost is roughly $0.005 per page at high detail. Chunks record `extraction_method = 'ocr'` so OCR'd provenance is visible.
+When pdfjs parses a page but finds no text — a scanned or image-only page — the worker rasterises that page and has a vision model (`WORKER_OCR_MODEL`, default `gpt-4o-mini`; `WORKER_OCR_FALLBACK_ENABLED`, default on) transcribe it in reading order. Only textless pages go to OCR, so a native PDF with a scanned appendix is handled page by page, and every page keeps its number. OCR runs once, during extraction; resumed batches rebuild the document text from the saved chunk candidates instead of transcribing again. Cost is roughly $0.005 per page at high detail. Chunks record `extraction_method = 'ocr'` so OCR'd provenance is visible. Page count is checked against `WORKER_MAX_PDF_PAGES` (default 1000) before any per-page work runs: `RAG_MAX_UPLOAD_BYTES` bounds compressed size, not page count, and every textless page is a paid OCR call, so an uncapped page count would let a small upload of mostly-blank pages fan out into an unbounded OCR bill.
 
 **Why this matters:** Without OCR, a scanned report is either rejected outright or — worse — byte-scraped into a single page so every citation points at page 1. Page-level OCR keeps the corpus growable without making provenance lie.
 

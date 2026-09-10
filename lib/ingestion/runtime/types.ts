@@ -114,6 +114,8 @@ export type IngestionRuntimeSettings = {
   ocrFallbackEnabled: boolean;
   /** Vision model that transcribes pages without a text layer. */
   ocrModel: string;
+  /** Hard ceiling on a single PDF's page count; see WORKER_MAX_PDF_PAGES. */
+  maxPdfPages: number;
   lockTimeoutSeconds: number;
   chunksPerRun: number;
   chunkInsertBatchSize: number;
