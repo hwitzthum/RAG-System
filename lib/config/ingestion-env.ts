@@ -73,6 +73,16 @@ const ingestionEnvSchema = z.object({
   // Independent of RAG_LLM_MODEL despite the matching default: this one has to
   // be a vision model, so the two move for different reasons.
   WORKER_OCR_MODEL: nonEmptyString("gpt-4o-mini"),
+  // Hard ceiling on a single PDF's page count, checked before any per-page
+  // work (pdfjs text extraction or OCR) runs. Without it, a PDF with no size
+  // limit on page *count* — only RAG_MAX_UPLOAD_BYTES bounds compressed bytes
+  // — can pack tens of thousands of near-empty pages into a few MB. Every
+  // page pdfjs finds no text on is routed to OCR (a paid vision-model call
+  // per page, ~$0.005 each), so a crafted upload well within the byte cap can
+  // still fan out into tens of thousands of billed OCR calls. 1000 pages
+  // comfortably covers real contracts, specs and reports while keeping the
+  // worst case bounded to a few dollars of OCR spend per upload.
+  WORKER_MAX_PDF_PAGES: positiveInt(1000),
   WORKER_LOCK_TIMEOUT_SECONDS: z.coerce.number().int().positive().optional(),
   INGESTION_LOCK_TIMEOUT_SECONDS:
     sharedEnvFields.INGESTION_LOCK_TIMEOUT_SECONDS,
@@ -109,6 +119,7 @@ export function resolveIngestionEnv(): IngestionRuntimeSettings {
     WORKER_EMBEDDING_DIMENSIONS: process.env.WORKER_EMBEDDING_DIMENSIONS,
     WORKER_OCR_FALLBACK_ENABLED: process.env.WORKER_OCR_FALLBACK_ENABLED,
     WORKER_OCR_MODEL: process.env.WORKER_OCR_MODEL,
+    WORKER_MAX_PDF_PAGES: process.env.WORKER_MAX_PDF_PAGES,
     WORKER_LOCK_TIMEOUT_SECONDS: process.env.WORKER_LOCK_TIMEOUT_SECONDS,
     INGESTION_LOCK_TIMEOUT_SECONDS: process.env.INGESTION_LOCK_TIMEOUT_SECONDS,
     WORKER_CHUNKS_PER_RUN: process.env.WORKER_CHUNKS_PER_RUN,
@@ -146,6 +157,7 @@ export function resolveIngestionEnv(): IngestionRuntimeSettings {
     embeddingDimensions: env.WORKER_EMBEDDING_DIMENSIONS,
     ocrFallbackEnabled: env.WORKER_OCR_FALLBACK_ENABLED,
     ocrModel: env.WORKER_OCR_MODEL,
+    maxPdfPages: env.WORKER_MAX_PDF_PAGES,
     lockTimeoutSeconds:
       env.WORKER_LOCK_TIMEOUT_SECONDS ?? env.INGESTION_LOCK_TIMEOUT_SECONDS,
     chunksPerRun: env.WORKER_CHUNKS_PER_RUN,
