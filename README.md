@@ -2105,7 +2105,7 @@ Each version searches independently. The result: it finds passages using differe
 
 #### **View Citations**
 
-Click any **[Source N]** link to see the exact passage the answer came from. This is **critical** for verification.
+Click any **[n]** link to see the exact passage the answer came from. This is **critical** for verification.
 
 **What you see:**
 
@@ -2768,7 +2768,7 @@ See the earlier section "[Before You Query → Language Hint](#language-hint--do
 
 When you get an answer, you'll see several components:
 
-**The answer text itself** — This is the AI's response, grounded in your documents. Every factual sentence ends with a `[Source N]` marker showing which document it came from.
+**The answer text itself** — This is the AI's response, grounded in your documents. Every factual sentence ends with a `[n]` marker showing which document it came from.
 
 **Source citations** — Below the answer, you'll see a numbered list:
 
