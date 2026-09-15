@@ -328,7 +328,7 @@ if (!parsed.success) {
 const config = {
   ...parsed.data,
   AUTH_JWKS_URL:
-    parsed.data.AUTH_JWKS_URL ?? `${parsed.data.SUPABASE_URL}/auth/v1/keys`,
+    parsed.data.AUTH_JWKS_URL ?? `${parsed.data.SUPABASE_URL}/auth/v1/.well-known/jwks.json`,
 };
 
 if (!config.SUPABASE_JWT_SECRET && !config.AUTH_JWKS_URL) {

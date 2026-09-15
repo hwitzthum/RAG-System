@@ -30,7 +30,7 @@ If documents conflict, follow this precedence order.
 ## Access and Security Rules (Mandatory)
 
 - Authentication required for all user actions.
-- Role model: `admin`, `reader`.
+- Role model: access roles `admin` and `reader`; account states without access `pending` (default for new sign-ups, awaiting admin approval), `suspended` and `rejected`. Stored in Supabase `app_metadata.role`.
 - `POST /api/upload` is available to `reader` and `admin`.
 - Query endpoints are `reader` and `admin`.
 - Rate limiting required for query endpoints.

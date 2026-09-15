@@ -92,7 +92,7 @@ npm run release:matrix:strict -- --base-url https://<staging-host> --token <read
 
 - uncached p95 latency exceeds `15s` sustained
 - cached p95 latency exceeds `12s` sustained
-- citation accuracy drops below `0.90`
+- verified citation rate drops below `0.90`
 - LLM-judge `faithfulness` drops below `0.90` (the token-overlap hallucination rate it replaced was report-only and could not fail)
 - repeated 5xx query error bursts or provider outage
 - sustained ingestion queue growth or repeated cron-run failures

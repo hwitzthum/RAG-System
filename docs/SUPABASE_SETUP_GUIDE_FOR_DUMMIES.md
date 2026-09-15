@@ -85,7 +85,7 @@ Set at least:
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `SUPABASE_PROJECT_REF=<project-ref>`
 - `SUPABASE_DB_PASSWORD=<database-password-you-chose>`
-- `AUTH_JWKS_URL=https://<project-ref>.supabase.co/auth/v1/keys`
+- `AUTH_JWKS_URL=https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`
 - `RAG_STORAGE_BUCKET=documents`
 - `OPENAI_BYOK_VAULT_KEY=<base64-encoded-32-byte-key>` (app/staging env files)
 - `OPENAI_BYOK_VAULT_KEY_VERSION=1` (app/staging env files)

@@ -116,15 +116,31 @@ Outputs:
 
 ## Target Thresholds (Release Gates)
 
+Gates are defined once in `DEFAULT_BENCHMARK_THRESHOLDS` (`lib/evaluation/types.ts`) and evaluated by `evaluateThresholds()` (`lib/evaluation/metrics.ts`). They are not configurable through environment variables or CLI flags.
+
+Aggregate gates (every run):
+
 - Recall@5: `>= 0.85`
 - nDCG@10: `>= 0.80`
-- Citation accuracy: `>= 0.90`
-- Hallucination rate: `< 0.05`
+- Citation evidence hit rate: `>= 0.80`
+- Verified citation rate: `>= 0.90` (fails when no query was verified)
+- Faithfulness (LLM judge): `>= 0.90` (fails when no query was judged, including runs with `--no-judge`)
+- False abstention rate (answerable slice): `<= 0.05`
+- False answer rate (unanswerable slice): `<= 0.10` (checked only when the dataset contains unanswerable queries)
 - Cache hit rate on repeated-query workload: `>= 0.30`
+- Uncached p50 latency: `< 8s`
 - Uncached p95 latency: `< 15s`
+- Cached p50 latency: `< 7s`
 - Cached p95 latency: `< 12s`
 
-If any threshold fails, release is blocked.
+Per-language gates (every language with at least 5 answerable queries):
+
+- Recall@5: `>= 0.85`
+- nDCG@10: `>= 0.80`
+
+Report-only (computed, never gated): strict citation accuracy, grounding score, hallucination rate, MRR, answer relevance, context precision, context recall.
+
+If any gate fails, `npm run eval:benchmark` exits non-zero (unless `--no-fail-on-gate` is passed), and `npm run release:readiness` blocks release unless `evaluation/runs/latest.json` is a live run with every gate passing.
 
 ## Regression Policy
 
