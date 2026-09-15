@@ -3,7 +3,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-63%20E2E%20%7C%20393%20Unit-brightgreen?logo=playwright&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-65%20E2E%20%7C%20398%20Unit-brightgreen?logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -3304,7 +3304,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## Testing
 
-### Unit Tests (393 tests)
+### Unit Tests (398 tests)
 
 ```bash
 npx tsx --test tests/*.test.ts
@@ -3312,7 +3312,7 @@ npx tsx --test tests/*.test.ts
 
 Covers: retrieval cache key generation and TTL behaviour, RRF score computation, lexical reranking weight blending, chunking pipeline boundary conditions, CSRF token generation and timing-safe comparison, rate limit bucket arithmetic, and the full prompt injection scanner category suite.
 
-### End-to-End Tests (63 tests + 3 auth setup steps)
+### End-to-End Tests (65 tests + 3 auth setup steps)
 
 ```bash
 # The dev server must be running before Playwright executes
@@ -3390,8 +3390,8 @@ Fork the repository, create a branch from `main`, and open a pull request with a
 
 ```bash
 npx tsc --noEmit                        # 0 TypeScript errors
-npx tsx --test tests/*.test.ts          # 393/393 unit tests pass
-npx playwright test                     # 66/66 pass incl. 3 auth setup steps (dev server must be running)
+npx tsx --test tests/*.test.ts          # 398/398 unit tests pass
+npx playwright test                     # 68/68 pass incl. 3 auth setup steps (dev server must be running)
 npm run lint                            # 0 lint errors
 ```
 
