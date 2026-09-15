@@ -37,13 +37,18 @@ async function ensurePendingUserExists(): Promise<void> {
     return;
   }
 
-  // User was deleted — re-create with the same ID
-  await supabase.auth.admin.createUser({
+  // User was deleted — re-create with the same ID, so E2E_PENDING_USER_ID
+  // (used by every later lookup) stays valid.
+  const { error: createError } = await supabase.auth.admin.createUser({
+    id: PENDING_USER_ID,
     email: PENDING_EMAIL,
     password: PENDING_PASSWORD,
     email_confirm: true,
     app_metadata: { role: "pending" },
   });
+  if (createError) {
+    throw new Error(`Failed to re-create pending user: ${createError.message}`);
+  }
 }
 
 test.describe("Admin API", () => {
