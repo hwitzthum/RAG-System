@@ -521,7 +521,7 @@ Tasks:
 1. Add cron entry in `vercel.json` (production only):
    - path: `/api/internal/ingestion/run`
    - schedule: start with low frequency (for example every 2-5 minutes), then tune
-   - current repo default: `*/5 * * * *`
+   - current repo default: `*/2 * * * *`
 2. Add `CRON_SECRET` in Vercel env.
 3. Ensure handler validates bearer token and returns non-2xx on auth failure.
 4. Add alerting/log checks for failed cron runs and queue backlog growth.
