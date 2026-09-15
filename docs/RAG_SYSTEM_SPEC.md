@@ -44,7 +44,7 @@ Primary goals:
 - query APIs
 - auth and RBAC enforcement
 
-2. Ingestion worker service (background runtime)
+2. Ingestion runtime (Vercel cron route in production; TypeScript worker as fallback)
 - pulls ingestion jobs from Postgres
 - runs extraction/chunking/context/embedding pipeline
 - writes chunk and job state updates
@@ -56,9 +56,10 @@ Primary goals:
 
 ## Hosting and Deployment Topology
 
-- Frontend/API: Vercel (Next.js)
+- Frontend/API: Vercel (Next.js, region `fra1`)
 - Database/Storage/Auth: Supabase
-- Worker: separate service runtime (container or managed process)
+- Ingestion (production): runs inside the Vercel deployment. A Vercel cron (`vercel.json`, every 2 minutes) calls `/api/internal/ingestion/run` with `Authorization: Bearer <CRON_SECRET>`. Each invocation stops starting new work within its 100-second budget (`maxDuration` 120s), and a document too large for one invocation checkpoints and resumes on the next tick. `POST /api/upload` and `POST /api/upload/batch` also schedule an ingestion run right after responding, so new documents start without waiting for the cron.
+- Worker (fallback only): the TypeScript worker (`npm run ingestion:worker`) runs the same pipeline as a long-lived polling process. It is a local and rollback path, not a production prerequisite; disable the Vercel cron job before draining the queue with it.
 
 ## Public APIs
 
@@ -220,7 +221,7 @@ Reliability requirements:
 ## Security and Access Control
 
 - authenticated internal users only
-- role model: `admin`, `reader`
+- role model: access roles `admin` and `reader`; non-access account states `pending` (awaiting approval), `suspended`, `rejected`, stored in Supabase `app_metadata.role`
 - RBAC enforced in API routes and UI actions
 - rate limiting on query endpoint
 - audit logs for privileged and data-impacting actions

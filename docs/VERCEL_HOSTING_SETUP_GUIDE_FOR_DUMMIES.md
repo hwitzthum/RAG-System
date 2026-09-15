@@ -421,7 +421,7 @@ Goal: introduce feature-gated Vercel ingestion path while keeping current worker
 Tasks:
 
 1. Add new env variables in web runtime config:
-   - `INGESTION_BATCH_SIZE` (default 1-5)
+   - `INGESTION_BATCH_SIZE` (default 1; keep 1 for the Vercel cron path)
    - `INGESTION_LOCK_TIMEOUT_SECONDS` (default aligns to current worker lock timeout)
    - `CRON_SECRET` (required for deployments that expose `/api/internal/ingestion/run`)
 2. Update:

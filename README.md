@@ -3,7 +3,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-57%20E2E%20%7C%20181%20Unit-brightgreen?logo=playwright&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-63%20E2E%20%7C%20393%20Unit-brightgreen?logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -338,7 +338,7 @@ conversation history, and a background scheduler that keeps ingestion moving.
 | -------------------------- | ------------------------------------------------------------------------------------------- |
 | Five roles                 | `admin`, `reader`, `pending`, `suspended`, `rejected`.                                      |
 | Approval workflow          | New sign-ups wait for an administrator rather than getting instant access.                  |
-| Admin panel                | Approve, promote, suspend or reactivate users.                                              |
+| Admin panel                | Approve, decline, suspend, reactivate or delete users.                                      |
 | Per-user document access   | Readers only ever search documents they are entitled to see.                                |
 | Bring your own keys        | Store your own OpenAI, Cohere or Anthropic keys, encrypted, used instead of the platform's. |
 | Rate limiting              | Protects the system and your API budget from runaway usage.                                 |
@@ -1337,7 +1337,7 @@ ls -t evaluation/runs/benchmark-*.json | head -2
 # nDCG: should stay >= 0.8
 # Faithfulness: should stay >= 0.9
 # Latency p50: should stay < 8s
-# Citation accuracy: should stay > 90%
+# Verified citation rate: should stay >= 0.9
 
 # If metrics got worse by >5%:
 #   ⚠ Even if gates pass, review what changed
@@ -2202,7 +2202,7 @@ All variables are validated at startup via Zod. Missing required variables throw
 | -------------------------- | ------------- | ------- | ------------------------------------------------------------------------------- |
 | `ADMIN_EMAIL`              | No            | —       | Email address auto-promoted to `admin` on first signup                          |
 | `SUPABASE_JWT_SECRET`      | No            | —       | HS256 verification secret. When unset, JWTs are verified via `AUTH_JWKS_URL`    |
-| `AUTH_JWKS_URL`            | No            | derived | JWKS endpoint for JWT verification. Defaults to `<SUPABASE_URL>/auth/v1/keys`   |
+| `AUTH_JWKS_URL`            | No            | derived | JWKS endpoint used when `SUPABASE_JWT_SECRET` is unset. Defaults to `<SUPABASE_URL>/auth/v1/.well-known/jwks.json` |
 | `OPENAI_BYOK_VAULT_KEY`    | Prod required | —       | 32-byte base64 AES key for encrypting user-supplied API keys at rest            |
 | `CRON_SECRET`              | Prod required | —       | Bearer token that authorises the `/api/internal/ingestion/run` endpoint         |
 | `AUTH_DEV_INSECURE_BYPASS` | No            | `false` | Skip auth checks in development — **must be `false` in production**             |
@@ -2471,6 +2471,7 @@ The system uses Supabase Auth with a **pending-approval workflow** — new accou
 | **`reader`**    | Upload documents, issue queries, download reports, manage own BYOK keys.       |
 | **`admin`**     | Everything a reader can do, plus user management at `/admin`.                  |
 | **`suspended`** | Revoked access. Session cleared on next request; redirected to `/login`.       |
+| **`rejected`**  | Sign-up declined by an admin. Session cleared on next request; login shows "Your account request has been declined". |
 
 #### Signing up
 
@@ -2481,14 +2482,17 @@ The system uses Supabase Auth with a **pending-approval workflow** — new accou
 
 #### Admin approval
 
-An admin visits `/admin` and sees all pending users. Clicking **Approve** promotes the user from `pending` → `reader`. Changes take effect on the user's next page load or **Check Status** click.
+An admin visits `/admin` and sees all pending users. Clicking **Approve** promotes the user from `pending` → `reader`; **Decline** sets `pending` → `rejected`. Changes take effect on the user's next page load or **Check Status** click.
 
-| Current role | Available actions                                                         |
-| ------------ | ------------------------------------------------------------------------- |
-| pending      | **Approve** → reader                                                      |
-| reader       | **Promote to Admin** or **Suspend**                                       |
-| admin        | **Demote to Reader** _(disabled for your own account — last-admin guard)_ |
-| suspended    | **Reactivate** → reader                                                   |
+| Current role | Available actions                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| pending      | **Approve** → reader, **Decline** → rejected, **Delete**                                  |
+| reader       | **Suspend**, **Delete**                                                                  |
+| admin        | **Suspend**, **Delete** _(not on your own account; suspending the last admin is blocked)_ |
+| suspended    | **Reactivate** → reader, **Delete**                                                      |
+| rejected     | **Delete** _(no reactivate action in the UI)_                                            |
+
+The `admin` role cannot be granted from the panel — only via `ADMIN_EMAIL` at signup or the CLI fallback below.
 
 #### Promoting the first admin (CLI fallback)
 
@@ -3300,7 +3304,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## Testing
 
-### Unit Tests (351 tests)
+### Unit Tests (393 tests)
 
 ```bash
 npx tsx --test tests/*.test.ts
@@ -3308,7 +3312,7 @@ npx tsx --test tests/*.test.ts
 
 Covers: retrieval cache key generation and TTL behaviour, RRF score computation, lexical reranking weight blending, chunking pipeline boundary conditions, CSRF token generation and timing-safe comparison, rate limit bucket arithmetic, and the full prompt injection scanner category suite.
 
-### End-to-End Tests (66 tests)
+### End-to-End Tests (63 tests + 3 auth setup steps)
 
 ```bash
 # The dev server must be running before Playwright executes
@@ -3320,13 +3324,23 @@ npx playwright test
 
 Runs against a live Next.js dev server on port 3001 with `workers: 1`. Covers: full auth flows (login, logout, signup, pending redirect, suspended redirect), single and batch document upload, end-to-end query with citation rendering, report download (DOCX and PDF), admin user management, BYOK key storage and removal, query history deletion, admin document deletion including its confirmation gate, and both mobile drawers at a 420px viewport.
 
-**Test users** — must exist in Supabase before running E2E:
+**Test users and environment** — the suite reads everything from environment variables (loaded from `.env.local` by `playwright.config.ts`); there are no built-in credentials. Create these email-confirmed users in Supabase Auth before running E2E, with the role set in `app_metadata.role`:
 
-| Role      | Email                        | Password            |
-| --------- | ---------------------------- | ------------------- |
-| `reader`  | `e2e-test@ragsystem.test`    | `E2eTestPass789`    |
-| `admin`   | `e2e-admin@ragsystem.test`   | `E2eAdminPass789`   |
-| `pending` | `e2e-pending@ragsystem.test` | `E2ePendingPass789` |
+| Role      | Email variable      | Password variable      | Also required                                  |
+| --------- | ------------------- | ---------------------- | ---------------------------------------------- |
+| `reader`  | `E2E_TEST_EMAIL`    | `E2E_TEST_PASSWORD`    | —                                              |
+| `admin`   | `E2E_ADMIN_EMAIL`   | `E2E_ADMIN_PASSWORD`   | —                                              |
+| `pending` | `E2E_PENDING_EMAIL` | `E2E_PENDING_PASSWORD` | `E2E_PENDING_USER_ID` (the user's Supabase ID) |
+
+| Variable                    | Used for                                                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_URL`              | Supabase Auth token requests and the admin client                                                                                       |
+| `SUPABASE_ANON_KEY`         | Password-grant sign-in for API-level tests                                                                                              |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin client: clears rate-limit buckets, switches the pending user's role, creates and deletes a temporary user, seeds and removes test documents |
+| `CRON_SECRET`               | Triggers `/api/internal/ingestion/run` in the upload-to-query smoke test; that test is skipped when unset                               |
+| `TEST_BASE_URL`             | Server under test (default `http://localhost:3001`)                                                                                     |
+
+The suite changes the pending user's role and resets it to `pending`, and deletes rate-limit buckets — run it only against a dedicated test project.
 
 ### TypeScript Check
 
@@ -3346,7 +3360,7 @@ Must report 0 errors. This is a hard gate — do not merge if type errors are pr
 2. Set all environment variables from `.env.example` in the Vercel dashboard under **Settings → Environment Variables**. Use separate values for Preview and Production.
 3. Set `OPENAI_BYOK_VAULT_KEY` to a securely generated 32-byte base64 string — required in production
 4. Set `CRON_SECRET` to a securely generated random string
-5. Configure a scheduled trigger — either a **Vercel Cron Job** or a **Supabase Edge Function schedule** — to call `POST /api/internal/ingestion/run` with the header `Authorization: Bearer <CRON_SECRET>` at a 5-minute interval
+5. The ingestion trigger is already scheduled: `vercel.json` defines a Vercel Cron Job that calls `/api/internal/ingestion/run` (GET or POST) every 2 minutes; Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically once `CRON_SECRET` is set
 
 > **Node.js packages:** `pdfkit` and `pdfjs-dist` are listed as `serverExternalPackages` in `next.config.ts`. They require the Node.js serverless runtime and are incompatible with Vercel's Edge runtime. Do not add `export const runtime = 'edge'` to any route that depends on these packages.
 
@@ -3376,8 +3390,8 @@ Fork the repository, create a branch from `main`, and open a pull request with a
 
 ```bash
 npx tsc --noEmit                        # 0 TypeScript errors
-npx tsx --test tests/*.test.ts          # 181/181 unit tests pass
-npx playwright test                     # 57/57 E2E tests pass (dev server must be running)
+npx tsx --test tests/*.test.ts          # 393/393 unit tests pass
+npx playwright test                     # 66/66 pass incl. 3 auth setup steps (dev server must be running)
 npm run lint                            # 0 lint errors
 ```
 
