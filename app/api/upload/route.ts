@@ -21,6 +21,7 @@ const uploadMetadataSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const requestStartedAt = Date.now();
   const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
 
     scheduleIngestionAutoKick({
       acceptedCount: 1,
+      requestStartedAt,
       cronSecret: env.CRON_SECRET,
       region: process.env.VERCEL_REGION,
       logger: console,

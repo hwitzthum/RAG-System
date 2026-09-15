@@ -3,6 +3,15 @@ import { assertRequiredIngestionRpcsAvailable } from "@/lib/ingestion/runtime/co
 import { runIngestionWorker, type IngestionWorkerLoopInput } from "@/lib/ingestion/runtime/worker-loop";
 import { resolveIngestionRuntimeSettings, type RuntimeLogger } from "@/lib/ingestion/runtime/types";
 
+// The instant a triggered run must be finished by, measured from the start of
+// the function invocation (`maxDuration` 120 on every route that triggers). A
+// batch is only started when it is projected to land before it, so this sits
+// close to `maxDuration` rather than holding back a whole batch's worth of
+// margin for a fixed cut-off. A document too large for one invocation checks
+// itself back in and resumes on the next run from its last checkpoint, instead
+// of being killed mid-batch and burning a retry.
+export const INGESTION_RUN_MAX_SECONDS = 100;
+
 export type IngestionTriggerDependencies = {
   assertRuntimeContract(): Promise<void>;
   runWorker(input: IngestionWorkerLoopInput): ReturnType<typeof runIngestionWorker>;
