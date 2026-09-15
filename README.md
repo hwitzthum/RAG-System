@@ -2482,7 +2482,7 @@ The system uses Supabase Auth with a **pending-approval workflow** — new accou
 
 #### Admin approval
 
-An admin visits `/admin` and sees all pending users. Clicking **Approve** promotes the user from `pending` → `reader`; **Decline** sets `pending` → `rejected`. Changes take effect on the user's next page load or **Check Status** click.
+An admin visits `/admin` and sees all pending users. Clicking **Approve** promotes the user from `pending` → `reader`; **Decline** sets `pending` → `rejected`; a declined user can still be approved later. Changes take effect on the user's next page load or **Check Status** click.
 
 | Current role | Available actions                                                                        |
 | ------------ | ---------------------------------------------------------------------------------------- |
@@ -2490,7 +2490,7 @@ An admin visits `/admin` and sees all pending users. Clicking **Approve** promot
 | reader       | **Suspend**, **Delete**                                                                  |
 | admin        | **Suspend**, **Delete** _(not on your own account; suspending the last admin is blocked)_ |
 | suspended    | **Reactivate** → reader, **Delete**                                                      |
-| rejected     | **Delete** _(no reactivate action in the UI)_                                            |
+| rejected     | **Approve** → reader, **Delete**                                                         |
 
 The `admin` role cannot be granted from the panel — only via `ADMIN_EMAIL` at signup or the CLI fallback below.
 

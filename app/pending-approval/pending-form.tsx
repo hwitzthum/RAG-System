@@ -4,29 +4,40 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getCsrfToken } from "@/lib/security/csrf-client";
+import { describePendingStatus, type PendingStatusFeedback } from "./pending-status";
+
+const CALLOUT_CLASS: Record<PendingStatusFeedback["tone"], string> = {
+  success: "callout-success",
+  warning: "callout-warning",
+  danger: "callout-danger",
+};
 
 export default function PendingApprovalForm() {
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<PendingStatusFeedback | null>(null);
 
   async function handleCheckStatus() {
     setChecking(true);
-    setMessage(null);
+    setFeedback(null);
 
     try {
       const supabase = getSupabaseBrowserClient();
       const { data, error } = await supabase.auth.refreshSession();
 
       if (error) {
-        setMessage("Unable to check status. Please try again.");
+        setFeedback({
+          approved: false,
+          tone: "warning",
+          message: "Unable to check status. Please try again.",
+        });
         return;
       }
 
-      const role = data.session?.user?.app_metadata?.role;
+      const status = describePendingStatus(data.session?.user?.app_metadata?.role);
+      setFeedback(status);
 
-      if (role === "reader" || role === "admin") {
-        setMessage("Your account has been approved! Redirecting...");
+      if (status.approved) {
         // Set the refreshed token as session cookie
         if (data.session?.access_token) {
           await fetch("/api/auth/session", {
@@ -42,12 +53,6 @@ export default function PendingApprovalForm() {
           router.push("/");
           router.refresh();
         }, 1000);
-      } else if (role === "suspended") {
-        setMessage(
-          "Your account has been suspended. Contact an administrator.",
-        );
-      } else {
-        setMessage("Your account is still pending approval.");
       }
     } finally {
       setChecking(false);
@@ -70,17 +75,9 @@ export default function PendingApprovalForm() {
         able to access the workspace once your account is approved.
       </p>
 
-      {message && (
-        <p
-          className={`callout mt-8 ${
-            message.includes("approved")
-              ? "callout-success"
-              : message.includes("suspended")
-                ? "callout-danger"
-                : "callout-warning"
-          }`}
-        >
-          {message}
+      {feedback && (
+        <p className={`callout mt-8 ${CALLOUT_CLASS[feedback.tone]}`}>
+          {feedback.message}
         </p>
       )}
 

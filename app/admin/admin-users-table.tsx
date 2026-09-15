@@ -76,32 +76,33 @@ function AdminUserActions(props: {
 
   return (
     <>
+      {isApprovableRole(props.user.role) ? (
+        <button
+          onClick={() => props.onApprove(props.user.id)}
+          disabled={loading}
+          className="btn-primary px-3 py-1.5 text-[10px] disabled:opacity-50"
+          data-testid={`approve-${props.user.id}`}
+        >
+          Approve
+        </button>
+      ) : null}
+
       {props.user.role === "pending" ? (
-        <>
-          <button
-            onClick={() => props.onApprove(props.user.id)}
-            disabled={loading}
-            className="btn-primary px-3 py-1.5 text-[10px] disabled:opacity-50"
-            data-testid={`approve-${props.user.id}`}
-          >
-            Approve
-          </button>
-          <button
-            onClick={() =>
-              props.onRequestConfirm({
-                userId: props.user.id,
-                action: "role",
-                role: "rejected",
-                label: `decline ${props.user.email ?? props.user.id}`,
-              })
-            }
-            disabled={loading}
-            className="btn-secondary px-3 py-1.5 text-[10px] disabled:opacity-50"
-            data-testid={`decline-${props.user.id}`}
-          >
-            Decline
-          </button>
-        </>
+        <button
+          onClick={() =>
+            props.onRequestConfirm({
+              userId: props.user.id,
+              action: "role",
+              role: "rejected",
+              label: `decline ${props.user.email ?? props.user.id}`,
+            })
+          }
+          disabled={loading}
+          className="btn-secondary px-3 py-1.5 text-[10px] disabled:opacity-50"
+          data-testid={`decline-${props.user.id}`}
+        >
+          Decline
+        </button>
       ) : null}
 
       {isSuspendableRole(props.user.role) ? (
@@ -156,6 +157,12 @@ function AdminUserActions(props: {
       </button>
     </>
   );
+}
+
+// A declined sign-up can still be approved later; the API already allows
+// rejected -> reader, so only the action was missing.
+function isApprovableRole(role: Role): boolean {
+  return role === "pending" || role === "rejected";
 }
 
 function isSuspendableRole(role: Role): boolean {

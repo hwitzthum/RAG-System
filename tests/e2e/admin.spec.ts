@@ -393,6 +393,31 @@ test.describe("Admin page UI", () => {
       await expect(reactivateBtn).not.toBeVisible();
     });
 
+    test("admin can approve a declined user from the table", async ({ page }) => {
+      await ensurePendingUserExists();
+      await setUserRole(PENDING_USER_ID, "rejected");
+
+      try {
+        await page.goto("/admin");
+        await expect(page.locator('[data-testid="admin-users-table"]')).toBeVisible({ timeout: 10_000 });
+
+        // Rejected user: Approve and Delete, nothing else
+        const approveBtn = page.locator(`[data-testid="approve-${PENDING_USER_ID}"]`);
+        await expect(approveBtn).toBeVisible();
+        await expect(page.locator(`[data-testid="delete-${PENDING_USER_ID}"]`)).toBeVisible();
+        await expect(page.locator(`[data-testid="decline-${PENDING_USER_ID}"]`)).not.toBeVisible();
+        await expect(page.locator(`[data-testid="suspend-${PENDING_USER_ID}"]`)).not.toBeVisible();
+        await expect(page.locator(`[data-testid="reactivate-${PENDING_USER_ID}"]`)).not.toBeVisible();
+
+        // Approving turns the row into a reader row
+        await approveBtn.click();
+        await expect(page.locator(`[data-testid="suspend-${PENDING_USER_ID}"]`)).toBeVisible({ timeout: 10_000 });
+        await expect(approveBtn).not.toBeVisible();
+      } finally {
+        await resetPendingUserRole();
+      }
+    });
+
     test("workbench shows admin link for admin users", async ({ page }) => {
       await page.goto("/");
       await expect(page.locator("text=Response Workspace")).toBeVisible({ timeout: 10_000 });
@@ -435,5 +460,22 @@ test.describe("Pending approval page UI", () => {
     await expect(page.locator("h1")).toHaveText("Pending Approval", { timeout: 10_000 });
     await expect(page.locator('button:has-text("Check Status")')).toBeVisible();
     await expect(page.locator('button:has-text("Sign Out")')).toBeVisible();
+  });
+
+  test("Check Status tells a user who was declined while waiting", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', PENDING_EMAIL);
+    await page.fill('input[type="password"]', PENDING_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL("/pending-approval", { timeout: 45_000 });
+
+    await setUserRole(PENDING_USER_ID, "rejected");
+    try {
+      await page.click('button:has-text("Check Status")');
+      await expect(page.locator("text=declined")).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator("text=still pending approval")).not.toBeVisible();
+    } finally {
+      await resetPendingUserRole();
+    }
   });
 });
