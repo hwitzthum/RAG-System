@@ -21,6 +21,7 @@ type BatchResult = {
 };
 
 export async function POST(request: NextRequest) {
+  const requestStartedAt = Date.now();
   const authResult = await requireAuthWithCsrf(request, ["reader", "admin"]);
   const ipAddress = getClientIp(request);
 
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
 
   scheduleIngestionAutoKick({
     acceptedCount: results.filter((result) => result.status === "accepted").length,
+    requestStartedAt,
     cronSecret: env.CRON_SECRET,
     region: process.env.VERCEL_REGION,
     logger: console,
