@@ -81,7 +81,7 @@ test("listEffectiveDocuments maps view rows into API payload rows", async () => 
   const result = await listEffectiveDocuments(supabase as never, {
     limit: 10,
     offset: 0,
-    user: { id: "reader-1", role: "reader", email: "reader@example.com" },
+    user: { id: "11111111-1111-4111-8111-111111111111", role: "reader", email: "reader@example.com" },
   });
 
   assert.deepEqual(result, {
@@ -105,7 +105,7 @@ test("listEffectiveDocuments maps view rows into API payload rows", async () => 
     { type: "from", args: ["documents"] },
     { type: "select:documents", args: ["id"] },
     { type: "eq:documents", args: ["status", "ready"] },
-    { type: "or:documents", args: ["user_id.eq.reader-1,user_id.is.null"] },
+    { type: "or:documents", args: ["user_id.eq.11111111-1111-4111-8111-111111111111,user_id.is.null"] },
     { type: "from", args: ["document_effective_statuses"] },
     {
       type: "select",
@@ -148,7 +148,7 @@ test("listEffectiveDocuments skips ownership filtering for admins", async () => 
   await listEffectiveDocuments(supabase as never, {
     limit: 10,
     offset: 0,
-    user: { id: "admin-1", role: "admin", email: "admin@example.com" },
+    user: { id: "22222222-2222-4222-8222-222222222222", role: "admin", email: "admin@example.com" },
   });
 
   assert.deepEqual(calls, [{ type: "range", args: [0, 9] }]);
@@ -226,7 +226,7 @@ test("getEffectiveDocumentById returns the effective document view row", async (
   };
 
   const result = await getEffectiveDocumentById(supabase as never, {
-    user: { id: "reader-1", role: "reader", email: "reader@example.com" },
+    user: { id: "11111111-1111-4111-8111-111111111111", role: "reader", email: "reader@example.com" },
     documentId: "doc-1",
   });
 
@@ -240,7 +240,7 @@ test("getEffectiveDocumentById returns the effective document view row", async (
     { type: "from", args: ["documents"] },
     { type: "select:documents", args: ["id"] },
     { type: "eq:documents", args: ["id", "doc-1"] },
-    { type: "or:documents", args: ["user_id.eq.reader-1,user_id.is.null"] },
+    { type: "or:documents", args: ["user_id.eq.11111111-1111-4111-8111-111111111111,user_id.is.null"] },
     { type: "from", args: ["document_effective_statuses"] },
     { type: "eq", args: ["document_id", "doc-1"] },
   ]);
@@ -278,7 +278,7 @@ test("listAccessibleDocumentIds returns shared and owned ready documents for rea
   };
 
   const result = await listAccessibleDocumentIds(supabase as never, {
-    user: { id: "reader-1", role: "reader", email: "reader@example.com" },
+    user: { id: "11111111-1111-4111-8111-111111111111", role: "reader", email: "reader@example.com" },
   });
 
   assert.deepEqual(result, ["doc-1", "doc-2"]);
@@ -286,7 +286,103 @@ test("listAccessibleDocumentIds returns shared and owned ready documents for rea
     { type: "from", args: ["documents"] },
     { type: "select", args: ["id"] },
     { type: "eq", args: ["status", "ready"] },
-    { type: "or", args: ["user_id.eq.reader-1,user_id.is.null"] },
+    { type: "or", args: ["user_id.eq.11111111-1111-4111-8111-111111111111,user_id.is.null"] },
+  ]);
+});
+
+test("listAccessibleDocumentIds rejects a non-UUID user id instead of interpolating it into the PostgREST filter", async () => {
+  // A non-UUID id (e.g. a forged/misissued AuthUser.id) must never reach
+  // `.or()` unescaped — `.or()` parses raw text, so a value containing a
+  // comma or parenthesis could append extra OR-conditions and widen the
+  // ownership scope past the caller's own documents. `.eq()` builds the
+  // query but does not execute it, so the malicious value throws while the
+  // `.or(...)` argument is being constructed, before `.or()` — and
+  // therefore before any network call — is ever reached.
+  const calls: Array<{ type: string; args: unknown[] }> = [];
+  const supabase = {
+    from(table: string) {
+      calls.push({ type: "from", args: [table] });
+      return {
+        select(columns: string) {
+          calls.push({ type: "select", args: [columns] });
+          return {
+            eq(column: string, value: string) {
+              calls.push({ type: "eq", args: [column, value] });
+              return {
+                or(filter: string) {
+                  calls.push({ type: "or", args: [filter] });
+                  return { returns: () => Promise.resolve({ data: [], error: null }) };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      listAccessibleDocumentIds(supabase as never, {
+        user: {
+          id: "11111111-1111-4111-8111-111111111111,user_id.neq.null",
+          role: "reader",
+          email: "reader@example.com",
+        },
+      }),
+    /Invalid user id/,
+  );
+
+  // The chain never reached `.or()` — no query describing the malicious
+  // filter was ever built, let alone sent.
+  assert.deepEqual(calls, [
+    { type: "from", args: ["documents"] },
+    { type: "select", args: ["id"] },
+    { type: "eq", args: ["status", "ready"] },
+  ]);
+});
+
+test("getEffectiveDocumentById rejects a non-UUID user id instead of interpolating it into the PostgREST filter", async () => {
+  const calls: Array<{ type: string; args: unknown[] }> = [];
+  const supabase = {
+    from(table: string) {
+      calls.push({ type: "from", args: [table] });
+      return {
+        select(columns: string) {
+          calls.push({ type: "select", args: [columns] });
+          return {
+            eq(column: string, value: string) {
+              calls.push({ type: "eq", args: [column, value] });
+              return {
+                or(filter: string) {
+                  calls.push({ type: "or", args: [filter] });
+                  return { maybeSingle: () => Promise.resolve({ data: null, error: null }) };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      getEffectiveDocumentById(supabase as never, {
+        user: {
+          id: "11111111-1111-4111-8111-111111111111,user_id.neq.null",
+          role: "reader",
+          email: "reader@example.com",
+        },
+        documentId: "11111111-1111-4111-8111-111111111111",
+      }),
+    /Invalid user id/,
+  );
+
+  assert.deepEqual(calls, [
+    { type: "from", args: ["documents"] },
+    { type: "select", args: ["id"] },
+    { type: "eq", args: ["id", "11111111-1111-4111-8111-111111111111"] },
   ]);
 });
 
