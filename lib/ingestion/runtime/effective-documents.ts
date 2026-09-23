@@ -1,6 +1,27 @@
+import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuthUser } from "@/lib/auth/types";
 import type { Database, DocumentStatus } from "@/lib/supabase/database.types";
+
+const userIdSchema = z.string().uuid();
+
+/**
+ * Builds the `user_id.eq.<id>,user_id.is.null` filter passed to PostgREST's
+ * `.or()`. `.or()` takes a raw filter string — commas separate conditions and
+ * parentheses group them — so interpolating `userId` directly would let any
+ * caller able to influence it (a forged/misissued AuthUser.id, not just a
+ * well-formed Supabase JWT `sub`) inject extra OR-conditions and read past
+ * their own ownership scope. Every legitimate `AuthUser.id` is a Supabase
+ * auth UUID, so validating the shape here is free and closes the class of
+ * bug outright rather than relying on every caller to keep `id` UUID-shaped.
+ */
+function buildOwnershipOrNullFilter(userId: string): string {
+  const parsed = userIdSchema.safeParse(userId);
+  if (!parsed.success) {
+    throw new Error("Invalid user id: expected a UUID");
+  }
+  return `user_id.eq.${parsed.data},user_id.is.null`;
+}
 
 export type DocumentEffectiveStatusRow = Database["public"]["Views"]["document_effective_statuses"]["Row"];
 export type EffectiveDocumentDetailRow = Pick<
@@ -122,7 +143,7 @@ export async function getEffectiveDocumentById(
       .from("documents")
       .select("id")
       .eq("id", input.documentId)
-      .or(`user_id.eq.${input.user.id},user_id.is.null`)
+      .or(buildOwnershipOrNullFilter(input.user.id))
       .maybeSingle();
 
     if (accessError) {
@@ -182,7 +203,7 @@ export async function listAccessibleDocumentIds(
     .from("documents")
     .select("id")
     .eq("status", "ready")
-    .or(`user_id.eq.${input.user.id},user_id.is.null`)
+    .or(buildOwnershipOrNullFilter(input.user.id))
     .returns<AccessibleDocumentIdRow[]>();
 
   if (error) {
