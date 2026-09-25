@@ -3,7 +3,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-65%20E2E%20%7C%20398%20Unit-brightgreen?logo=playwright&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-65%20E2E%20%7C%20390%20Unit-brightgreen?logo=playwright&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -3304,7 +3304,7 @@ User-supplied API keys are encrypted with AES-256-GCM before database storage. T
 
 ## Testing
 
-### Unit Tests (398 tests)
+### Unit Tests (390 tests)
 
 ```bash
 npx tsx --test tests/*.test.ts
@@ -3390,7 +3390,7 @@ Fork the repository, create a branch from `main`, and open a pull request with a
 
 ```bash
 npx tsc --noEmit                        # 0 TypeScript errors
-npx tsx --test tests/*.test.ts          # 398/398 unit tests pass
+npx tsx --test tests/*.test.ts          # 390/390 unit tests pass
 npx playwright test                     # 68/68 pass incl. 3 auth setup steps (dev server must be running)
 npm run lint                            # 0 lint errors
 ```
