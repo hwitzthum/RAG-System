@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   const isRecovery =
     type === "recovery" || (next && next.includes("reset-password"));
   if (isRecovery) {
-    return NextResponse.redirect(`${origin}/reset-password?code=${code}`);
+    return NextResponse.redirect(`${origin}/reset-password?code=${encodeURIComponent(code)}`);
   }
 
   // All other flows (email confirmation, etc.) — exchange server-side.
