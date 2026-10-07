@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22 <25"
   },
   "scripts": {
     "dev": "concurrently --names \"next,worker\" --prefix-colors \"blue,green\" \"next dev -p 3001\" \"npm run dev:worker\"",
@@ -102,5 +102,11 @@
     },
     "postcss": ">=8.5.18",
     "sharp": ">=0.35.4"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true,
+    "unrs-resolver": true,
+    "protobufjs": false
   }
 }
