@@ -72,7 +72,7 @@ const ingestionEnvSchema = z.object({
   WORKER_OCR_FALLBACK_ENABLED: booleanFlag(true),
   // Independent of RAG_LLM_MODEL despite the matching default: this one has to
   // be a vision model, so the two move for different reasons.
-  WORKER_OCR_MODEL: nonEmptyString("gpt-4o-mini"),
+  WORKER_OCR_MODEL: nonEmptyString("gpt-6-luna"),
   // Hard ceiling on a single PDF's page count, checked before any per-page
   // work (pdfjs text extraction or OCR) runs. Without it, a PDF with no size
   // limit on page *count* — only RAG_MAX_UPLOAD_BYTES bounds compressed bytes

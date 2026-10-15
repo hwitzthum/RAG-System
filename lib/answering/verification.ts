@@ -4,6 +4,7 @@ import {
 } from "@langfuse/tracing";
 import { env } from "@/lib/config/env";
 import { getRuntimeSecrets } from "@/lib/runtime/secrets";
+import { openAiChatParams } from "@/lib/providers/openai-chat";
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 
 export type CitationVerification = {
@@ -16,8 +17,8 @@ export type CitationVerification = {
 };
 
 const VERIFICATION_TIMEOUT_MS = 3_500;
-const CHUNK_EXCERPT_CHARS = 1_200;
 const CITATION_MARKER_PATTERN = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+const LEADING_MARKERS_PATTERN = /^(?:\[\d+(?:\s*,\s*\d+)*\]\s*)+/;
 
 const VERIFIER_SYSTEM_PROMPT = [
   "You verify citations in a retrieval-grounded answer.",
@@ -37,12 +38,31 @@ type CitedSentence = {
   chunkIndexes: number[];
 };
 
+/**
+ * Splits on terminal punctuation, keeping markers placed after it ("fact. [1]",
+ * gpt-6-luna's habit; gpt-4o-mini wrote "fact [1].") with the sentence they
+ * close. Otherwise each marker is attributed to the next sentence and every
+ * claim is verified against the wrong chunks.
+ */
+function splitSentences(answer: string): string[] {
+  const sentences: string[] = [];
+  for (const segment of answer.split(/(?<=[.!?])\s+/)) {
+    const leadingMarkers = segment.match(LEADING_MARKERS_PATTERN)?.[0];
+    if (leadingMarkers && sentences.length > 0) {
+      sentences[sentences.length - 1] += ` ${leadingMarkers.trim()}`;
+      sentences.push(segment.slice(leadingMarkers.length));
+    } else {
+      sentences.push(segment);
+    }
+  }
+  return sentences;
+}
+
 function extractCitedSentences(
   answer: string,
   chunkCount: number,
 ): CitedSentence[] {
-  return answer
-    .split(/(?<=[.!?])\s+/)
+  return splitSentences(answer)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 0)
     .map((sentence) => {
@@ -124,14 +144,14 @@ async function verifyCitedStatementsUntraced(input: {
     ...new Set(citedSentences.flatMap((entry) => entry.chunkIndexes)),
   ].sort((a, b) => a - b);
 
+  // Each cited chunk in full: the answer was written from the whole chunk, so
+  // a verifier shown only a leading excerpt (formerly 1,200 characters of
+  // 3-4K) rejects every claim supported further down. Only cited chunks are
+  // sent, and chunks are size-bounded at ingest, so the prompt stays small.
   const chunkBlocks = referencedChunkIndexes
     .map((index) => {
       const chunk = input.chunks[index]!;
-      const excerpt = `${chunk.sectionTitle}\n${chunk.content}`.slice(
-        0,
-        CHUNK_EXCERPT_CHARS,
-      );
-      return `[chunk ${index + 1}]\n${excerpt}`;
+      return `[chunk ${index + 1}]\n${chunk.sectionTitle}\n${chunk.content}`;
     })
     .join("\n\n");
 
@@ -141,6 +161,11 @@ async function verifyCitedStatementsUntraced(input: {
         `${position + 1}. (cites chunk${entry.chunkIndexes.length > 1 ? "s" : ""} ${entry.chunkIndexes.map((i) => i + 1).join(", ")}) ${entry.sentence}`,
     )
     .join("\n");
+
+  const chatParams = openAiChatParams({
+    model: env.RAG_CITATION_VERIFIER_MODEL,
+    maxCompletionTokens: 300,
+  });
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -152,8 +177,7 @@ async function verifyCitedStatementsUntraced(input: {
       },
       body: JSON.stringify({
         model: env.RAG_CITATION_VERIFIER_MODEL,
-        temperature: 0,
-        max_tokens: 300,
+        ...chatParams,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: VERIFIER_SYSTEM_PROMPT },
@@ -176,7 +200,7 @@ async function verifyCitedStatementsUntraced(input: {
     updateActiveObservation(
       {
         model: env.RAG_CITATION_VERIFIER_MODEL,
-        modelParameters: { temperature: 0, max_tokens: 300 },
+        modelParameters: chatParams,
         ...(payload.usage
           ? {
               usageDetails: {

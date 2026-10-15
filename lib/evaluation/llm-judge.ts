@@ -8,6 +8,7 @@ import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 import { formatEvidenceChunk } from "@/lib/answering/prompts";
 import type { RetrievedChunk } from "@/lib/contracts/retrieval";
 import { env } from "@/lib/config/env";
+import { openAiChatParams } from "@/lib/providers/openai-chat";
 import { stripLimitationsSection } from "@/lib/evaluation/metrics";
 import type { QueryJudgeMetrics } from "@/lib/evaluation/types";
 
@@ -226,6 +227,11 @@ async function judgeViaOpenAi(
     throw new Error("OPENAI_API_KEY is required for the OpenAI judge path");
   }
 
+  const chatParams = openAiChatParams({
+    model: env.RAG_EVAL_JUDGE_MODEL,
+    maxCompletionTokens: JUDGE_MAX_OUTPUT_TOKENS,
+  });
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS),
@@ -235,8 +241,7 @@ async function judgeViaOpenAi(
     },
     body: JSON.stringify({
       model: env.RAG_EVAL_JUDGE_MODEL,
-      temperature: 0,
-      max_tokens: JUDGE_MAX_OUTPUT_TOKENS,
+      ...chatParams,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -257,10 +262,7 @@ async function judgeViaOpenAi(
   updateActiveObservation(
     {
       model: env.RAG_EVAL_JUDGE_MODEL,
-      modelParameters: {
-        temperature: 0,
-        max_tokens: JUDGE_MAX_OUTPUT_TOKENS,
-      },
+      modelParameters: chatParams,
       ...(payload.usage
         ? {
             usageDetails: {

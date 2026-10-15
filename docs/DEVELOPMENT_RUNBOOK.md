@@ -174,7 +174,7 @@ Note:
 
 ## Phase 6 Definition of Done Checklist
 
-- worker extraction path OCRs pages without a text layer (scanned/image-only PDFs) via a vision model (`WORKER_OCR_FALLBACK_ENABLED`, default on; `WORKER_OCR_MODEL`, default `gpt-4o-mini`), keeping page numbers; pages with a text layer are never OCR'd
+- worker extraction path OCRs pages without a text layer (scanned/image-only PDFs) via a vision model (`WORKER_OCR_FALLBACK_ENABLED`, default on; `WORKER_OCR_MODEL`, default `gpt-6-luna`), keeping page numbers; pages with a text layer are never OCR'd
 - section chunking uses target/overlap token settings (`700`/`120` defaults)
 - chunk contexts are generated before embedding
 - embeddings are generated and persisted to `document_chunks`
