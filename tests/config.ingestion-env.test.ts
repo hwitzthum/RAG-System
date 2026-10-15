@@ -69,7 +69,7 @@ test("resolveIngestionEnv applies the documented defaults when nothing is set", 
     assert.equal(settings.ingestionBatchSize, 1);
     assert.equal(settings.lockTimeoutSeconds, 120);
     assert.equal(settings.workerName, "rag-ingestion-worker");
-    assert.equal(settings.contextModel, "gpt-4o-mini");
+    assert.equal(settings.contextModel, "gpt-6-luna");
     assert.equal(settings.embeddingModel, "text-embedding-3-large");
     assert.equal(settings.ragStorageBucket, "documents");
     assert.equal(settings.contextEnabled, true);
@@ -107,8 +107,8 @@ test("the shared fields carry the same defaults the worker resolves to", () => {
 test("WORKER_-prefixed overrides win over the variables they fall back to", () => {
   withEnv(
     {
-      RAG_LLM_MODEL: "gpt-4.1",
-      WORKER_CONTEXT_MODEL: "gpt-4o",
+      RAG_LLM_MODEL: "gpt-6-luna",
+      WORKER_CONTEXT_MODEL: "gpt-6-sol",
       RAG_QUERY_EMBEDDING_MODEL: "text-embedding-3-small",
       WORKER_EMBEDDING_MODEL: "text-embedding-3-large",
       INGESTION_LOCK_TIMEOUT_SECONDS: "900",
@@ -117,7 +117,7 @@ test("WORKER_-prefixed overrides win over the variables they fall back to", () =
     () => {
       const settings = resolveIngestionEnv();
 
-      assert.equal(settings.contextModel, "gpt-4o");
+      assert.equal(settings.contextModel, "gpt-6-sol");
       assert.equal(settings.embeddingModel, "text-embedding-3-large");
       assert.equal(settings.lockTimeoutSeconds, 300);
     },
@@ -127,14 +127,14 @@ test("WORKER_-prefixed overrides win over the variables they fall back to", () =
 test("the fallback variables apply when no WORKER_ override is present", () => {
   withEnv(
     {
-      RAG_LLM_MODEL: "gpt-4.1",
+      RAG_LLM_MODEL: "gpt-6-luna",
       RAG_QUERY_EMBEDDING_MODEL: "text-embedding-3-small",
       INGESTION_LOCK_TIMEOUT_SECONDS: "900",
     },
     () => {
       const settings = resolveIngestionEnv();
 
-      assert.equal(settings.contextModel, "gpt-4.1");
+      assert.equal(settings.contextModel, "gpt-6-luna");
       assert.equal(settings.embeddingModel, "text-embedding-3-small");
       assert.equal(settings.lockTimeoutSeconds, 900);
     },

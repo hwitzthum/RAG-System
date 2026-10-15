@@ -31,6 +31,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { validateEvaluationDataset } from "../../lib/evaluation/dataset";
+import { openAiChatParams } from "../../lib/providers/openai-chat";
 import type {
   EvaluationDatasetEnvelope,
   EvaluationQueryRecord,
@@ -204,8 +205,11 @@ async function callGenerator(
     },
     body: JSON.stringify({
       model,
-      temperature: 0.2,
-      max_tokens: maxTokens,
+      ...openAiChatParams({
+        model,
+        maxCompletionTokens: maxTokens,
+        temperature: 0.2,
+      }),
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },

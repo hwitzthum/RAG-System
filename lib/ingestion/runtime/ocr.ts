@@ -1,3 +1,4 @@
+import { openAiChatParams } from "@/lib/providers/openai-chat";
 import type { RuntimeLogger } from "./types";
 
 /**
@@ -55,8 +56,10 @@ export function createOpenAiTranscriber(input: {
       },
       body: JSON.stringify({
         model: input.model,
-        temperature: 0,
-        max_tokens: 4_000,
+        ...openAiChatParams({
+          model: input.model,
+          maxCompletionTokens: 4_000,
+        }),
         messages: [
           { role: "system", content: OCR_SYSTEM_PROMPT },
           {

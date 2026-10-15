@@ -3,6 +3,7 @@ import { env } from "@/lib/config/env";
 import { createQueryEmbedding } from "@/lib/retrieval/embedding";
 import { rerankCandidates } from "@/lib/retrieval/reranker";
 import { getRuntimeSecrets } from "@/lib/runtime/secrets";
+import { openAiChatParams } from "@/lib/providers/openai-chat";
 import type {
   LlmGenerateInput,
   LlmGenerateResult,
@@ -29,6 +30,14 @@ type ChatCompletionResponse = {
   };
 };
 
+function answerChatParams(input: LlmGenerateInput) {
+  return openAiChatParams({
+    model: env.RAG_LLM_MODEL,
+    maxCompletionTokens: Math.max(64, input.maxOutputTokens),
+    fastMode: env.RAG_LLM_FAST_MODE,
+  });
+}
+
 /**
  * Records model, parameters and token usage on whichever `generation`
  * observation the caller opened around this request.
@@ -47,10 +56,7 @@ function recordGenerationUsage(
   updateActiveObservation(
     {
       model: env.RAG_LLM_MODEL,
-      modelParameters: {
-        temperature: 0,
-        max_tokens: Math.max(64, input.maxOutputTokens),
-      },
+      modelParameters: answerChatParams(input),
       ...(usage
         ? {
             usageDetails: {
@@ -84,8 +90,7 @@ async function generateOpenAiAnswer(
     },
     body: JSON.stringify({
       model: env.RAG_LLM_MODEL,
-      temperature: 0,
-      max_tokens: Math.max(64, input.maxOutputTokens),
+      ...answerChatParams(input),
       messages: [
         { role: "system", content: input.systemPrompt },
         {
@@ -137,8 +142,7 @@ async function generateOpenAiAnswerStream(
     },
     body: JSON.stringify({
       model: env.RAG_LLM_MODEL,
-      temperature: 0,
-      max_tokens: Math.max(64, input.maxOutputTokens),
+      ...answerChatParams(input),
       stream: true,
       // Without this a streamed completion reports no token counts at all,
       // leaving the streaming answer path — the most expensive call in the

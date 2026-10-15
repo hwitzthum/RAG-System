@@ -157,14 +157,22 @@ const envSchema = z.object({
   // Anthropic SDK; any other value routes through OpenAI.
   RAG_EVAL_JUDGE_MODEL: z.string().min(1).default("claude-opus-5"),
   // Production citation verifier — runs on the answer path under a 3.5s
-  // timeout, so it stays on the fast, cheap model rather than following the
-  // offline judge to a frontier model.
-  RAG_CITATION_VERIFIER_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  // timeout. gpt-6-sol rather than the answer model: on claim/evidence pairs
+  // labelled by Opus it caught every unsupported claim (kappa ~0.8 vs ~0.6
+  // for gpt-6-luna) at ~1.5s p95; both accept ~99% of supported claims.
+  RAG_CITATION_VERIFIER_MODEL: z.string().min(1).default("gpt-6-sol"),
   // Offline generator for the corpus-derived evaluation dataset.
-  RAG_DATASET_GENERATOR_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  RAG_DATASET_GENERATOR_MODEL: z.string().min(1).default("gpt-6-luna"),
   // "ends" places the strongest evidence at the beginning AND end of the
   // prompt (lost-in-the-middle mitigation); "score" keeps plain score order.
   RAG_EVIDENCE_PLACEMENT: z.enum(["ends", "score"]).default("ends"),
+  // Fast mode (service_tier "fast") for gpt-6-luna on the answer path —
+  // answer generation, decomposition and query expansion. Roughly halves time
+  // to first token at twice the per-token price; ignored for other models.
+  RAG_LLM_FAST_MODE: z.preprocess(
+    (val) => !(val === "false" || val === "0" || val === false),
+    z.boolean().default(true),
+  ),
   // Post-generation citation verification (annotate-only, never blocks).
   RAG_CITATION_VERIFICATION_ENABLED: z.preprocess(
     (val) => !(val === "false" || val === "0" || val === false),
@@ -285,6 +293,7 @@ const parsed = envSchema.safeParse(
     RAG_CITATION_VERIFIER_MODEL: process.env.RAG_CITATION_VERIFIER_MODEL,
     RAG_DATASET_GENERATOR_MODEL: process.env.RAG_DATASET_GENERATOR_MODEL,
     RAG_EVIDENCE_PLACEMENT: process.env.RAG_EVIDENCE_PLACEMENT,
+    RAG_LLM_FAST_MODE: process.env.RAG_LLM_FAST_MODE,
     RAG_CITATION_VERIFICATION_ENABLED:
       process.env.RAG_CITATION_VERIFICATION_ENABLED,
     RAG_MAX_CHUNKS_PER_DOCUMENT: process.env.RAG_MAX_CHUNKS_PER_DOCUMENT,

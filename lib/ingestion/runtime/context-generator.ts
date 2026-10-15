@@ -4,6 +4,7 @@ import {
   updateActiveObservation,
 } from "@langfuse/tracing";
 
+import { openAiChatParams } from "@/lib/providers/openai-chat";
 import type {
   ChunkCandidate,
   ChunkWithContext,
@@ -179,6 +180,11 @@ export class ContextGenerator {
       return this.heuristicContext(chunk, document);
     }
 
+    const chatParams = openAiChatParams({
+      model: this.settings.contextModel,
+      maxCompletionTokens: 140,
+    });
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       signal: AbortSignal.timeout(this.settings.openAiTimeoutSeconds * 1000),
@@ -188,8 +194,7 @@ export class ContextGenerator {
       },
       body: JSON.stringify({
         model: this.settings.contextModel,
-        temperature: 0,
-        max_tokens: 140,
+        ...chatParams,
         messages: [
           {
             role: "system",
@@ -208,7 +213,7 @@ export class ContextGenerator {
     updateActiveObservation(
       {
         model: this.settings.contextModel,
-        modelParameters: { temperature: 0, max_tokens: 140 },
+        modelParameters: chatParams,
         ...(payload.usage
           ? {
               usageDetails: {
@@ -553,8 +558,10 @@ export class ContextGenerator {
             },
             body: JSON.stringify({
               model: this.settings.contextModel,
-              temperature: 0,
-              max_tokens: 220,
+              ...openAiChatParams({
+                model: this.settings.contextModel,
+                maxCompletionTokens: 220,
+              }),
               messages: [
                 { role: "system", content: DOCUMENT_SUMMARY_SYSTEM_PROMPT },
                 { role: "user", content: userContent },

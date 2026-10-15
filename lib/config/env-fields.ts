@@ -29,6 +29,6 @@ export const sharedEnvFields = {
     .string()
     .min(1)
     .default("text-embedding-3-large"),
-  RAG_LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  RAG_LLM_MODEL: z.string().min(1).default("gpt-6-luna"),
   RAG_STORAGE_BUCKET: z.string().min(1).default("documents"),
 } as const;

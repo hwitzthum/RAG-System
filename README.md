@@ -1124,7 +1124,7 @@ npm run eval:dataset:corpus
 
 1. The command reads ALL `ready` documents from the database
 2. Samples passages from each document
-3. Generates 63 realistic questions using GPT-4o-mini (costs ~$2–3)
+3. Generates 63 realistic questions using gpt-6-luna (costs ~$2–3)
 4. Writes output to `evaluation/evaluation_queries.generated.json`
 5. Also creates a human review sheet: `evaluation/reports/dataset-review.md`
 
@@ -1511,7 +1511,7 @@ Ask: Did retrieval find the right passage?
 | Updating retrieval pipeline (new ranking algorithm)     | ✓ YES                                         |
 | Re-chunking documents                                   | ✓ YES (must regenerate golden set)            |
 | Modifying prompts                                       | ✓ YES                                         |
-| Changing model (gpt-4 → gpt-4o-mini)                    | ✓ YES (always)                                |
+| Changing model (gpt-4o-mini → gpt-6-luna)               | ✓ YES (always)                                |
 | Updating dependencies (npm install)                     | ✗ Usually no, unless it affects retrieval/LLM |
 | Bug fix (off-by-one in scoring)                         | ✓ YES (to measure impact)                     |
 | Documentation only                                      | ✗ No                                          |
@@ -2212,7 +2212,8 @@ All variables are validated at startup via Zod. Missing required variables throw
 | Variable                          | Required | Default                  | Description                                                                    |
 | --------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------ |
 | `RAG_QUERY_EMBEDDING_MODEL`       | No       | `text-embedding-3-large` | OpenAI embedding model used at query time                                      |
-| `RAG_LLM_MODEL`                   | No       | `gpt-4o-mini`            | Chat model used for answer synthesis                                           |
+| `RAG_LLM_MODEL`                   | No       | `gpt-6-luna`             | Chat model used for answer synthesis                                           |
+| `RAG_LLM_FAST_MODE`               | No       | `true`                   | OpenAI Fast mode (`service_tier: "fast"`) for gpt-6-luna on the answer path: ~half the time to first token at 2x token price ($0.20 / $1.00 per 1M in/out). Ignored for other models |
 | `RAG_LLM_MAX_OUTPUT_TOKENS`       | No       | `2000`                   | Maximum tokens in the LLM response                                             |
 | `RAG_DEFAULT_TOP_K`               | No       | `8`                      | Number of chunks to retrieve before reranking                                  |
 | `RAG_RRF_K`                       | No       | `60`                     | RRF dampening constant                                                         |
@@ -2240,8 +2241,8 @@ All variables are validated at startup via Zod. Missing required variables throw
 | `RAG_EVIDENCE_PLACEMENT`                 | No       | `ends`          | `ends` = strongest evidence at both context edges (lost-in-the-middle mitigation); `score` = plain score order                                                            |
 | `RAG_CITATION_VERIFICATION_ENABLED`      | No       | `true`          | Post-answer LLM check that cited sentences are supported (annotate-only)                                                                                                  |
 | `RAG_EVAL_JUDGE_MODEL`                   | No       | `claude-opus-5` | Offline benchmark judge. Must differ from `RAG_LLM_MODEL` — `faithfulness` is a release gate. A `claude-*` value routes via `ANTHROPIC_API_KEY`; anything else via OpenAI |
-| `RAG_CITATION_VERIFIER_MODEL`            | No       | `gpt-4o-mini`   | Production citation verifier (answer path, 3.5s timeout)                                                                                                                  |
-| `RAG_DATASET_GENERATOR_MODEL`            | No       | `gpt-4o-mini`   | Offline generator for the corpus-derived evaluation dataset                                                                                                               |
+| `RAG_CITATION_VERIFIER_MODEL`            | No       | `gpt-6-sol`     | Production citation verifier (answer path, 3.5s timeout; effort `none`, sees each cited chunk in full)                                                                    |
+| `RAG_DATASET_GENERATOR_MODEL`            | No       | `gpt-6-luna`    | Offline generator for the corpus-derived evaluation dataset                                                                                                               |
 | `RAG_WEB_SEARCH_ENABLED`                 | No       | `false`         | Enable Tavily web-augmented retrieval globally                                                                                                                            |
 | `RAG_WEB_SEARCH_API_KEY`                 | No       | —               | Tavily API key — required if `RAG_WEB_SEARCH_ENABLED=true`                                                                                                                |
 | `RAG_WEB_SEARCH_MAX_RESULTS`             | No       | `5`             | Maximum web results per query                                                                                                                                             |
@@ -2274,7 +2275,7 @@ Read by `lib/config/ingestion-env.ts`, which the worker resolves on every batch.
 | `WORKER_EMBEDDING_BATCH_SIZE`    | No       | `32`                             | Chunks per embedding request                                                                                 |
 | `WORKER_OPENAI_TIMEOUT_SECONDS`  | No       | `40`                             | Per-request timeout for worker OpenAI calls                                                                  |
 | `WORKER_OCR_FALLBACK_ENABLED`    | No       | `true`                           | Transcribe pages that have no text layer                                                                     |
-| `WORKER_OCR_MODEL`               | No       | `gpt-4o-mini`                    | Vision model used for OCR. Independent of `RAG_LLM_MODEL`.                                                   |
+| `WORKER_OCR_MODEL`               | No       | `gpt-6-luna`                     | Vision model used for OCR. Independent of `RAG_LLM_MODEL`.                                                   |
 | `WORKER_MAX_PDF_PAGES`           | No       | `1000`                           | Hard cap on a single PDF's page count, checked before extraction or OCR. Bounds worst-case OCR spend on a crafted many-page upload. |
 
 ### Observability
@@ -2961,7 +2962,7 @@ Text is extracted page-by-page using `pdfjs-dist`, with page numbers recorded al
 
 **2b. OCR for pages without a text layer**
 
-When pdfjs parses a page but finds no text — a scanned or image-only page — the worker rasterises that page and has a vision model (`WORKER_OCR_MODEL`, default `gpt-4o-mini`; `WORKER_OCR_FALLBACK_ENABLED`, default on) transcribe it in reading order. Only textless pages go to OCR, so a native PDF with a scanned appendix is handled page by page, and every page keeps its number. OCR runs once, during extraction; resumed batches rebuild the document text from the saved chunk candidates instead of transcribing again. Cost is roughly $0.005 per page at high detail. Chunks record `extraction_method = 'ocr'` so OCR'd provenance is visible. Page count is checked against `WORKER_MAX_PDF_PAGES` (default 1000) before any per-page work runs: `RAG_MAX_UPLOAD_BYTES` bounds compressed size, not page count, and every textless page is a paid OCR call, so an uncapped page count would let a small upload of mostly-blank pages fan out into an unbounded OCR bill.
+When pdfjs parses a page but finds no text — a scanned or image-only page — the worker rasterises that page and has a vision model (`WORKER_OCR_MODEL`, default `gpt-6-luna`; `WORKER_OCR_FALLBACK_ENABLED`, default on) transcribe it in reading order. Only textless pages go to OCR, so a native PDF with a scanned appendix is handled page by page, and every page keeps its number. OCR runs once, during extraction; resumed batches rebuild the document text from the saved chunk candidates instead of transcribing again. Cost is roughly $0.001 per page at high detail (measured on gpt-6-luna: ~2.6K input and ~1K output tokens for a dense A4 page). Chunks record `extraction_method = 'ocr'` so OCR'd provenance is visible. Page count is checked against `WORKER_MAX_PDF_PAGES` (default 1000) before any per-page work runs: `RAG_MAX_UPLOAD_BYTES` bounds compressed size, not page count, and every textless page is a paid OCR call, so an uncapped page count would let a small upload of mostly-blank pages fan out into an unbounded OCR bill.
 
 **Why this matters:** Without OCR, a scanned report is either rejected outright or — worse — byte-scraped into a single page so every citation points at page 1. Page-level OCR keeps the corpus growable without making provenance lie.
 
@@ -3084,11 +3085,11 @@ Query
 
 **Why this matters:** LLMs have a "lost in the middle" problem — evidence in the middle of a long context is ignored, while evidence at the start or end is weighted higher. The ends-first strategy exploits this by placing the strongest evidence at both ends (opening and closing) so the LLM attends to it. Untrusted-data guards (XML-style markers) make the boundary between evidence and instruction explicit, so the LLM doesn't accidentally treat a user prompt hidden in a document as a system instruction. Citations as `[n]` markers (rather than structured JSON) are parsed post-generation, so the LLM can focus on answering rather than formatting — a single `[3]` is easier to produce than `{"citation": 3}`.
 
-**3. LLM Inference (streamed)** — Default model `gpt-4o-mini` at temperature 0, streamed sentence-by-sentence: each completed sentence passes per-sentence redaction (secrets, PII, HTML, unsafe links; prompt-leak signatures halt the stream) before it is emitted as an SSE token event. The `final` event carries the fully-filtered authoritative answer and the client replaces streamed text with it. Model is configurable per-deployment or per-user BYOK.
+**3. LLM Inference (streamed)** — Default model `gpt-6-luna` at reasoning effort `none`, temperature 0 and OpenAI Fast mode (`RAG_LLM_FAST_MODE`), streamed sentence-by-sentence: each completed sentence passes per-sentence redaction (secrets, PII, HTML, unsafe links; prompt-leak signatures halt the stream) before it is emitted as an SSE token event. The `final` event carries the fully-filtered authoritative answer and the client replaces streamed text with it. Model is configurable per-deployment or per-user BYOK.
 
 **Why this matters:** Streaming the answer sentence-by-sentence keeps the user from waiting 20 seconds for a response they could see typing out in real time. But a typed-out stream includes tokens the model might later regret — like accidental secrets. Per-sentence redaction catches these before they reach the user's screen, and the `final` event carries the authoritative version so the client UI shows the safe text (not the streamed version). Temperature 0 ensures reproducible, deterministic answers — critical for a system where consistency matters (users can re-ask and get the same result).
 
-**3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_CITATION_VERIFIER_MODEL`) checks that every `[n]`-cited sentence is entailed by the chunk(s) it cites. The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
+**3b. Citation Verification (annotate-only)** — After filtering, a single batched LLM call (`RAG_CITATION_VERIFIER_MODEL`) checks that every `[n]`-cited sentence is entailed by the full text of the chunk(s) it cites (default `gpt-6-sol` at effort `none`). The result never alters the answer; unsupported counts surface in the response metadata and as a warning badge in the workbench.
 
 **Why this matters:** An LLM can cite the right chunk but phrase the answer in a way that extrapolates beyond what the chunk says. Citation verification doesn't edit the answer (the system stays transparent), but surfaces a warning badge so the user knows to double-check. A legal team reading the answer sees the badge and knows "this claim is inferred, not directly stated".
 
