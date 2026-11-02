@@ -648,7 +648,7 @@ What happens next depends on the result:
 npm run eval:smoke
 ```
 
-This runs only 25 random questions, is not gated (failures don't block deployment), and takes ~5 minutes. Use this during active development; always run the full benchmark before release.
+This runs only the first 25 questions, is not gated (failures don't block deployment), and takes ~5 minutes. Use this during active development; always run the full benchmark before release.
 
 **When documents change substantially: Regenerate the golden set** — If you upload a new batch of documents or re-chunk existing ones, the golden set becomes invalid (its answer locations no longer point to real passages). Regenerate it:
 
@@ -1095,7 +1095,7 @@ Before generating a golden set, your documents must be uploaded and fully proces
 # Check ingestion status
 curl http://localhost:3001/api/admin/runtime-status
 
-# Look for: "ingestion_jobs": {"queued": 0, "processing": 0}
+# Look for: "ingestionHealth": {"queuedCount": 0, "processingCount": 0}
 # This means all documents are ready
 ```
 
