@@ -1014,7 +1014,7 @@ When you open a benchmark report (`evaluation/reports/latest.md`), you'll see ma
 - **Target:** 0 (should be 0)
 - **Example:** 0 means no answers were truncated
 - **What it means:** All answers complete properly
-- **If it's bad:** LLM_MAX_OUTPUT_TOKENS is too low. Increase it
+- **If it's bad:** RAG_LLM_MAX_OUTPUT_TOKENS is too low. Increase it
 
 **Grounding Score** — "Bag-of-words overlap between answer and retrieved evidence"
 
