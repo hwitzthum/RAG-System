@@ -192,8 +192,10 @@ export const DEFAULT_BENCHMARK_THRESHOLDS: BenchmarkThresholds = {
   recallAt5: 0.85,
   ndcgAt10: 0.8,
   citationEvidenceHitRate: 0.8,
-  verifiedCitationRate: 0.9,
-  // Set to match verifiedCitationRate rather than to the level the current
+  // Raised 0.90 -> 0.95 on 2026-11-13 after the gpt-6-luna full run measured
+  // 0.974 (118 queries, judge noise floor ~0.01), keeping ~0.02 headroom.
+  verifiedCitationRate: 0.95,
+  // Set to match the original 0.90 verifiedCitationRate rather than to the level the current
   // system happens to reach. The bag-of-words grounding metric it replaces
   // scored 0.000/0.000/0.000/0.004 across four live runs -- it could not fail.
   // Expect the first runs under a real NLI-style judge to fail while the true
