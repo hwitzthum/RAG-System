@@ -1,10 +1,10 @@
 # Phase 11 Benchmark Report
 
-Generated: 2026-11-13T07:06:03.565Z
+Generated: 2026-11-13T10:10:44.707Z
 Mode: live
 Dataset: /Users/hwitzthum/rag-system/evaluation/evaluation_queries.generated.json
 Corpus fingerprint: `34ec45e9d5b7a0fb006deccfd51c644244111c4721e082f0edd810abb2b0dec3`
-Run artifact: /Users/hwitzthum/rag-system/evaluation/runs/benchmark-2026-11-13T07-06-03-565Z.json
+Run artifact: /Users/hwitzthum/rag-system/evaluation/runs/benchmark-2026-11-13T10-10-44-707Z.json
 Evaluated queries: 118
 Generator model: gpt-6-luna
 Judge model: claude-opus-5
@@ -17,7 +17,7 @@ Judge model: claude-opus-5
 | expansion | `false` |
 | judge | `true` |
 | ignoreExpectedSection | `false` |
-| cacheNamespace | `benchmark:2026-11-13T06:37:13.428Z` |
+| cacheNamespace | `benchmark:2026-11-13T09:41:22.053Z` |
 | retrievalConfigFingerprint | `b2af720d45f0` |
 | generatorModel | `gpt-6-luna` |
 | judgeModel | `claude-opus-5` |
@@ -61,19 +61,19 @@ Judge model: claude-opus-5
 | System error count | 0 |
 | Answerable / unanswerable | 103 / 15 |
 | False answer rate (unanswerable slice) | 0 |
-| False abstention rate (answerable slice) | 0.0388 |
+| False abstention rate (answerable slice) | 0.0097 |
 | Recall@5 | 0.9612 |
 | nDCG@10 | 0.9328 |
 | MRR | 0.9177 |
-| Citation evidence hit rate | 0.9612 |
-| Verified citation rate | 0.9740 (99 verified) |
-| Citation accuracy (strict, report-only) | 0.3812 |
+| Citation evidence hit rate | 0.9806 |
+| Verified citation rate | 0.9748 (102 verified) |
+| Citation accuracy (strict, report-only) | 0.3856 |
 | Answer truncation rate | 0 |
-| Cache hit rate | 0.9746 |
-| Uncached p50 latency (ms) | 4143 |
-| Uncached p95 latency (ms) | 5701 |
-| Cached p50 latency (ms) | 2702 |
-| Cached p95 latency (ms) | 4173 |
+| Cache hit rate | 0.9915 |
+| Uncached p50 latency (ms) | 4228 |
+| Uncached p95 latency (ms) | 5724 |
+| Cached p50 latency (ms) | 2934 |
+| Cached p95 latency (ms) | 4136 |
 
 ## Token-Overlap Grounding (report-only, NOT gated)
 
@@ -84,9 +84,9 @@ Abstentions are excluded rather than scored as perfectly grounded.
 
 | Metric | Value |
 | --- | ---: |
-| Scored queries (abstentions excluded) | 99 |
-| Grounding score | 0.9978 |
-| Hallucination rate | 0.0022 |
+| Scored queries (abstentions excluded) | 102 |
+| Grounding score | 0.9927 |
+| Hallucination rate | 0.0073 |
 
 ## LLM-Judge Metrics (faithfulness is gated; the rest are report-only)
 
@@ -100,12 +100,12 @@ downward for every answer.
 
 | Metric | Value |
 | --- | ---: |
-| Judged queries | 103 |
-| Faithfulness (GATED) | 0.9951 |
-| Answer relevance | 0.9199 |
-| Context precision | 0.5740 |
-| Context recall | 0.9573 |
-| Abstention rate | 0.0388 |
+| Judged queries | 100 |
+| Faithfulness (GATED) | 0.9938 |
+| Answer relevance | 0.9489 |
+| Context precision | 0.6088 |
+| Context recall | 0.9960 |
+| Abstention rate | 0.0100 |
 
 ## Threshold Gates
 
@@ -113,16 +113,16 @@ downward for every answer.
 | --- | --- | ---: | --- |
 | Recall@5 | >= 0.85 | 0.9612 | PASS |
 | nDCG@10 | >= 0.8 | 0.9328 | PASS |
-| Citation evidence hit rate | >= 0.8 | 0.9612 | PASS |
-| Verified citation rate | >= 0.9 | 0.9740 | PASS |
-| Faithfulness (LLM judge) | >= 0.9 | 0.9951 | PASS |
+| Citation evidence hit rate | >= 0.8 | 0.9806 | PASS |
+| Verified citation rate | >= 0.9 | 0.9748 | PASS |
+| Faithfulness (LLM judge) | >= 0.9 | 0.9938 | PASS |
 | False answer rate (unanswerable slice) | <= 0.1 | 0 | PASS |
-| False abstention rate (answerable slice) | <= 0.05 | 0.0388 | PASS |
-| Cache hit rate | >= 0.3 | 0.9746 | PASS |
-| Uncached p50 latency (ms) | < 8000 | 4143 | PASS |
-| Uncached p95 latency (ms) | < 15000 | 5701 | PASS |
-| Cached p50 latency (ms) | < 7000 | 2702 | PASS |
-| Cached p95 latency (ms) | < 12000 | 4173 | PASS |
+| False abstention rate (answerable slice) | <= 0.05 | 0.0097 | PASS |
+| Cache hit rate | >= 0.3 | 0.9915 | PASS |
+| Uncached p50 latency (ms) | < 8000 | 4228 | PASS |
+| Uncached p95 latency (ms) | < 15000 | 5724 | PASS |
+| Cached p50 latency (ms) | < 7000 | 2934 | PASS |
+| Cached p95 latency (ms) | < 12000 | 4136 | PASS |
 | Recall@5 [EN] | >= 0.85 | 0.9655 | PASS |
 | nDCG@10 [EN] | >= 0.8 | 0.9097 | PASS |
 | Recall@5 [DE] | >= 0.85 | 0.9556 | PASS |
@@ -132,41 +132,38 @@ downward for every answer.
 
 | Language | Queries | Recall@5 | nDCG@10 | Citation acc. | Faithfulness | Cache hit | Uncached p95 (ms) | Cached p95 (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| EN | 66 | 0.9655 | 0.9097 | 0.2781 | 1 | 0.9848 | 5918 | 3909 |
-| DE | 52 | 0.9556 | 0.9626 | 0.5141 | 0.9889 | 0.9615 | 5045 | 4394 |
+| EN | 66 | 0.9655 | 0.9097 | 0.2963 | 1 | 0.9848 | 5780 | 4012 |
+| DE | 52 | 0.9556 | 0.9626 | 0.5006 | 0.9858 | 1 | 5535 | 4362 |
 | FR | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 | IT | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 | ES | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 
 ## Open Risks
 
-- 21 queries include at least one failure type requiring triage.
+- 18 queries include at least one failure type requiring triage.
 
 ## Failure Sample
 
 | Query ID | Language | Failure types |
 | --- | --- | --- |
-| de-051209e7-30 | DE | cache |
-| de-051209e7-32 | DE | citation |
+| de-051209e7-21 | DE | citation, grounding |
 | de-051209e7-4 | DE | grounding |
-| de-051209e7-26 | DE | citation |
 | en-2e51c566-23 | EN | abstention |
-| en-2e51c566-21 | EN | citation, cache |
-| de-373a9133-0 | DE | citation |
-| de-8f39c1e0-0 | DE | retrieval, citation, citation |
-| de-8f39c1e0-14 | DE | citation |
-| de-8f39c1e0-22 | DE | abstention |
-| de-8f39c1e0-29 | DE | abstention, retrieval, citation |
-| de-939ca640-34 | DE | citation |
-| de-939ca640-1 | DE | citation |
-| de-939ca640-37 | DE | citation |
-| de-939ca640-5 | DE | cache |
-| en-9d723400-333 | EN | abstention |
-| en-9d723400-182 | EN | retrieval, citation |
+| en-2e51c566-12 | EN | citation |
+| en-2e51c566-36 | EN | citation |
+| en-2e51c566-21 | EN | citation |
+| de-8f39c1e0-0 | DE | retrieval, citation |
+| de-8f39c1e0-29 | DE | retrieval |
+| de-939ca640-3 | DE | citation |
+| en-9d723400-101 | EN | citation |
+| en-9d723400-102 | EN | citation |
+| en-9d723400-181 | EN | citation |
+| en-9d723400-182 | EN | retrieval |
+| en-9d723400-108 | EN | citation |
+| en-9d723400-265 | EN | cache |
 | en-9d723400-190 | EN | citation |
 | en-9d723400-39 | EN | retrieval, citation |
-| en-9d723400-201 | EN | citation |
-| en-9d723400-319 | EN | citation |
+| en-9d723400-122 | EN | citation |
 
 ## Release Recommendation
 
