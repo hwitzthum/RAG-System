@@ -1,12 +1,12 @@
 # Phase 11 Benchmark Report
 
-Generated: 2026-08-29T16:51:48.914Z
+Generated: 2026-11-13T10:10:44.707Z
 Mode: live
 Dataset: /Users/hwitzthum/rag-system/evaluation/evaluation_queries.generated.json
 Corpus fingerprint: `34ec45e9d5b7a0fb006deccfd51c644244111c4721e082f0edd810abb2b0dec3`
-Run artifact: /Users/hwitzthum/rag-system/evaluation/runs/benchmark-2026-08-29T16-51-48-914Z.json
+Run artifact: /Users/hwitzthum/rag-system/evaluation/runs/benchmark-2026-11-13T10-10-44-707Z.json
 Evaluated queries: 118
-Generator model: gpt-4o-mini
+Generator model: gpt-6-luna
 Judge model: claude-opus-5
 
 ## Run Configuration
@@ -17,11 +17,11 @@ Judge model: claude-opus-5
 | expansion | `false` |
 | judge | `true` |
 | ignoreExpectedSection | `false` |
-| cacheNamespace | `benchmark:2026-08-29T16:19:07.187Z` |
+| cacheNamespace | `benchmark:2026-11-13T09:41:22.053Z` |
 | retrievalConfigFingerprint | `b2af720d45f0` |
-| generatorModel | `gpt-4o-mini` |
+| generatorModel | `gpt-6-luna` |
 | judgeModel | `claude-opus-5` |
-| citationVerifierModel | `gpt-4o-mini` |
+| citationVerifierModel | `gpt-6-sol` |
 | queryEmbeddingModel | `text-embedding-3-large` |
 | queryEmbeddingDimensions | `1024` |
 | retrievalVersion | `1` |
@@ -61,19 +61,19 @@ Judge model: claude-opus-5
 | System error count | 0 |
 | Answerable / unanswerable | 103 / 15 |
 | False answer rate (unanswerable slice) | 0 |
-| False abstention rate (answerable slice) | 0.0194 |
+| False abstention rate (answerable slice) | 0.0097 |
 | Recall@5 | 0.9612 |
 | nDCG@10 | 0.9328 |
 | MRR | 0.9177 |
-| Citation evidence hit rate | 0.9515 |
-| Verified citation rate | 0.9572 (101 verified) |
-| Citation accuracy (strict, report-only) | 0.3262 |
+| Citation evidence hit rate | 0.9806 |
+| Verified citation rate | 0.9748 (102 verified) |
+| Citation accuracy (strict, report-only) | 0.3856 |
 | Answer truncation rate | 0 |
-| Cache hit rate | 0.9576 |
-| Uncached p50 latency (ms) | 4890 |
-| Uncached p95 latency (ms) | 7745 |
-| Cached p50 latency (ms) | 3271 |
-| Cached p95 latency (ms) | 4597 |
+| Cache hit rate | 0.9915 |
+| Uncached p50 latency (ms) | 4228 |
+| Uncached p95 latency (ms) | 5724 |
+| Cached p50 latency (ms) | 2934 |
+| Cached p95 latency (ms) | 4136 |
 
 ## Token-Overlap Grounding (report-only, NOT gated)
 
@@ -84,9 +84,9 @@ Abstentions are excluded rather than scored as perfectly grounded.
 
 | Metric | Value |
 | --- | ---: |
-| Scored queries (abstentions excluded) | 101 |
-| Grounding score | 0.9959 |
-| Hallucination rate | 0.0041 |
+| Scored queries (abstentions excluded) | 102 |
+| Grounding score | 0.9927 |
+| Hallucination rate | 0.0073 |
 
 ## LLM-Judge Metrics (faithfulness is gated; the rest are report-only)
 
@@ -100,12 +100,12 @@ downward for every answer.
 
 | Metric | Value |
 | --- | ---: |
-| Judged queries | 103 |
-| Faithfulness (GATED) | 0.9492 |
-| Answer relevance | 0.8992 |
-| Context precision | 0.6007 |
-| Context recall | 0.9534 |
-| Abstention rate | 0.0194 |
+| Judged queries | 100 |
+| Faithfulness (GATED) | 0.9938 |
+| Answer relevance | 0.9489 |
+| Context precision | 0.6088 |
+| Context recall | 0.9960 |
+| Abstention rate | 0.0100 |
 
 ## Threshold Gates
 
@@ -113,16 +113,16 @@ downward for every answer.
 | --- | --- | ---: | --- |
 | Recall@5 | >= 0.85 | 0.9612 | PASS |
 | nDCG@10 | >= 0.8 | 0.9328 | PASS |
-| Citation evidence hit rate | >= 0.8 | 0.9515 | PASS |
-| Verified citation rate | >= 0.9 | 0.9572 | PASS |
-| Faithfulness (LLM judge) | >= 0.9 | 0.9492 | PASS |
+| Citation evidence hit rate | >= 0.8 | 0.9806 | PASS |
+| Verified citation rate | >= 0.9 | 0.9748 | PASS |
+| Faithfulness (LLM judge) | >= 0.9 | 0.9938 | PASS |
 | False answer rate (unanswerable slice) | <= 0.1 | 0 | PASS |
-| False abstention rate (answerable slice) | <= 0.05 | 0.0194 | PASS |
-| Cache hit rate | >= 0.3 | 0.9576 | PASS |
-| Uncached p50 latency (ms) | < 8000 | 4890 | PASS |
-| Uncached p95 latency (ms) | < 15000 | 7745 | PASS |
-| Cached p50 latency (ms) | < 7000 | 3271 | PASS |
-| Cached p95 latency (ms) | < 12000 | 4597 | PASS |
+| False abstention rate (answerable slice) | <= 0.05 | 0.0097 | PASS |
+| Cache hit rate | >= 0.3 | 0.9915 | PASS |
+| Uncached p50 latency (ms) | < 8000 | 4228 | PASS |
+| Uncached p95 latency (ms) | < 15000 | 5724 | PASS |
+| Cached p50 latency (ms) | < 7000 | 2934 | PASS |
+| Cached p95 latency (ms) | < 12000 | 4136 | PASS |
 | Recall@5 [EN] | >= 0.85 | 0.9655 | PASS |
 | nDCG@10 [EN] | >= 0.8 | 0.9097 | PASS |
 | Recall@5 [DE] | >= 0.85 | 0.9556 | PASS |
@@ -132,45 +132,38 @@ downward for every answer.
 
 | Language | Queries | Recall@5 | nDCG@10 | Citation acc. | Faithfulness | Cache hit | Uncached p95 (ms) | Cached p95 (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| EN | 66 | 0.9655 | 0.9097 | 0.2286 | 0.9600 | 0.9545 | 7892 | 5075 |
-| DE | 52 | 0.9556 | 0.9626 | 0.4520 | 0.9352 | 0.9615 | 5916 | 3847 |
+| EN | 66 | 0.9655 | 0.9097 | 0.2963 | 1 | 0.9848 | 5780 | 4012 |
+| DE | 52 | 0.9556 | 0.9626 | 0.5006 | 0.9858 | 1 | 5535 | 4362 |
 | FR | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 | IT | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 | ES | 0 | 0 | 0 | 0 | n/a | 0 | 0 | 0 |
 
 ## Open Risks
 
-- 41 queries include at least one failure type requiring triage.
+- 18 queries include at least one failure type requiring triage.
 
 ## Failure Sample
 
 | Query ID | Language | Failure types |
 | --- | --- | --- |
-| en-32fb0a96-10 | EN | citation |
-| de-051209e7-20 | DE | grounding |
-| de-051209e7-40 | DE | grounding |
-| de-051209e7-32 | DE | grounding |
-| de-051209e7-41 | DE | grounding |
-| en-2e51c566-23 | EN | citation, citation |
-| en-2e51c566-47 | EN | citation, grounding |
-| en-2e51c566-12 | EN | grounding |
-| en-2e51c566-24 | EN | citation |
-| en-2e51c566-2 | EN | citation, grounding |
-| en-2e51c566-36 | EN | citation, grounding |
-| en-2e51c566-27 | EN | grounding |
-| en-2e51c566-39 | EN | citation |
+| de-051209e7-21 | DE | citation, grounding |
+| de-051209e7-4 | DE | grounding |
+| en-2e51c566-23 | EN | abstention |
+| en-2e51c566-12 | EN | citation |
+| en-2e51c566-36 | EN | citation |
+| en-2e51c566-21 | EN | citation |
 | de-8f39c1e0-0 | DE | retrieval, citation |
-| de-8f39c1e0-28 | DE | citation |
-| de-8f39c1e0-15 | DE | grounding |
-| de-8f39c1e0-22 | DE | abstention |
-| de-8f39c1e0-29 | DE | retrieval, citation |
-| de-8f39c1e0-4 | DE | citation |
-| de-7b8b0ee3-5 | DE | grounding |
-| de-7b8b0ee3-9 | DE | grounding |
-| de-939ca640-46 | DE | citation |
-| de-939ca640-1 | DE | citation |
-| de-939ca640-12 | DE | grounding |
-| de-939ca640-3 | DE | cache |
+| de-8f39c1e0-29 | DE | retrieval |
+| de-939ca640-3 | DE | citation |
+| en-9d723400-101 | EN | citation |
+| en-9d723400-102 | EN | citation |
+| en-9d723400-181 | EN | citation |
+| en-9d723400-182 | EN | retrieval |
+| en-9d723400-108 | EN | citation |
+| en-9d723400-265 | EN | cache |
+| en-9d723400-190 | EN | citation |
+| en-9d723400-39 | EN | retrieval, citation |
+| en-9d723400-122 | EN | citation |
 
 ## Release Recommendation
 
