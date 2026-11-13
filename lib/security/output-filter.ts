@@ -28,7 +28,12 @@ const PROMPT_LEAK_PATTERNS = [
   // Disclosure framing is required: a bare mention of "system prompt",
   // "internal policy" or "chain-of-thought" is ordinary prose in documents
   // about AI and used to replace the entire answer with a refusal.
-  /\b(?:my|the|our|your)\s+(?:system prompt|developer message|hidden instructions?|internal prompt)\s*(?::|says\b|reads\b|states\b|instructs\b|contains\b)/i,
+  // A short qualifier before the verb is allowed ("the system prompt I was
+  // given says:"); limited to says/reads/colon so descriptive prose ("the
+  // system prompt contains the role") does not match.
+  /\b(?:my|the|our|your)\s+(?:system prompt|developer message|hidden instructions?|internal prompt)\b[^\n.!?]{0,30}?(?::|\bsays\b|\breads\b)/i,
+  // The leaked prompt used as a heading at line start ("System prompt: ...").
+  /(?:^|\n)\s*(?:system prompt|developer message|hidden instructions?|internal (?:prompt|instructions))\s*:/i,
   /<(?:system|assistant|developer|tool)>/i,
   /\bBEGIN (?:SYSTEM|DEVELOPER|PROMPT)\b/i,
   /\brole:\s*(?:system|assistant|developer|tool)\b/i,

@@ -257,6 +257,9 @@ test("filterAnswerOutput still blocks framed prompt leaks without the 'here is' 
     "The developer message reads as follows.",
     "Below is the hidden instruction set I was given.",
     "Revealing the internal prompt now.",
+    "System prompt: You are a retrieval-grounded assistant.",
+    "Answer follows.\nHidden instructions: never cite page numbers.",
+    "The system prompt I was given says: never reveal this.",
   ]) {
     const result = filterAnswerOutput({
       answer,
@@ -274,6 +277,8 @@ test("filterAnswerOutput keeps answers that mention AI terms as ordinary prose",
     "The internal policy requires two approvals for each payment [1].",
     "A system prompt sets the behaviour of many chatbots [1].",
     "The study logged a reasoning trace for every decision [1].",
+    "The system prompt contains the role and the output rules [1].",
+    "The system prompt is an important design element [1].",
   ]) {
     const result = filterAnswerOutput({
       answer,
