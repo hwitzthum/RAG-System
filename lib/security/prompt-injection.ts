@@ -48,9 +48,15 @@ const PROMPT_INJECTION_RULES: PromptInjectionRule[] = [
       /\bsystem prompt\b|\bdeveloper message\b|\bhidden instructions\b|\brepeat (?:everything|all|the text) (?:above|before) this (?:line|point)\b/i,
     score: 7,
   },
+  // A bare mention of "token" / "credential" / "secret" is ordinary prose (NLP
+  // and philosophy texts, certification documents), and as a high-confidence
+  // single-match rule it redacted whole legitimate chunks. The rule now needs
+  // an extraction request: a disclosure verb followed by the secret noun, or a
+  // possessive/qualified reference to the assistant's own secret.
   {
     label: "secret_exfiltration",
-    pattern: /\bapi key\b|\bsecret\b|\btoken\b|\bcredential\b|\bpassword\b/i,
+    pattern:
+      /\b(?:reveal|show|print|display|send|tell|give|share|leak|expose|output|repeat|disclose|dump|list|provide|return|email|post)\b[^\n.!?]{0,40}\b(?:api[ -]?keys?|secrets?|tokens?|credentials?|passwords?)\b|\b(?:your|internal|hidden)\s+(?:api[ -]?keys?|secrets?|tokens?|credentials?|passwords?)\b/i,
     score: 7,
   },
   {
