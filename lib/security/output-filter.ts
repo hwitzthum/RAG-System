@@ -25,7 +25,10 @@ export type OutputFilterResult = {
 
 const PROMPT_LEAK_PATTERNS = [
   /\b(?:here(?:'s| is)|below is|revealing|showing)\b.{0,40}\b(?:system prompt|developer message|hidden instructions?|internal prompt)\b/i,
-  /\b(?:system prompt|developer message|hidden instructions?|internal policy|chain[- ]of[- ]thought|reasoning trace)\b/i,
+  // Disclosure framing is required: a bare mention of "system prompt",
+  // "internal policy" or "chain-of-thought" is ordinary prose in documents
+  // about AI and used to replace the entire answer with a refusal.
+  /\b(?:my|the|our|your)\s+(?:system prompt|developer message|hidden instructions?|internal prompt)\s*(?::|says\b|reads\b|states\b|instructs\b|contains\b)/i,
   /<(?:system|assistant|developer|tool)>/i,
   /\bBEGIN (?:SYSTEM|DEVELOPER|PROMPT)\b/i,
   /\brole:\s*(?:system|assistant|developer|tool)\b/i,

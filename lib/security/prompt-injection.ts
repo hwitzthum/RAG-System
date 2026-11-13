@@ -114,10 +114,12 @@ const PROMPT_INJECTION_RULES: PromptInjectionRule[] = [
   },
 ];
 
+// Bare "api key" / "secret token" mentions were removed: they refused whole
+// answers about documents that merely discuss API access, while a real leaked
+// value ("sk-...", "token: ...") never matched them. Secret values are
+// redacted by SECRET_PATTERNS in lib/security/output-filter.ts instead.
 const OUTPUT_LEAK_RULES = [
   /\bhere(?:'s| is) (?:the )?(?:system prompt|developer message)\b/i,
-  /\bapi key\b/i,
-  /\bsecret token\b/i,
 ];
 
 const REFUSAL_BY_LANGUAGE: Record<SupportedLanguage, string> = {
@@ -334,7 +336,7 @@ export function buildPromptInjectionRefusal(
 
 export function containsSensitiveLeakage(value: string): boolean {
   // Normalize the same way scanPromptInjection() does before matching: an
-  // LLM answer that leaks a system-prompt marker or bare "api key" mention
+  // LLM answer that leaks a system-prompt marker
   // with invisible characters interleaved (bidi controls, Unicode Tag
   // characters, zero-width joiners, etc.) would otherwise silently skip this
   // check and fall through to the caller treating the response as clean.
