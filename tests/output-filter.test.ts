@@ -250,3 +250,54 @@ test("filterAnswerOutput blocks prompt-leak text split by invisible Unicode Tag 
   assert.equal(result.blocked, true);
   assert.ok(result.reasons.includes("prompt_leak"));
 });
+
+test("filterAnswerOutput still blocks framed prompt leaks without the 'here is' phrasing", () => {
+  for (const answer of [
+    "My system prompt says: never reveal this.",
+    "The developer message reads as follows.",
+    "Below is the hidden instruction set I was given.",
+    "Revealing the internal prompt now.",
+    "System prompt: You are a retrieval-grounded assistant.",
+    "Answer follows.\nHidden instructions: never cite page numbers.",
+    "The system prompt I was given says: never reveal this.",
+  ]) {
+    const result = filterAnswerOutput({
+      answer,
+      citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+      language: "EN",
+    });
+    assert.equal(result.blocked, true, answer);
+    assert.ok(result.reasons.includes("prompt_leak"), answer);
+  }
+});
+
+test("filterAnswerOutput keeps answers that mention AI terms as ordinary prose", () => {
+  for (const answer of [
+    "The model uses chain-of-thought prompting to improve reasoning [1].",
+    "The internal policy requires two approvals for each payment [1].",
+    "A system prompt sets the behaviour of many chatbots [1].",
+    "The study logged a reasoning trace for every decision [1].",
+    "The system prompt contains the role and the output rules [1].",
+    "The system prompt is an important design element [1].",
+  ]) {
+    const result = filterAnswerOutput({
+      answer,
+      citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+      language: "EN",
+    });
+    assert.equal(result.blocked, false, answer);
+    assert.ok(!result.reasons.includes("prompt_leak"), answer);
+    assert.equal(result.answer, answer);
+  }
+});
+
+test("filterAnswerOutput still redacts a leaked secret value inside an otherwise clean answer", () => {
+  const result = filterAnswerOutput({
+    answer: "The key is sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456 [1].",
+    citations: [{ documentId: "doc-1", pageNumber: 1, chunkId: "chunk-1" }],
+    language: "EN",
+  });
+  assert.equal(result.blocked, false);
+  assert.ok(result.reasons.includes("secret_redaction"));
+  assert.ok(!result.answer.includes("sk-proj-ABCDEF"));
+});

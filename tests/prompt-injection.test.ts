@@ -151,9 +151,18 @@ test("scanPromptInjection catches phrases split by invisible Unicode Tag charact
   assert.equal(scan.suspicious, true);
 });
 
-test("containsSensitiveLeakage catches an 'api key' mention hidden behind bidi isolate characters", () => {
-  const hidden = "here\u2066is\u2066your\u2066api key";
+test("containsSensitiveLeakage catches a system-prompt leak hidden behind bidi isolate characters", () => {
+  const hidden = "here\u2066is\u2066the\u2066system prompt";
   assert.equal(containsSensitiveLeakage(hidden), true);
+});
+
+test("containsSensitiveLeakage does not refuse answers that merely discuss API keys or tokens", () => {
+  for (const answer of [
+    "In Langfuse, copy the API key from Settings > API Keys [1].",
+    "Rotate the secret token every 90 days, as the policy states [2].",
+  ]) {
+    assert.equal(containsSensitiveLeakage(answer), false, answer);
+  }
 });
 
 test("secret_exfiltration still blocks real extraction requests", () => {
