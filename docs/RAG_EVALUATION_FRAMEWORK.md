@@ -123,7 +123,7 @@ Aggregate gates (every run):
 - Recall@5: `>= 0.85`
 - nDCG@10: `>= 0.80`
 - Citation evidence hit rate: `>= 0.80`
-- Verified citation rate: `>= 0.90` (fails when no query was verified)
+- Verified citation rate: `>= 0.95` (fails when no query was verified)
 - Faithfulness (LLM judge): `>= 0.90` (fails when no query was judged, including runs with `--no-judge`)
 - False abstention rate (answerable slice): `<= 0.05`
 - False answer rate (unanswerable slice): `<= 0.10` (checked only when the dataset contains unanswerable queries)
