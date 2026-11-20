@@ -875,7 +875,7 @@ When you open a benchmark report (`evaluation/reports/latest.md`), you'll see ma
 **Verified Citation Rate** — "Do the cited facts actually appear in the cited passages?"
 
 - **Range:** 0 to 1
-- **Target:** ≥ 0.9
+- **Target:** ≥ 0.95
 - **Example:** A second LLM checks each citation: "Does [fact] actually appear in [passage]?" If yes for 95%, rate = 0.95
 - **What it means:** Users can trust citations — when they click a citation link, they'll find the fact there
 - **If it's bad:** The model is citing passages but paraphrasing them beyond what the text says. Adjust the evidence gate to be stricter
@@ -1337,7 +1337,7 @@ ls -t evaluation/runs/benchmark-*.json | head -2
 # nDCG: should stay >= 0.8
 # Faithfulness: should stay >= 0.9
 # Latency p50: should stay < 8s
-# Verified citation rate: should stay >= 0.9
+# Verified citation rate: should stay >= 0.95
 
 # If metrics got worse by >5%:
 #   ⚠ Even if gates pass, review what changed
@@ -3230,7 +3230,7 @@ Even when an injection attempt evades the scanner and manipulates the LLM, the r
 - **API key patterns** — common prefixes (`sk-`, `Bearer `, AWS key shapes)
 - **System prompt leakage** — known phrases from the system prompt template
 
-Detected content is replaced with `[REDACTED]`, and the response includes a `redactions_count` integer field. A non-zero count is a signal worth monitoring — it indicates an injection attempt reached the LLM and partially succeeded.
+Detected content is replaced with `[REDACTED]`, and the response includes a `outputFilter.redactionCount` integer field. A non-zero count is a signal worth monitoring — it indicates an injection attempt reached the LLM and partially succeeded.
 
 **PII redaction is deliberately not maximal.** In a retrieval system, "looks like a phone number" and "looks like the figure the user asked for" are the same shape: a generic grouped-numeral pattern turns `Total: 12 500 000 units shipped.` into `Total: [REDACTED] units shipped.`, and it does so _after_ citations are attached, leaving a `[n]` marker pointing at a number the reader can no longer see. `RAG_PII_REDACTION` selects the trade-off:
 
