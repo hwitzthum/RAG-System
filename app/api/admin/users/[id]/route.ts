@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuthWithCsrf } from "@/lib/auth/request-auth";
+import { env } from "@/lib/config/env";
+import {
+  createPurgeUserDocumentsClient,
+  purgeUserDocuments,
+} from "@/lib/documents/purge-user-documents";
 import { logAuditEvent } from "@/lib/observability/audit";
+import { pruneRetrievalCache } from "@/lib/retrieval/cache";
 import { getClientIp } from "@/lib/security/request";
 import { consumeSharedRateLimit } from "@/lib/security/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -256,6 +262,47 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Purge the user's documents BEFORE deleting the auth user. documents.user_id
+    // is ON DELETE SET NULL and a NULL owner means "shared with every reader",
+    // so deleting the user first would publish their private documents.
+    // purgeUserDocuments throws on failure, aborting the user deletion.
+    const purged = await purgeUserDocuments({
+      client: createPurgeUserDocumentsClient(supabase),
+      userId: targetUserId,
+    });
+
+    if (purged.storagePaths.length > 0) {
+      // Best effort: storage reads require a matching documents row (RLS), so
+      // leftover objects are unreachable once the rows are gone.
+      const { error: storageError } = await supabase.storage
+        .from(env.RAG_STORAGE_BUCKET)
+        .remove(purged.storagePaths);
+      if (storageError) {
+        logAuditEvent({
+          action: "admin.user.delete",
+          actorId: authResult.user.id,
+          actorRole: "admin",
+          outcome: "failure",
+          resource: "admin",
+          ipAddress,
+          metadata: {
+            reason: "storage_delete_failed",
+            targetUserId,
+            message: storageError.message,
+          },
+        });
+      }
+    }
+
+    if (purged.deletedDocumentIds.length > 0) {
+      void pruneRetrievalCache(env.RAG_RETRIEVAL_VERSION).catch((cacheError) => {
+        console.warn(
+          "retrieval_cache_invalidation_on_user_delete_failed",
+          cacheError instanceof Error ? cacheError.message : String(cacheError),
+        );
+      });
+    }
+
     const { error: deleteError } =
       await supabase.auth.admin.deleteUser(targetUserId);
     if (deleteError) {
@@ -273,6 +320,7 @@ export async function DELETE(
         targetUserId,
         targetEmail: targetUser.user.email,
         targetRole: targetUser.user.app_metadata?.role ?? "pending",
+        deletedDocumentCount: purged.deletedDocumentIds.length,
       },
     });
 
